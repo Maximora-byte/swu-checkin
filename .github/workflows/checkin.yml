@@ -131,6 +131,12 @@ jobs:
           echo "✅ 签到正常完成"
         continue-on-error: true
 
+      - name: 格式化执行时间
+        id: format_time
+        if: always()
+        run: |
+          echo "beijing_time=$(TZ='Asia/Shanghai' date '+%Y-%m-%d %H:%M:%S')" >> "$GITHUB_OUTPUT"
+
       - name: 检查邮件通知配置
         id: mail_config
         if: always()
@@ -188,7 +194,7 @@ jobs:
             账号：${{ matrix.account.name }}
             状态码：${{ steps.checkin.outputs.status_code }}
             状态信息：${{ steps.checkin.outputs.status_msg }}
-            执行时间：${{ github.run_started_at }}
+            执行时间：${{ steps.format_time.outputs.beijing_time }} (北京时间)
 
             本次脚本已完成自动重试。完整结果：
             ${{ steps.checkin.outputs.full_result }}
@@ -244,23 +250,7 @@ jobs:
                           </table>
 
                           <div style="padding:16px;border-radius:8px;background:#eff6ff;border:1px solid #dbeafe;color:#1e3a8a;font-size:14px;line-height:1.75;">
-                            脚本已完成自动重试。请根据状态码查看下方处理建议。
-                          </div>
-
-                          <h2 style="margin:26px 0 12px;color:#0f172a;font-size:16px;line-height:1.5;">处理建议</h2>
-                          <div style="color:#475569;font-size:14px;line-height:1.85;">
-                            <div><strong style="color:#0f172a;">[0]</strong> 今日暂无签到任务，稍后再次运行即可。</div>
-                            <div><strong style="color:#0f172a;">[3]</strong> 检查 GitHub Secrets 中的校园网账号和密码。</div>
-                            <div><strong style="color:#0f172a;">[4]</strong> 可能是网络异常或学校系统维护，可等待下一次运行。</div>
-                            <div><strong style="color:#0f172a;">[5]</strong> 当前处于请假时间，系统已自动跳过。</div>
-                            <div><strong style="color:#0f172a;">[CONFIG_ERROR]</strong> 检查账号或邮件通知配置。</div>
-                          </div>
-
-                          <h2 style="margin:26px 0 12px;color:#0f172a;font-size:16px;line-height:1.5;">本次运行</h2>
-                          <div style="padding:14px 15px;border:1px solid #e2e8f0;border-radius:8px;background:#f8fafc;color:#475569;font-size:13px;line-height:1.8;">
-                            <div>执行时间：${{ github.run_started_at }}</div>
-                            <div>运行编号：${{ github.run_number }}</div>
-                            <div>仓库：${{ github.repository }}</div>
+                              脚本已完成自动重试。详细日志请点击下方按钮查看。
                           </div>
 
                           <div style="margin-top:24px;text-align:center;">
