@@ -76,7 +76,7 @@ def build_idm_login_url(state: str) -> str:
         f"?service=https://uaaap.swu.edu.cn/cas/oauth2.0/callbackAuthorize"
         f"&originalRequestUrl=https://uaaap.swu.edu.cn/cas/oauth2.0/authorize"
         f"?response_type=code&client_id=cas6"
-        f"&redirect_uri=https%3A%2F%2Fof.swu.edu.cn%3A443%2Fcas%2Foauth%2Fcallback%2FSWU_CAS2_FEDERAL"
+        f"&redirect_uri=https://of.swu.edu.cn:443/cas/oauth/callback/SWU_CAS2_FEDERAL"
         f"&state={state}&scope=simple&federalEnable=true&decision=Allow"
     )
 

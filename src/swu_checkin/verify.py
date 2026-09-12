@@ -20,7 +20,7 @@ def verify(username: str, password: str, timeout: int = 10) -> bool:
     state = re.search(r'state%3D([a-f0-9]{32})', response.url)
     state = state.group(1) if state else None
     
-    url = f"https://idm.swu.edu.cn/am/UI/Login?realm=/&service=initService&goto=http://idm.swu.edu.cn/am/oauth2/authorize?service=initService&response_type=code&client_id=7c1zokoljl9bbiho6yuo&scope=uid cn userIdCode&redirect_uri=https://uaaap.swu.edu.cn/cas/login?service=https://uaaap.swu.edu.cn/cas/oauth2.0/callbackAuthorize&originalRequestUrl=https://uaaap.swu.edu.cn/cas/oauth2.0/authorize?response_type=code&client_id=cas6&redirect_uri=https%3A%2F%2Fof.swu.edu.cn%3A443%2Fcas%2Foauth%2Fcallback%2FSWU_CAS2_FEDERAL&state={state}&scope=simple&federalEnable=true&decision=Allow"
+    url = f"https://idm.swu.edu.cn/am/UI/Login?realm=/&service=initService&goto=http://idm.swu.edu.cn/am/oauth2/authorize?service=initService&response_type=code&client_id=7c1zokoljl9bbiho6yuo&scope=uid cn userIdCode&redirect_uri=https://uaaap.swu.edu.cn/cas/login?service=https://uaaap.swu.edu.cn/cas/oauth2.0/callbackAuthorize&originalRequestUrl=https://uaaap.swu.edu.cn/cas/oauth2.0/authorize?response_type=code&client_id=cas6&redirect_uri=https://of.swu.edu.cn:443/cas/oauth/callback/SWU_CAS2_FEDERAL&state={state}&scope=simple&federalEnable=true&decision=Allow"
     response = session.get(url=url, timeout=timeout)
     soup = BeautifulSoup(response.text, 'html.parser')
     code_random = soup.find('input', {'id': 'codeRandom'})
