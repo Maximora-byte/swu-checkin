@@ -84,6 +84,10 @@ jobs:
             echo "请在 GitHub Secrets 中配置："
             echo "  - ${{ matrix.account.username_secret }}"
             echo "  - ${{ matrix.account.password_secret }}"
+            echo "status_code=CONFIG_ERROR" >> "$GITHUB_OUTPUT"
+            echo "status_msg=账号或密码未配置" >> "$GITHUB_OUTPUT"
+            echo "full_result=账号或密码未配置" >> "$GITHUB_OUTPUT"
+            echo "exit_code=1" >> "$GITHUB_OUTPUT"
             exit 1
           fi
           
@@ -126,65 +130,170 @@ jobs:
           echo ""
           echo "✅ 签到正常完成"
         continue-on-error: true
-      
+
+      - name: 检查邮件通知配置
+        id: mail_config
+        if: always()
+        env:
+          MAIL_SERVER: ${{ secrets.MAIL_SERVER }}
+          MAIL_PORT: ${{ secrets.MAIL_PORT }}
+          MAIL_USERNAME: ${{ secrets.MAIL_USERNAME }}
+          MAIL_PASSWORD: ${{ secrets.MAIL_PASSWORD }}
+          NOTIFY_EMAIL: ${{ secrets.NOTIFY_EMAIL }}
+        run: |
+          required_vars=(MAIL_SERVER MAIL_PORT MAIL_USERNAME MAIL_PASSWORD NOTIFY_EMAIL)
+          missing_vars=()
+
+          for variable_name in "${required_vars[@]}"; do
+            if [ -z "${!variable_name:-}" ]; then
+              missing_vars+=("$variable_name")
+            fi
+          done
+
+          if [ "${#missing_vars[@]}" -gt 0 ]; then
+            missing_text=$(IFS=', '; echo "${missing_vars[*]}")
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "missing=$missing_text" >> "$GITHUB_OUTPUT"
+            echo "::warning::邮件通知配置不完整，已跳过发送。缺少: $missing_text"
+            echo ""
+            echo "⚠️ 邮件通知未发送：配置不完整"
+            echo "缺少配置: $missing_text"
+            echo "请进入 GitHub 仓库 Settings → Secrets and variables → Actions，补齐以上 Secret。"
+            echo "签到结果仍以本次运行的状态码和 Actions 日志为准。"
+          else
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+            echo "missing=" >> "$GITHUB_OUTPUT"
+            echo "✅ 邮件通知配置检查通过"
+          fi
+
       - name: 发送通知邮件
-        if: steps.checkin.outputs.status_code != '1' && steps.checkin.outputs.status_code != '2'
+        id: send_mail
+        if: always() && steps.checkin.outputs.status_code != '1' && steps.checkin.outputs.status_code != '2' && steps.mail_config.outputs.configured == 'true'
+        continue-on-error: true
         uses: dawidd6/action-send-mail@v3
         with:
           server_address: ${{ secrets.MAIL_SERVER }}
           server_port: ${{ secrets.MAIL_PORT }}
           username: ${{ secrets.MAIL_USERNAME }}
           password: ${{ secrets.MAIL_PASSWORD }}
-          subject: '⚠️ SWU 签到异常 - ${{ matrix.account.name }} - ${{ steps.checkin.outputs.status_msg }}'
+          subject: '⚠️ SWU 查寝打卡｜${{ matrix.account.name }}｜${{ steps.checkin.outputs.status_msg }}'
           to: ${{ secrets.NOTIFY_EMAIL }}
           from: ${{ secrets.MAIL_USERNAME }}
           body: |
-            ## 签到任务执行异常
-            
-            脚本已自动重试多次，以下为最终结果。
-            
-            **账号名称**: ${{ matrix.account.name }}
-            **执行时间**: ${{ github.event.repository.updated_at }}
-            **仓库**: ${{ github.repository }}
-            **运行ID**: ${{ github.run_id }}
-            
-            ---
-            
-            ### 签到结果
-            
-            **状态码**: ${{ steps.checkin.outputs.status_code }}
-            **状态信息**: ${{ steps.checkin.outputs.status_msg }}
-            
-            ### 状态码说明
-            
-            - [0] 今日无签到记录
-            - [1] ✅ 签到成功
-            - [2] ✅ 已签到
-            - [3] ❌ 登录失败
-            - [4] ❌ 网络错误或数据异常
-            - [5] ℹ️ 请假期间无需签到
-            
-            ---
-            
-            ### 完整输出
-            
-            `
+            SWU 查寝打卡
+
+            自动签到异常通知
+            ====================
+
+            账号：${{ matrix.account.name }}
+            状态码：${{ steps.checkin.outputs.status_code }}
+            状态信息：${{ steps.checkin.outputs.status_msg }}
+            执行时间：${{ github.run_started_at }}
+
+            本次脚本已完成自动重试。完整结果：
             ${{ steps.checkin.outputs.full_result }}
-            `
-            
-            ---
-            
-            ### 操作建议
-            
-            **状态码 0**: 今日暂无签到任务，无需处理
-            **状态码 3**: 请检查 GitHub Secrets 中的账号密码是否正确
-            **状态码 4**: 网络异常或学校系统维护，本次已自动重试仍失败
-            **状态码 5**: 请假期间自动跳过，无需处理
-            
-            ---
-            
-            查看详细日志: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
-      
+
+            状态码说明：
+            [0] 今日无签到记录
+            [1] 签到成功
+            [2] 已签到
+            [3] 登录失败，请检查账号密码 Secret
+            [4] 网络错误或数据异常
+            [5] 请假期间无需签到
+            [CONFIG_ERROR] 运行配置不完整
+
+            查看 Actions 日志：
+            ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          html_body: |
+            <!doctype html>
+            <html lang="zh-CN">
+            <head>
+              <meta charset="UTF-8">
+              <meta name="viewport" content="width=device-width, initial-scale=1.0">
+              <title>SWU 查寝打卡异常通知</title>
+            </head>
+            <body style="margin:0;padding:0;background:#f8fafc;color:#475569;font-family:'Segoe UI','Microsoft YaHei',Arial,sans-serif;">
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f8fafc;margin:0;padding:32px 12px;">
+                <tr>
+                  <td align="center">
+                    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:620px;border-collapse:collapse;">
+                      <tr>
+                        <td style="padding:0 4px 16px;text-align:left;">
+                          <span style="color:#0f172a;font-size:18px;font-weight:700;">SWU 查寝打卡</span>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style="border:1px solid #e2e8f0;border-radius:10px;background:#ffffff;padding:32px 28px;">
+                          <div style="color:#2563eb;font-size:11px;line-height:1.4;font-weight:700;letter-spacing:1.2px;margin-bottom:10px;">自动签到通知</div>
+                          <h1 style="margin:0;color:#0f172a;font-size:23px;line-height:1.4;font-weight:700;">签到任务需要关注</h1>
+                          <div style="height:2px;width:40px;background:#2563eb;margin:18px 0 22px;"></div>
+
+                          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;margin-bottom:22px;">
+                            <tr>
+                              <td style="padding:0 0 12px;color:#64748b;font-size:13px;width:92px;">账号</td>
+                              <td style="padding:0 0 12px;color:#0f172a;font-size:14px;font-weight:600;">${{ matrix.account.name }}</td>
+                            </tr>
+                            <tr>
+                              <td style="padding:0 0 12px;color:#64748b;font-size:13px;">状态码</td>
+                              <td style="padding:0 0 12px;color:#0f172a;font-size:14px;font-weight:600;">${{ steps.checkin.outputs.status_code }}</td>
+                            </tr>
+                            <tr>
+                              <td style="padding:0;color:#64748b;font-size:13px;">状态信息</td>
+                              <td style="padding:0;color:#0f172a;font-size:14px;font-weight:600;">${{ steps.checkin.outputs.status_msg }}</td>
+                            </tr>
+                          </table>
+
+                          <div style="padding:16px;border-radius:8px;background:#eff6ff;border:1px solid #dbeafe;color:#1e3a8a;font-size:14px;line-height:1.75;">
+                            脚本已完成自动重试。请根据状态码查看下方处理建议。
+                          </div>
+
+                          <h2 style="margin:26px 0 12px;color:#0f172a;font-size:16px;line-height:1.5;">处理建议</h2>
+                          <div style="color:#475569;font-size:14px;line-height:1.85;">
+                            <div><strong style="color:#0f172a;">[0]</strong> 今日暂无签到任务，稍后再次运行即可。</div>
+                            <div><strong style="color:#0f172a;">[3]</strong> 检查 GitHub Secrets 中的校园网账号和密码。</div>
+                            <div><strong style="color:#0f172a;">[4]</strong> 可能是网络异常或学校系统维护，可等待下一次运行。</div>
+                            <div><strong style="color:#0f172a;">[5]</strong> 当前处于请假时间，系统已自动跳过。</div>
+                            <div><strong style="color:#0f172a;">[CONFIG_ERROR]</strong> 检查账号或邮件通知配置。</div>
+                          </div>
+
+                          <h2 style="margin:26px 0 12px;color:#0f172a;font-size:16px;line-height:1.5;">本次运行</h2>
+                          <div style="padding:14px 15px;border:1px solid #e2e8f0;border-radius:8px;background:#f8fafc;color:#475569;font-size:13px;line-height:1.8;">
+                            <div>执行时间：${{ github.run_started_at }}</div>
+                            <div>运行编号：${{ github.run_number }}</div>
+                            <div>仓库：${{ github.repository }}</div>
+                          </div>
+
+                          <div style="margin-top:24px;text-align:center;">
+                            <a href="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" style="display:inline-block;padding:11px 18px;border-radius:7px;background:#2563eb;color:#ffffff;text-decoration:none;font-size:14px;font-weight:700;">查看 Actions 日志</a>
+                          </div>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style="padding:20px 4px 0;text-align:center;color:#64748b;font-size:13px;line-height:1.7;">
+                          <div>此邮件由 SWU 查寝打卡自动发送</div>
+                          <div>如果任务已经恢复正常，可以忽略本邮件。</div>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+            </body>
+            </html>
+
+      - name: 邮件通知结果
+        if: always() && steps.checkin.outputs.status_code != '1' && steps.checkin.outputs.status_code != '2'
+        run: |
+          if [ "${{ steps.mail_config.outputs.configured }}" != "true" ]; then
+            echo "⚠️ 邮件通知未发送：邮件配置不完整"
+            echo "缺少配置: ${{ steps.mail_config.outputs.missing }}"
+          elif [ "${{ steps.send_mail.outcome }}" != "success" ]; then
+            echo "⚠️ 邮件通知发送失败：请检查 SMTP 服务器、端口、邮箱账号和授权码"
+            echo "签到结果不受邮件发送失败影响，详细 SMTP 错误请查看上一步日志"
+          else
+            echo "✅ 异常通知邮件已发送"
+          fi
+
       - name: 最终状态检查
         if: always()
         run: |
@@ -200,6 +309,13 @@ jobs:
           elif [ "${{ steps.checkin.outputs.status_code }}" = "2" ]; then
             echo "✅ 已签到，无需重复"
           else
-            echo "⚠️  多次重试后仍异常，已发送通知邮件"
+            echo "⚠️ 签到任务异常"
+            if [ "${{ steps.mail_config.outputs.configured }}" = "true" ] && [ "${{ steps.send_mail.outcome }}" = "success" ]; then
+              echo "✅ 异常通知邮件已发送"
+            elif [ "${{ steps.mail_config.outputs.configured }}" != "true" ]; then
+              echo "⚠️ 邮件通知未发送：配置不完整"
+            else
+              echo "⚠️ 邮件通知发送失败，请检查 SMTP 配置"
+            fi
           fi
           echo "========================================="
