@@ -82,8 +82,11 @@ jobs:
             exit 1
           fi
           
+          # main() 对签到异常状态返回 1；关闭 errexit，确保仍能读取并解析结果
+          set +e
           python -m swu_checkin.check_in > checkin_result.txt 2>&1
           exit_code=$?
+          set -e
           
           echo ""
           echo "========================================="
