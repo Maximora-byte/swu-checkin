@@ -28,7 +28,7 @@
 
 1. Fork 本仓库到你的账号
 2. 在仓库 **Settings** → **Secrets** 中配置账号密码
-3. 每天北京时间 21:00 自动签到（GitHub Actions 可能有延迟）
+3. 每天北京时间 21:15、21:45 自动签到（GitHub Actions 可能有延迟）
 
 **详细配置教程**: [GITHUB_ACTIONS.md](GITHUB_ACTIONS.md)
 
