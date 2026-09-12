@@ -67,7 +67,12 @@ jobs:
           echo "账号名称: ${{ matrix.account.name }}"
           echo "时间: $(TZ='Asia/Shanghai' date '+%Y-%m-%d %H:%M:%S')"
           if [ -n "$SWUDK_USERNAME" ]; then
-            echo "账号: ${SWUDK_USERNAME:0:4}****${SWUDK_USERNAME: -2}"
+            # 短账号禁止显示首尾字符，避免首尾片段重叠后泄露完整账号
+            masked_username="****"
+            if [ "${#SWUDK_USERNAME}" -ge 8 ]; then
+              masked_username="${SWUDK_USERNAME:0:2}****${SWUDK_USERNAME: -2}"
+            fi
+            echo "账号: $masked_username"
           else
             echo "⚠️  账号未配置（Secret: ${{ matrix.account.username_secret }}）"
           fi
