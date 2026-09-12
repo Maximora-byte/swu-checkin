@@ -15,6 +15,7 @@ from .identity import submit_identity_selection_if_needed
 # ===== 常量定义 =====
 CAS_LOGIN_URL = "https://of.swu.edu.cn/cas/oauth/login/SWU_CAS2_FEDERAL"
 CAS_SERVICE = "https://of.swu.edu.cn/gateway/fighter-middle/api/integrate/uaap/cas/resolve-cas-return?next=https://of.swu.edu.cn/#/casLogin?from=/appCenter"
+CAS_LOGIN_ENTRY_URL = f"{CAS_LOGIN_URL}?service={CAS_SERVICE}"
 IDM_BASE_URL = "https://idm.swu.edu.cn/am"
 IDM_VALIDATE_CODE_URL = "https://idm.swu.edu.cn/am/validate.code"
 CAS_CALLBACK_URL = "https://of.swu.edu.cn/cas/oauth/callback/SWU_CAS2_FEDERAL"
@@ -151,11 +152,7 @@ def _get_token(username: str, password: str, timeout: int) -> str:
     session = requests.Session()
     
     # 步骤 1: 获取 OAuth state
-    response = session.get(
-        CAS_LOGIN_URL,
-        params={"service": CAS_SERVICE},
-        timeout=timeout
-    )
+    response = session.get(CAS_LOGIN_ENTRY_URL, timeout=timeout)
     state = extract_state_from_url(response.url)
     debug_print(f"state: {state}")
     
