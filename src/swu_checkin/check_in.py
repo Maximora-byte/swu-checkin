@@ -6,7 +6,8 @@ import time
 
 import requests
 
-from .get_info import get_dormitory, get_student_id, get_transition_today, get_token
+from .get_info import get_dormitory, get_student_id, get_transition_today, get_token, mask_sensitive_data
+from .cache import CheckinContext
 
 STATUS_MESSAGES = {
     0: "今日无签到记录",
@@ -35,9 +36,9 @@ def _env_int(name: str, default: int) -> int:
     return value if value > 0 else default
 
 
-def _check_vacation_enabled(token: str, timeout: int) -> bool:
+def _check_vacation_enabled(ctx: CheckinContext, timeout: int) -> bool:
     """检查是否在请假期间"""
-    headers = {"fighter-auth-token": token}
+    headers = {"fighter-auth-token": ctx.token}
     url = "https://of.swu.edu.cn/gateway/fighter-baida/api/xsqjxj/listSelfLeaveData?pageNum=1&pageSize=10"
     
     try:
@@ -88,26 +89,35 @@ def _parse_dormitory_data(dormitory_list: list) -> tuple[dict, str, str]:
     return location, building, room
 
 
-def _submit_checkin(token: str, timeout: int) -> int:
+def _submit_checkin(ctx: CheckinContext, timeout: int) -> int:
     """
-    执行签到请求
-    返回: 1=成功, 4=网络错误, None=无今日记录
+    执行签到请求（使用上下文中已缓存的数据，避免重复调用）
+    返回: 1=成功, 4=网络错误
     """
     try:
-        transition = get_transition_today(token, timeout)
-        if transition is None:
-            return None
+        # 从上下文获取已缓存的数据
+        form_id = ctx.transition["formId"]
+        record_id = ctx.transition["id"]
         
-        form_id = transition["formId"]
-        record_id = transition["id"]
+        # 如果宿舍信息未缓存，则获取
+        if not ctx.has_dormitory_info():
+            dorm_response = get_dormitory(ctx.token, timeout)
+            column_list = dorm_response.get("data", {}).get("columnList", [])
+            location, building, room = _parse_dormitory_data(column_list)
+            
+            # 缓存到上下文
+            ctx.dormitory_data = dorm_response
+            ctx.building = building
+            ctx.room = room
+            ctx.latitude = location["latitude"]
+            ctx.longitude = location["longitude"]
         
-        # 获取宿舍信息
-        dorm_response = get_dormitory(token, timeout)
-        column_list = dorm_response.get("data", {}).get("columnList", [])
-        location, building, room = _parse_dormitory_data(column_list)
+        # 如果学号未缓存，则获取
+        if not ctx.has_student_id():
+            ctx.student_id = get_student_id(ctx.token, timeout)
         
         headers = {
-            "fighter-auth-token": token,
+            "fighter-auth-token": ctx.token,
             "Content-Type": "application/json;charset=UTF-8"
         }
         url = "https://of.swu.edu.cn/gateway/fighter-baida/api/form-instance/save"
@@ -117,14 +127,14 @@ def _submit_checkin(token: str, timeout: int) -> int:
             "id": record_id,
             "formId": form_id,
             "tsrq": time.strftime("%Y-%m-%d"),
-            "xh": get_student_id(token, timeout),
+            "xh": ctx.student_id,
             "qdsj": ["21:00", "23:30"],
-            "qsqddd": building,
-            "qdbj": room,
+            "qsqddd": ctx.building,
+            "qdbj": ctx.room,
             "qddz": {
-                "latitude": location["latitude"],
-                "longitude": location["longitude"],
-                "address": building,
+                "latitude": ctx.latitude,
+                "longitude": ctx.longitude,
+                "address": ctx.building,
                 "netType": "wifi",
                 "operatorType": "unknown",
                 "imei": "imei",
@@ -171,25 +181,31 @@ def check_in(username: str, password: str, timeout: int = 10) -> int:
         5: 请假期间无需签到
     """
     try:
-        token = get_token(username, password, timeout)
-        if not token:
+        # 创建会话上下文，避免一次 action 中重复调用
+        ctx = CheckinContext()
+        
+        # 步骤1: 登录获取 token（只调用一次）
+        ctx.token = get_token(username, password, timeout)
+        if not ctx.token:
             return 3
 
-        if _check_vacation_enabled(token, timeout):
+        # 步骤2: 检查请假状态（只调用一次）
+        if _check_vacation_enabled(ctx, timeout):
             return 5
 
-        transition = get_transition_today(token, timeout)
-        if not transition:
+        # 步骤3: 获取今日签到任务（只调用一次，存入上下文）
+        ctx.transition = get_transition_today(ctx.token, timeout)
+        if not ctx.transition:
             return 0
 
-        if transition.get("qdzt") == "已签到":
+        # 步骤4: 检查是否已签到
+        if ctx.transition.get("qdzt") == "已签到":
             return 2
 
-        result = _submit_checkin(token, timeout)
-        if result is None:
-            return 0
-
+        # 步骤5: 执行签到（使用上下文中已缓存的数据）
+        result = _submit_checkin(ctx, timeout)
         return result
+        
     except (KeyboardInterrupt, SystemExit):
         raise
     except (requests.exceptions.RequestException, KeyError, ValueError, TypeError, json.JSONDecodeError):
