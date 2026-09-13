@@ -7,6 +7,7 @@ import os
 import ddddocr
 import json
 import re
+import time
 
 from .des import des
 from .identity import submit_identity_selection_if_needed
@@ -29,10 +30,50 @@ OAUTH_GOTO_BASE64 = "aHR0cDovL2lkbS5zd3UuZWR1LmNuL2FtL29hdXRoMi9hdXRob3JpemU/c2V
 
 
 # ===== 辅助函数 =====
+def mask_sensitive_data(data: str, show_chars: int = 4) -> str:
+    """
+    脱敏处理敏感数据
+    
+    Args:
+        data: 敏感字符串
+        show_chars: 显示的字符数（前后各显示一半）
+    
+    Returns:
+        脱敏后的字符串，例如：abc***xyz
+    """
+    if not data or len(data) <= show_chars:
+        return "****"
+    
+    half = show_chars // 2
+    return f"{data[:half]}{'*' * (len(data) - show_chars)}{data[-half:]}"
+
+
+def safe_print(message: str, sensitive_keywords: list[str] = None) -> None:
+    """
+    安全打印，自动脱敏敏感信息
+    
+    Args:
+        message: 要打印的消息
+        sensitive_keywords: 敏感关键词列表（如 token、ticket）
+    """
+    # 在非调试模式下，不输出包含敏感信息的日志
+    if os.getenv("SWUDK_DEBUG_CREDENTIALS") != "1":
+        if sensitive_keywords:
+            for keyword in sensitive_keywords:
+                if keyword.lower() in message.lower():
+                    return  # 直接跳过包含敏感关键词的输出
+    print(message)
+
+
 def debug_print(message: object) -> None:
-    """调试模式输出"""
+    """
+    调试模式输出（仅在 SWUDK_DEBUG_CREDENTIALS=1 时输出）
+    
+    ⚠️ 警告：调试模式会输出敏感信息（token、密码等），仅用于本地开发
+    绝不要在 GitHub Actions 或生产环境中启用此模式
+    """
     if os.getenv("SWUDK_DEBUG_CREDENTIALS") == "1":
-        print(message)
+        print(f"[DEBUG] {message}")
 
 
 def transform_ticket(ticket: str) -> str:
@@ -94,12 +135,42 @@ def parse_code_random(html: str) -> str:
     return code_random.get('value') if code_random else None
 
 
-def recognize_captcha(session: requests.Session, timeout: int = 10) -> str:
-    """OCR 识别验证码"""
-    response = session.get(IDM_VALIDATE_CODE_URL, timeout=timeout)
-    img = Image.open(BytesIO(response.content))
+def recognize_captcha(session: requests.Session, timeout: int = 10, max_attempts: int = 3) -> str:
+    """
+    OCR 识别验证码，支持重试机制
+    
+    Args:
+        session: requests 会话
+        timeout: 超时时间
+        max_attempts: 最大尝试次数
+    
+    Returns:
+        识别出的验证码字符串
+    
+    Raises:
+        ValueError: 多次尝试后仍无法识别
+    """
     ocr = ddddocr.DdddOcr(show_ad=False, use_gpu=False)
-    return ocr.classification(img)
+    
+    for attempt in range(1, max_attempts + 1):
+        try:
+            response = session.get(IDM_VALIDATE_CODE_URL, timeout=timeout)
+            img = Image.open(BytesIO(response.content))
+            result = ocr.classification(img)
+            
+            # 验证码基本验证：应该是4位数字或字母
+            if result and len(result) >= 3:
+                debug_print(f"验证码识别成功 (尝试 {attempt}/{max_attempts}): {result}")
+                return result
+            else:
+                safe_print(f"验证码识别结果异常 (尝试 {attempt}/{max_attempts})，重新获取", ["captcha"])
+        except Exception as e:
+            safe_print(f"验证码识别失败 (尝试 {attempt}/{max_attempts}): {type(e).__name__}", ["error"])
+        
+        if attempt < max_attempts:
+            time.sleep(0.5)  # 短暂延迟后重试
+    
+    raise ValueError("验证码识别失败，已达到最大重试次数")
 
 
 def build_login_form_data(username: str, password: str, captcha: str) -> dict:
@@ -148,83 +219,122 @@ def get_token(username: str, password: str, timeout: int = 10) -> str:
         return ""
 
 
-def _get_token(username: str, password: str, timeout: int) -> str:
-    session = requests.Session()
+def _get_token(username: str, password: str, timeout: int, max_login_attempts: int = 3) -> str:
+    """
+    内部登录实现，支持验证码错误重试
     
-    # 步骤 1: 获取 OAuth state
-    response = session.get(CAS_LOGIN_ENTRY_URL, timeout=timeout)
-    state = extract_state_from_url(response.url)
-    debug_print(f"state: {state}")
+    Args:
+        username: 用户名
+        password: 密码
+        timeout: 超时时间
+        max_login_attempts: 最大登录尝试次数（验证码错误时重试）
     
-    if not state:
-        return ""
+    Returns:
+        成功返回 token，失败返回空字符串
+    """
+    for login_attempt in range(1, max_login_attempts + 1):
+        try:
+            session = requests.Session()
+            
+            # 步骤 1: 获取 OAuth state
+            response = session.get(CAS_LOGIN_ENTRY_URL, timeout=timeout)
+            state = extract_state_from_url(response.url)
+            debug_print(f"state: {state}")
+            
+            if not state:
+                safe_print(f"获取 OAuth state 失败 (尝试 {login_attempt}/{max_login_attempts})", [])
+                continue
+            
+            # 步骤 2: 访问 IDM 登录页
+            idm_login_url = build_idm_login_url(state)
+            response = session.get(idm_login_url, timeout=timeout)
+            code_random = parse_code_random(response.text)
+            debug_print(f"random: {code_random}")
+            
+            if not code_random:
+                safe_print(f"解析 codeRandom 失败 (尝试 {login_attempt}/{max_login_attempts})", [])
+                continue
+            
+            # 步骤 3: DES 加密凭证
+            encrypted_username, encrypted_password = des(username, password, code_random)
+            
+            # 步骤 4: OCR 识别验证码（带重试）
+            try:
+                captcha = recognize_captcha(session, timeout, max_attempts=3)
+                debug_print(f"验证码: {captcha}")
+            except ValueError as e:
+                safe_print(f"验证码识别失败 (尝试 {login_attempt}/{max_login_attempts}): {e}", [])
+                continue
+            
+            # 步骤 5: 提交登录表单
+            form_data = build_login_form_data(
+                encrypted_username,
+                encrypted_password,
+                captcha
+            )
+            response = session.post(
+                f"{IDM_BASE_URL}/UI/Login",
+                data=form_data,
+                timeout=timeout
+            )
+            
+            # 检查是否因验证码错误导致登录失败
+            if "验证码" in response.text or "validateCode" in response.text:
+                safe_print(f"验证码可能错误，重新尝试登录 (尝试 {login_attempt}/{max_login_attempts})", [])
+                time.sleep(1)  # 短暂延迟
+                continue
+            
+            # 步骤 6: 处理身份选择
+            response = submit_identity_selection_if_needed(
+                session,
+                response,
+                login_url=f"{IDM_BASE_URL}/UI/Login",
+                goto_value=OAUTH_GOTO_BASE64,
+                timeout=timeout,
+            )
+            
+            debug_print(f"回调 URL: {response.url}")
+            
+            # 步骤 7: 提取并转换 ticket
+            ticket_st = extract_ticket_from_url(response.url)
+            if not ticket_st:
+                safe_print(f"未能从回调 URL 提取 ticket (尝试 {login_attempt}/{max_login_attempts})", ["ticket"])
+                continue
+            
+            ticket_cd = transform_ticket(ticket_st)
+            
+            # 步骤 8a: 使用转换后的 ticket 访问回调
+            callback_url = f"{CAS_CALLBACK_URL}?code={ticket_cd}@@hxbeat&state={state}"
+            response = session.get(callback_url, timeout=timeout)
+            
+            # 步骤 8b: 从最终回调 URL 获取 token ticket
+            token_st = extract_ticket_from_url(response.url)
+            if not token_st:
+                safe_print(f"未能获取 token ticket (尝试 {login_attempt}/{max_login_attempts})", ["token"])
+                continue
+            
+            # 步骤 8c: 用 token ticket 换取最终 token
+            exchange_url = f"{TOKEN_EXCHANGE_URL}?token={token_st}&remember=true"
+            token_response = session.get(exchange_url, timeout=timeout).json()
+            
+            if "data" not in token_response:
+                safe_print(f"token 交换失败 (尝试 {login_attempt}/{max_login_attempts})", ["token"])
+                continue
+            
+            token = token_response["data"]
+            debug_print(f"登录成功，获取到 token")
+            
+            return token
+            
+        except (requests.exceptions.RequestException, KeyError, ValueError, TypeError) as e:
+            safe_print(f"登录过程异常 (尝试 {login_attempt}/{max_login_attempts}): {type(e).__name__}", [])
+            if login_attempt < max_login_attempts:
+                time.sleep(1)
+            continue
     
-    # 步骤 2: 访问 IDM 登录页
-    idm_login_url = build_idm_login_url(state)
-    response = session.get(idm_login_url, timeout=timeout)
-    code_random = parse_code_random(response.text)
-    debug_print(f"random: {code_random}")
-    
-    if not code_random:
-        return ""
-    
-    # 步骤 3: DES 加密凭证
-    encrypted_username, encrypted_password = des(username, password, code_random)
-    
-    # 步骤 4: OCR 识别验证码
-    captcha = recognize_captcha(session, timeout)
-    debug_print(f"code: {captcha}")
-    
-    # 步骤 5: 提交登录表单
-    form_data = build_login_form_data(
-        encrypted_username,
-        encrypted_password,
-        captcha
-    )
-    response = session.post(
-        f"{IDM_BASE_URL}/UI/Login",
-        data=form_data,
-        timeout=timeout
-    )
-    
-    # 步骤 6: 处理身份选择
-    response = submit_identity_selection_if_needed(
-        session,
-        response,
-        login_url=f"{IDM_BASE_URL}/UI/Login",
-        goto_value=OAUTH_GOTO_BASE64,
-        timeout=timeout,
-    )
-    
-    debug_print(response.url)
-    
-    # 步骤 7: 提取并转换 ticket
-    ticket_st = extract_ticket_from_url(response.url)
-    if not ticket_st:
-        return ""
-    
-    ticket_cd = transform_ticket(ticket_st)
-    
-    # 步骤 8a: 使用转换后的 ticket 访问回调
-    callback_url = f"{CAS_CALLBACK_URL}?code={ticket_cd}@@hxbeat&state={state}"
-    response = session.get(callback_url, timeout=timeout)
-    
-    # 步骤 8b: 从最终回调 URL 获取 token ticket
-    token_st = extract_ticket_from_url(response.url)
-    if not token_st:
-        return ""
-    
-    # 步骤 8c: 用 token ticket 换取最终 token
-    exchange_url = f"{TOKEN_EXCHANGE_URL}?token={token_st}&remember=true"
-    token_response = session.get(exchange_url, timeout=timeout).json()
-    
-    if "data" not in token_response:
-        return ""
-    
-    token = token_response["data"]
-    debug_print(f"token: {token}")
-    
-    return token
+    # 所有尝试都失败
+    safe_print(f"登录失败，已用尽 {max_login_attempts} 次尝试", [])
+    return ""
 
 
 def get_student_id(token: str, timeout: int = 10) -> str:
