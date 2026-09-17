@@ -3,7 +3,9 @@ from unittest.mock import Mock
 import pytest
 import requests
 
+from swu_checkin import oauth_flow
 from swu_checkin.get_info import (
+    _get_token,
     debug_print,
     mask_sensitive_data,
     safe_print,
@@ -92,8 +94,12 @@ def test_ticket_bearing_swu_412_callback_is_accepted(url: str):
         "https://uaaap.swu.edu.cn/cas/oauth2.0/callbackAuthorize",
         "http://uaaap.swu.edu.cn/cas/oauth2.0/callbackAuthorize?ticket=ST-test",
         "https://example.invalid/cas/oauth2.0/callbackAuthorize?ticket=ST-test",
+        "https://uaaap.swu.edu.cn.evil.example/cas/oauth2.0/callbackAuthorize?ticket=ST-test",
+        "https://user:pass@uaaap.swu.edu.cn/cas/oauth2.0/callbackAuthorize?ticket=ST-test",
         "https://uaaap.swu.edu.cn/unexpected?ticket=ST-test",
         "https://uaaap.swu.edu.cn:444/cas/oauth2.0/callbackAuthorize?ticket=ST-test",
+        "https://uaaap.swu.edu.cn/cas/oauth2.0/callbackAuthorize?ticket=one&ticket=two",
+        "https://uaaap.swu.edu.cn/cas/oauth2.0/callbackAuthorize?ticket=ST-test#fragment",
     ],
 )
 def test_untrusted_or_ticketless_412_callback_is_rejected(url: str):
@@ -125,9 +131,12 @@ def test_ticket_bearing_swu_404_landing_page_is_accepted(url: str):
         "https://of.swu.edu.cn/",
         "http://of.swu.edu.cn/&ticket=ST-test",
         "https://example.invalid/&ticket=ST-test",
+        "https://of.swu.edu.cn.evil.example/&ticket=ST-test",
+        "https://user:pass@of.swu.edu.cn/&ticket=ST-test",
         "https://of.swu.edu.cn/unexpected?ticket=ST-test",
         "https://of.swu.edu.cn/cas/oauth/callback?ticket=ST-test",
         "https://of.swu.edu.cn:444/&ticket=ST-test",
+        "https://of.swu.edu.cn/&ticket=ST-test#fragment",
     ],
 )
 def test_untrusted_or_ticketless_404_landing_page_is_rejected(url: str):
@@ -136,3 +145,45 @@ def test_untrusted_or_ticketless_404_landing_page_is_rejected(url: str):
 
     with pytest.raises(requests.HTTPError):
         validate_cas_callback_response(response)
+
+
+def test_login_exception_and_debug_output_never_leak_sensitive_values(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+):
+    secrets = [
+        "username-secret",
+        "password-secret",
+        "token-secret",
+        "ticket-secret",
+        "state-secret",
+        "captcha-secret",
+        "oauth-code-secret",
+    ]
+    monkeypatch.setenv("SWUDK_DEBUG_CREDENTIALS", "1")
+    error = oauth_flow.OAuthDiscoveryError(" ".join(secrets))
+    monkeypatch.setattr("swu_checkin.get_info.discover_login_flow", Mock(side_effect=error))
+
+    assert _get_token(secrets[0], secrets[1], timeout=1, max_login_attempts=1) == ""
+
+    output = capsys.readouterr().out
+    for secret in secrets:
+        assert secret not in output
+    assert "OAuthDiscoveryError" in output
+
+
+def test_auth_response_stage_masks_ticket_and_query_values(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+):
+    monkeypatch.setenv("SWUDK_DEBUG_CREDENTIALS", "1")
+    response = Mock(
+        status_code=404,
+        url="https://of.swu.edu.cn/&ticket=ST-sensitive-ticket",
+    )
+
+    debug_print(oauth_flow.describe_auth_response(response))
+
+    output = capsys.readouterr().out
+    assert "ST-sensitive-ticket" not in output
+    assert "/<ticket-landing>" in output

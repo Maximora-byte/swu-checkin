@@ -5,6 +5,8 @@ from typing import Any
 
 from bs4 import BeautifulSoup
 
+from .oauth_flow import extract_ticket_from_url
+
 _IDENTITY_CODES_RE = re.compile(r"(?:var|let|const)\s+defaultCodes\s*=\s*['\"]([^'\"]*)['\"]")
 
 
@@ -67,7 +69,7 @@ def submit_identity_selection_if_needed(
 ) -> Any:
     """Submit the preferred identity when the initial login response asks for it."""
 
-    if "ticket" in str(response.url):
+    if extract_ticket_from_url(str(response.url)):
         return response
     identity_code = choose_identity_code(response.text)
     if not identity_code:

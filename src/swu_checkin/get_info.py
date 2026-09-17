@@ -2,33 +2,31 @@ import json
 import os
 import re
 import time
-import urllib.parse
 from io import BytesIO
 
 import ddddocr
 import requests
-from bs4 import BeautifulSoup
 from PIL import Image
 
 from .des import des
 from .identity import submit_identity_selection_if_needed
+from .oauth_flow import (
+    OAuthDiscoveryError,
+    build_cas_callback_url,
+    build_login_form_data,
+    describe_auth_response,
+    discover_login_flow,
+    extract_ticket_from_url,
+    follow_trusted_auth_redirects,
+    validate_cas_callback_response,
+    validate_idm_login_response,
+)
 
 # ===== 常量定义 =====
-CAS_LOGIN_URL = "https://of.swu.edu.cn/cas/oauth/login/SWU_CAS2_FEDERAL"
-CAS_SERVICE = "https://of.swu.edu.cn/gateway/fighter-middle/api/integrate/uaap/cas/resolve-cas-return?next=https://of.swu.edu.cn/#/casLogin?from=/appCenter"
-CAS_LOGIN_ENTRY_URL = f"{CAS_LOGIN_URL}?service={CAS_SERVICE}"
-IDM_BASE_URL = "https://idm.swu.edu.cn/am"
-IDM_VALIDATE_CODE_URL = "https://idm.swu.edu.cn/am/validate.code"
-CAS_CALLBACK_URL = "https://of.swu.edu.cn/cas/oauth/callback/SWU_CAS2_FEDERAL"
 TOKEN_EXCHANGE_URL = "https://of.swu.edu.cn/gateway/fighter-middle/api/integrate/uaap/cas/exchange-token"
 USER_INFO_URL = "https://of.swu.edu.cn/gateway/fighter-middle/api/auth/user"
 DORMITORY_URL = "https://of.swu.edu.cn/gateway/fighter-baida/api/cqlc/getDormitory"
 TRANSITION_TODAY_URL = "https://of.swu.edu.cn//gateway/fighter-baida/api/cqtj/getTransitionByToday"
-
-# OAuth2 固定参数
-# TODO: Replace hard-coded OAuth flow metadata with trusted HTTPS discovery.
-# See docs/oauth-login-discovery.md for the follow-up scope and acceptance criteria.
-OAUTH_GOTO_BASE64 = "aHR0cDovL2lkbS5zd3UuZWR1LmNuL2FtL29hdXRoMi9hdXRob3JpemU/c2VydmljZT1pbml0U2VydmljZSZyZXNwb25zZV90eXBlPWNvZGUmY2xpZW50X2lkPTdjMXpva29samw5YmJpaG82eXVvJnNjb3BlPXVpZCtjbit1c2VySWRDb2RlJnJlZGlyZWN0X3VyaT1odHRwcyUzQSUyRiUyRnVhYWFwLnN3dS5lZHUuY24lMkZjYXMlMkZsb2dpbiUzRnNlcnZpY2UlM0RodHRwcyUyNTNBJTI1MkYlMjUyRnVhYWFwLnN3dS5lZHUuY24lMjUyRmNhcyUyNTJGb2F1dGgyLjAlMjUyRmNhbGxiYWNrQXV0aG9yaXplJTI2b3JpZ2luYWxSZXF1ZXN0VXJsJTNEaHR0cHMlMjUzQSUyNTJGJTI1MkZ1YWFhcC5zd3UuZWR1LmNuJTI1MkZjYXMlMjUyRm9hdXRoMi4wJTI1MkZhdXRob3JpemUlMjUzRnJlc3BvbnNlX3R5cGUlMjUzRGNvZGUlMjUyNmNsaWVudF9pZCUyNTNEY2FzNiUyNTI2cmVkaXJlY3RfdXJpJTI1M0RodHRwcyUyNTI1M0ElMjUyNTJGJTI1MjUyRm9mLnN3dS5lZHUuY24lMjUyNTNBNDQzJTI1MjUyRmNhcyUyNTI1MkZvYXV0aCUyNTI1MkZjYWxsYmFjayUyNTI1MkZTV1VfQ0FTMl9GRURFUkFMJTI1MjZzdGF0ZSUyNTNEZTFlMTczODhlNzU4MjY3YjFiNzI2ZjM4Mjg0NDM5MWElMjUyNnNjb3BlJTI1M0RzaW1wbGUlMjZmZWRlcmFsRW5hYmxlJTNEdHJ1ZSZkZWNpc2lvbj1BbGxvdw=="
 
 
 # ===== 辅助函数 =====
@@ -98,38 +96,12 @@ def transform_ticket(ticket: str) -> str:
     return result
 
 
-def build_idm_login_url(state: str) -> str:
-    """构建 IDM 登录 URL"""
-    return (
-        f"{IDM_BASE_URL}/UI/Login"
-        f"?realm=/&service=initService"
-        f"&goto=http://idm.swu.edu.cn/am/oauth2/authorize"
-        f"?service=initService&response_type=code"
-        f"&client_id=7c1zokoljl9bbiho6yuo"
-        f"&scope=uid cn userIdCode"
-        f"&redirect_uri=https://uaaap.swu.edu.cn/cas/login"
-        f"?service=https://uaaap.swu.edu.cn/cas/oauth2.0/callbackAuthorize"
-        f"&originalRequestUrl=https://uaaap.swu.edu.cn/cas/oauth2.0/authorize"
-        f"?response_type=code&client_id=cas6"
-        f"&redirect_uri=https://of.swu.edu.cn:443/cas/oauth/callback/SWU_CAS2_FEDERAL"
-        f"&state={state}&scope=simple&federalEnable=true&decision=Allow"
-    )
-
-
-def extract_state_from_url(url: str) -> str | None:
-    """从跳转 URL 提取 state 参数"""
-    match = re.search(r"state%3D([a-f0-9]{32})", url)
-    return match.group(1) if match else None
-
-
-def parse_code_random(html: str) -> str | None:
-    """从登录页 HTML 解析 codeRandom"""
-    soup = BeautifulSoup(html, "html.parser")
-    code_random = soup.find("input", {"id": "codeRandom"})
-    return code_random.get("value") if code_random else None
-
-
-def recognize_captcha(session: requests.Session, timeout: int = 10, max_attempts: int = 3) -> str:
+def recognize_captcha(
+    session: requests.Session,
+    captcha_url: str,
+    timeout: int = 10,
+    max_attempts: int = 3,
+) -> str:
     """
     OCR 识别验证码，支持重试机制
 
@@ -148,7 +120,9 @@ def recognize_captcha(session: requests.Session, timeout: int = 10, max_attempts
 
     for attempt in range(1, max_attempts + 1):
         try:
-            response = session.get(IDM_VALIDATE_CODE_URL, timeout=timeout)
+            response = session.get(captcha_url, timeout=timeout, allow_redirects=False)
+            if response.status_code != 200:
+                raise OAuthDiscoveryError("验证码端点未返回成功响应")
             response.raise_for_status()
             img = Image.open(BytesIO(response.content))
             result = ocr.classification(img)
@@ -166,73 +140,6 @@ def recognize_captcha(session: requests.Session, timeout: int = 10, max_attempts
             time.sleep(0.5)  # 短暂延迟后重试
 
     raise ValueError("验证码识别失败，已达到最大重试次数")
-
-
-def build_login_form_data(username: str, password: str, captcha: str) -> dict[str, str]:
-    """构建登录表单数据"""
-    return {
-        "IDToken1": username,
-        "IDToken2": password,
-        "IDToken3": "",
-        "goto": OAUTH_GOTO_BASE64,
-        "gotoOnFail": "",
-        "validateCode": captcha,
-        "sunQueryParamsString": "cmVhbG09LyZzZXJ2aWNlPWluaXRTZXJ2aWNlJg==",
-        "encoded": "true",
-        "gx_charset": "UTF-8",
-    }
-
-
-def extract_ticket_from_url(url: str) -> str | None:
-    """从回调 URL 提取 ticket"""
-    if "ticket=" not in url:
-        return None
-    return urllib.parse.unquote(url).split("ticket=")[1]
-
-
-def _uses_default_https_port(parsed: urllib.parse.SplitResult) -> bool:
-    try:
-        return (
-            parsed.scheme == "https"
-            and parsed.username is None
-            and parsed.password is None
-            and parsed.port in (None, 443)
-        )
-    except ValueError:
-        return False
-
-
-def validate_idm_login_response(response: requests.Response) -> None:
-    """Accept SWU's ticket-bearing 412 callback, but reject every other HTTP error."""
-    if response.status_code == 412:
-        parsed = urllib.parse.urlsplit(response.url)
-        query = urllib.parse.parse_qs(parsed.query)
-        if (
-            _uses_default_https_port(parsed)
-            and parsed.hostname == "uaaap.swu.edu.cn"
-            and parsed.path == "/cas/oauth2.0/callbackAuthorize"
-            and not parsed.fragment
-            and set(query) == {"ticket"}
-            and query.get("ticket")
-        ):
-            return
-    response.raise_for_status()
-
-
-def validate_cas_callback_response(response: requests.Response) -> None:
-    """Accept SWU's ticket-bearing 404 landing page, but reject every other HTTP error."""
-    if response.status_code == 404:
-        parsed = urllib.parse.urlsplit(response.url)
-        if (
-            _uses_default_https_port(parsed)
-            and parsed.hostname == "of.swu.edu.cn"
-            and re.fullmatch(r"/&ticket=[^/?#]+", parsed.path)
-            and not parsed.query
-            and not parsed.fragment
-            and extract_ticket_from_url(response.url)
-        ):
-            return
-    response.raise_for_status()
 
 
 # ===== 主要登录流程 =====
@@ -276,41 +183,31 @@ def _get_token(username: str, password: str, timeout: int, max_login_attempts: i
         try:
             session = requests.Session()
 
-            # 步骤 1: 获取 OAuth state
-            response = session.get(CAS_LOGIN_ENTRY_URL, timeout=timeout)
-            response.raise_for_status()
-            state = extract_state_from_url(response.url)
-            debug_print("已解析 OAuth state")
+            # 步骤 1: 从可信 SWU HTTPS 响应发现 OAuth state、回调与登录 form
+            flow = discover_login_flow(session, timeout)
+            debug_print("已从可信响应发现登录流程")
 
-            if not state:
-                safe_print(f"获取 OAuth state 失败 (尝试 {login_attempt}/{max_login_attempts})")
-                continue
+            # 步骤 2: DES 加密凭证
+            encrypted_username, encrypted_password = des(username, password, flow.code_random)
 
-            # 步骤 2: 访问 IDM 登录页
-            idm_login_url = build_idm_login_url(state)
-            response = session.get(idm_login_url, timeout=timeout)
-            response.raise_for_status()
-            code_random = parse_code_random(response.text)
-            debug_print("已解析登录随机参数")
-
-            if not code_random:
-                safe_print(f"解析 codeRandom 失败 (尝试 {login_attempt}/{max_login_attempts})")
-                continue
-
-            # 步骤 3: DES 加密凭证
-            encrypted_username, encrypted_password = des(username, password, code_random)
-
-            # 步骤 4: OCR 识别验证码（带重试）
+            # 步骤 3: OCR 识别验证码（带重试）
             try:
-                captcha = recognize_captcha(session, timeout, max_attempts=3)
+                captcha = recognize_captcha(session, flow.captcha_url, timeout, max_attempts=3)
                 debug_print("验证码已识别")
             except ValueError:
                 safe_print(f"验证码识别失败 (尝试 {login_attempt}/{max_login_attempts})")
                 continue
 
-            # 步骤 5: 提交登录表单
-            form_data = build_login_form_data(encrypted_username, encrypted_password, captcha)
-            response = session.post(f"{IDM_BASE_URL}/UI/Login", data=form_data, timeout=timeout)
+            # 步骤 4: 提交服务端提供的登录表单，并逐跳验证 Redirect
+            form_data = build_login_form_data(flow, encrypted_username, encrypted_password, captcha)
+            response = session.post(
+                flow.form_action,
+                data=form_data,
+                timeout=timeout,
+                allow_redirects=False,
+            )
+            response = follow_trusted_auth_redirects(session, response, timeout=timeout)
+            debug_print(f"登录提交响应: {describe_auth_response(response)}")
             validate_idm_login_response(response)
 
             # 检查是否因验证码错误导致登录失败
@@ -319,18 +216,22 @@ def _get_token(username: str, password: str, timeout: int, max_login_attempts: i
                 time.sleep(1)  # 短暂延迟
                 continue
 
-            # 步骤 6: 处理身份选择
+            # 步骤 5: 处理身份选择
             response = submit_identity_selection_if_needed(
                 session,
                 response,
-                login_url=f"{IDM_BASE_URL}/UI/Login",
-                goto_value=OAUTH_GOTO_BASE64,
+                login_url=flow.form_action,
+                goto_value=flow.goto_value,
                 timeout=timeout,
+                allow_redirects=False,
             )
+            response = follow_trusted_auth_redirects(session, response, timeout=timeout)
+            debug_print(f"身份选择响应: {describe_auth_response(response)}")
+            validate_idm_login_response(response)
 
             debug_print("身份选择流程已完成")
 
-            # 步骤 7: 提取并转换 ticket
+            # 步骤 6: 提取并转换 ticket
             ticket_st = extract_ticket_from_url(response.url)
             if not ticket_st:
                 safe_print(f"未能从回调 URL 提取 ticket (尝试 {login_attempt}/{max_login_attempts})")
@@ -338,20 +239,25 @@ def _get_token(username: str, password: str, timeout: int, max_login_attempts: i
 
             ticket_cd = transform_ticket(ticket_st)
 
-            # 步骤 8a: 使用转换后的 ticket 访问回调
-            callback_url = f"{CAS_CALLBACK_URL}?code={ticket_cd}@@hxbeat&state={state}"
-            response = session.get(callback_url, timeout=timeout)
+            # 步骤 7a: 使用服务端发现的 callback 与 state 访问回调
+            callback_url = build_cas_callback_url(flow, ticket_cd)
+            response = session.get(callback_url, timeout=timeout, allow_redirects=False)
+            response = follow_trusted_auth_redirects(session, response, timeout=timeout)
+            debug_print(f"CAS callback 响应: {describe_auth_response(response)}")
             validate_cas_callback_response(response)
 
-            # 步骤 8b: 从最终回调 URL 获取 token ticket
+            # 步骤 7b: 从最终回调 URL 获取 token ticket
             token_st = extract_ticket_from_url(response.url)
             if not token_st:
                 safe_print(f"未能获取 token ticket (尝试 {login_attempt}/{max_login_attempts})")
                 continue
 
-            # 步骤 8c: 用 token ticket 换取最终 token
-            exchange_url = f"{TOKEN_EXCHANGE_URL}?token={token_st}&remember=true"
-            response = session.get(exchange_url, timeout=timeout)
+            # 步骤 7c: 用 token ticket 换取最终 token
+            response = session.get(
+                TOKEN_EXCHANGE_URL,
+                params={"token": token_st, "remember": "true"},
+                timeout=timeout,
+            )
             response.raise_for_status()
             token_response = response.json()
 
@@ -360,11 +266,21 @@ def _get_token(username: str, password: str, timeout: int, max_login_attempts: i
                 continue
 
             token = token_response["data"]
-            debug_print("登录成功")
+            if not isinstance(token, str) or not token:
+                safe_print(f"token 交换失败 (尝试 {login_attempt}/{max_login_attempts})")
+                continue
+            debug_print("登录成功，认证结果已确认")
 
             return token
 
-        except (requests.exceptions.RequestException, json.JSONDecodeError, KeyError, ValueError, TypeError) as error:
+        except (
+            requests.exceptions.RequestException,
+            OAuthDiscoveryError,
+            json.JSONDecodeError,
+            KeyError,
+            ValueError,
+            TypeError,
+        ) as error:
             safe_print(f"登录过程异常 (尝试 {login_attempt}/{max_login_attempts}): {type(error).__name__}")
             if login_attempt < max_login_attempts:
                 time.sleep(1)

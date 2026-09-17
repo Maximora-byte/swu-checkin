@@ -108,6 +108,7 @@ swu-checkin
 │       ├── __init__.py
 │       ├── check_in.py       # 主打卡脚本
 │       ├── get_info.py       # 信息获取模块
+│       ├── oauth_flow.py      # 可信 SWU OAuth/CAS 登录链发现与校验
 │       ├── status.py         # 统一状态码语义
 │       ├── time_utils.py     # Asia/Shanghai 时间处理
 │       ├── verify.py         # 登录验证模块
@@ -120,7 +121,7 @@ swu-checkin
 
 ## 工作流程
 
-1. 使用校园网账号密码登录统一身份认证
+1. 从可信 SWU HTTPS 入口逐跳发现并校验统一身份认证流程
 2. 通过 OCR 识别验证码自动登录
 3. 获取 token 和打卡任务信息
 4. 检测请假状态
