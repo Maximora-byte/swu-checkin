@@ -10,7 +10,13 @@
 - timer 不启用持久补跑，避免服务器在签到窗口外启动后提交过期任务。
 - 部署前先运行 `swu-checkin-probe.service` 做只读探测；该服务只登录并读取任务，不提交签到。
 
-凭据文件格式：
+部署完成后，在服务器终端运行凭据录入器：
+
+```bash
+sudo swu-checkin-set-credentials
+```
+
+该命令使用无回显输入，原子写入凭据文件，先运行只读探测；只有探测成功才启用 timer。凭据文件格式为：
 
 ```ini
 SWUDK_USERNAME=学号
