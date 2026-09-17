@@ -6,18 +6,17 @@ Wants=network-online.target
 
 [Service]
 Type=oneshot
+# OpenClaw is installed for root and reads root-owned channel configuration/state.
 User=root
-Group=swu-checkin
+Group=root
 WorkingDirectory=/opt/swu-checkin
+EnvironmentFile=/etc/swu-checkin/notify.env
 Environment=TZ=Asia/Shanghai
 Environment=SWUDK_STATE_DIR=/var/lib/swu-checkin
 Environment=SWUDK_NOTIFY_CHANNEL=telegram
 Environment=SWUDK_NOTIFY_ACCOUNT=default
-Environment=SWUDK_NOTIFY_TARGET=5823996119
 Environment=XDG_CACHE_HOME=/var/cache/swu-checkin
 ExecStart=/opt/swu-checkin/.venv/bin/swu-checkin-notify
-StateDirectory=swu-checkin
-StateDirectoryMode=0770
 CacheDirectory=swu-checkin
 CacheDirectoryMode=0700
 UMask=0077
