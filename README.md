@@ -44,11 +44,8 @@
 #### 1. 安装依赖
 
 ```bash
-# 使用 pip
-pip install -e .
-
-# 或使用 uv（推荐）
-uv sync
+# 使用锁文件安装生产依赖
+uv sync --locked --no-dev --python 3.13
 ```
 
 #### 2. 运行脚本
@@ -65,10 +62,11 @@ swu-checkin
 或作为 Python 模块调用：
 
 ```python
+import os
+
 from swu_checkin import check_in
 
-# 从环境变量读取账号密码
-check_in()
+result = check_in(os.environ["SWUDK_USERNAME"], os.environ["SWUDK_PASSWORD"])
 ```
 
 ##### Windows PowerShell
@@ -110,6 +108,8 @@ swu-checkin
 │       ├── __init__.py
 │       ├── check_in.py       # 主打卡脚本
 │       ├── get_info.py       # 信息获取模块
+│       ├── status.py         # 统一状态码语义
+│       ├── time_utils.py     # Asia/Shanghai 时间处理
 │       ├── verify.py         # 登录验证模块
 │       ├── identity.py       # 身份选择处理
 │       └── des.py            # DES 加密工具
@@ -135,16 +135,15 @@ swu-checkin
 ### 可选配置
 - `SWUDK_MAX_ATTEMPTS` - 签到失败重试次数（默认 3 次）
 - `SWUDK_RETRY_DELAY` - 首次重试等待秒数，后续指数退避（默认 8 秒）
-- `SWUDK_CACHE_TTL` - 缓存有效期秒数（默认 3600 秒，1 小时）
-- `SWUDK_DEBUG_CREDENTIALS` - 调试模式，输出敏感信息（`1` 启用，默认关闭）
+- `SWUDK_DEBUG_CREDENTIALS` - 输出不含凭据值的诊断信息（`1` 启用，默认关闭）
 
 ## 注意事项
 
 ### 安全性
 - ⚠️ **脚本仅从环境变量读取账号密码，切勿硬编码或提交到仓库**
-- ⚠️ **GitHub Actions 使用 Secrets 存储敏感信息，不会泄露到日志**
+- ⚠️ **GitHub Actions 使用 Secrets 存储敏感信息，代码不会主动打印账号或凭据值**
 - ⚠️ **正常模式下不会输出 token、ticket 等敏感信息**
-- ⚠️ **调试模式（`SWUDK_DEBUG_CREDENTIALS=1`）会输出敏感信息，仅用于本地开发，切勿在 GitHub Actions 中启用**
+- ⚠️ **诊断模式也会过滤密码、token、ticket、验证码和回调 URL**
 
 ### 功能特性
 - ✅ 验证码识别失败自动重试（每次登录尝试最多识别 3 次验证码）

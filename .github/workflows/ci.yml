@@ -1,0 +1,39 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      TZ: Asia/Shanghai
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: 安装 uv 与 Python
+        uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6
+        with:
+          version: "0.12.15"
+          enable-cache: true
+
+      - name: 按锁文件安装依赖
+        run: |
+          uv python install 3.13
+          uv sync --locked --all-groups --python 3.13
+
+      - name: 运行测试
+        run: uv run --locked pytest -q
+
+      - name: Ruff 检查
+        run: uv run --locked ruff check .
+
+      - name: Ruff 格式检查
+        run: uv run --locked ruff format --check .

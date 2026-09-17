@@ -1,5 +1,8 @@
 name: 自动签到
 
+permissions:
+  contents: read
+
 # 停用方式：仓库 Actions → 自动签到 → Disable workflow
 # GitHub 官方禁用 workflow 后，定时任务和手动触发都会停止
 
@@ -14,6 +17,9 @@ on:
 jobs:
   checkin:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      TZ: Asia/Shanghai
     strategy:
       # 多账号并行执行，失败不影响其他账号
       fail-fast: false
@@ -34,21 +40,21 @@ jobs:
     
     steps:
       - name: 检出代码
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       
-      - name: 设置 Python
-        uses: actions/setup-python@v5
+      - name: 安装 uv 与 Python
+        uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6
         with:
-          python-version: '3.13'
-          cache: 'pip'
+          version: "0.12.15"
+          enable-cache: true
       
       - name: 安装依赖
         run: |
           echo "========================================="
           echo "开始安装依赖..."
           echo "========================================="
-          pip install --upgrade pip
-          pip install -e .
+          uv python install 3.13
+          uv sync --locked --no-dev --python 3.13
           echo ""
           echo "✅ 依赖安装完成"
           echo ""
@@ -65,15 +71,8 @@ jobs:
           echo "========================================="
           echo "开始执行签到任务"
           echo "账号名称: ${{ matrix.account.name }}"
-          echo "时间: $(TZ='Asia/Shanghai' date '+%Y-%m-%d %H:%M:%S')"
-          if [ -n "$SWUDK_USERNAME" ]; then
-            # 短账号禁止显示首尾字符，避免首尾片段重叠后泄露完整账号
-            masked_username="****"
-            if [ "${#SWUDK_USERNAME}" -ge 8 ]; then
-              masked_username="${SWUDK_USERNAME:0:2}****${SWUDK_USERNAME: -2}"
-            fi
-            echo "账号: $masked_username"
-          else
+          echo "时间: $(date '+%Y-%m-%d %H:%M:%S')"
+          if [ -z "$SWUDK_USERNAME" ]; then
             echo "⚠️  账号未配置（Secret: ${{ matrix.account.username_secret }}）"
           fi
           echo "========================================="
@@ -93,7 +92,7 @@ jobs:
           
           # main() 对签到异常状态返回 1；关闭 errexit，确保仍能读取并解析结果
           set +e
-          python -m swu_checkin.check_in > checkin_result.txt 2>&1
+          uv run --locked --no-dev swu-checkin > checkin_result.txt 2>&1
           exit_code=$?
           set -e
           
@@ -105,14 +104,19 @@ jobs:
           echo ""
           
           # 提取返回码和消息
-          result_line=$(cat checkin_result.txt | tail -1)
-          status_code=$(echo "$result_line" | grep -oP '\[\K[0-9]+(?=\])')
-          status_msg=$(echo "$result_line" | grep -oP '\] \K.*')
+          result_line=$(tail -1 checkin_result.txt)
+          if [[ "$result_line" =~ ^\[([0-9]+)\]\ (.*)$ ]]; then
+            status_code="${BASH_REMATCH[1]}"
+            status_msg="${BASH_REMATCH[2]}"
+          else
+            status_code="OUTPUT_ERROR"
+            status_msg="无法解析签到程序输出"
+          fi
           
-          echo "status_code=$status_code" >> $GITHUB_OUTPUT
-          echo "status_msg=$status_msg" >> $GITHUB_OUTPUT
-          echo "full_result=$result_line" >> $GITHUB_OUTPUT
-          echo "exit_code=$exit_code" >> $GITHUB_OUTPUT
+          echo "status_code=$status_code" >> "$GITHUB_OUTPUT"
+          echo "status_msg=$status_msg" >> "$GITHUB_OUTPUT"
+          echo "full_result=$result_line" >> "$GITHUB_OUTPUT"
+          echo "exit_code=$exit_code" >> "$GITHUB_OUTPUT"
           
           echo "========================================="
           echo "状态码: $status_code"
@@ -120,8 +124,8 @@ jobs:
           echo "退出码: $exit_code"
           echo "========================================="
           
-          # 1=成功, 2=已签到；其余状态已在脚本内重试，仍失败才告警
-          if [ "$status_code" != "1" ] && [ "$status_code" != "2" ]; then
+          # 1=成功, 2=已签到, 5=请假期间无需签到
+          if [[ "$status_code" != "1" && "$status_code" != "2" && "$status_code" != "5" ]]; then
             echo ""
             echo "⚠️  多次重试后仍异常，准备发送通知邮件"
             exit 1
@@ -135,11 +139,11 @@ jobs:
         id: format_time
         if: always()
         run: |
-          echo "beijing_time=$(TZ='Asia/Shanghai' date '+%Y-%m-%d %H:%M:%S')" >> "$GITHUB_OUTPUT"
+          echo "beijing_time=$(date '+%Y-%m-%d %H:%M:%S')" >> "$GITHUB_OUTPUT"
 
       - name: 检查邮件通知配置
         id: mail_config
-        if: always()
+        if: always() && steps.checkin.outputs.status_code != '1' && steps.checkin.outputs.status_code != '2' && steps.checkin.outputs.status_code != '5'
         env:
           MAIL_SERVER: ${{ secrets.MAIL_SERVER }}
           MAIL_PORT: ${{ secrets.MAIL_PORT }}
@@ -174,9 +178,9 @@ jobs:
 
       - name: 发送通知邮件
         id: send_mail
-        if: always() && steps.checkin.outputs.status_code != '1' && steps.checkin.outputs.status_code != '2' && steps.mail_config.outputs.configured == 'true'
+        if: always() && steps.checkin.outputs.status_code != '1' && steps.checkin.outputs.status_code != '2' && steps.checkin.outputs.status_code != '5' && steps.mail_config.outputs.configured == 'true'
         continue-on-error: true
-        uses: dawidd6/action-send-mail@v3
+        uses: dawidd6/action-send-mail@4226df7daafa6fc901a43789c49bf7ab309066e7 # v3
         with:
           server_address: ${{ secrets.MAIL_SERVER }}
           server_port: ${{ secrets.MAIL_PORT }}
@@ -272,7 +276,7 @@ jobs:
             </html>
 
       - name: 邮件通知结果
-        if: always() && steps.checkin.outputs.status_code != '1' && steps.checkin.outputs.status_code != '2'
+        if: always() && steps.checkin.outputs.status_code != '1' && steps.checkin.outputs.status_code != '2' && steps.checkin.outputs.status_code != '5'
         run: |
           if [ "${{ steps.mail_config.outputs.configured }}" != "true" ]; then
             echo "⚠️ 邮件通知未发送：邮件配置不完整"
@@ -298,6 +302,8 @@ jobs:
             echo "✅ 签到成功"
           elif [ "${{ steps.checkin.outputs.status_code }}" = "2" ]; then
             echo "✅ 已签到，无需重复"
+          elif [ "${{ steps.checkin.outputs.status_code }}" = "5" ]; then
+            echo "✅ 请假期间无需签到"
           else
             echo "⚠️ 签到任务异常"
             if [ "${{ steps.mail_config.outputs.configured }}" = "true" ] && [ "${{ steps.send_mail.outcome }}" = "success" ]; then
@@ -307,5 +313,6 @@ jobs:
             else
               echo "⚠️ 邮件通知发送失败，请检查 SMTP 配置"
             fi
+            exit 1
           fi
           echo "========================================="

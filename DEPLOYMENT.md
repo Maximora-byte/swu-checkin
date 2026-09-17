@@ -10,6 +10,7 @@
 - timer 不启用持久补跑，避免服务器在签到窗口外启动后提交过期任务。
 - 部署前先运行 `swu-checkin-probe.service` 做只读探测；该服务只登录并读取任务，不提交签到。
 - 签到任务把非敏感结果写入 `/var/lib/swu-checkin/status.json`；通知 timer 每天 21:50 汇总一次并发送 Telegram。
+- Telegram target 仅写入 `/etc/swu-checkin/notify.env`，权限设为 `0600 root:root`，不要提交到 Git。
 
 部署完成后，在服务器终端运行凭据录入器：
 
@@ -25,6 +26,17 @@ SWUDK_PASSWORD=密码
 ```
 
 推荐安装路径为 `/opt/swu-checkin`，systemd 单元模板位于 `deploy/systemd/`。默认在北京时间 21:15 与 21:45 各执行一次；第二次运行会识别“已签到”并退出。
+
+如需 Telegram 汇总通知，先复制示例并填入实际 target：
+
+```bash
+sudo install -d -m 0700 -o root -g root /etc/swu-checkin
+sudo install -m 0600 -o root -g root deploy/notify.env.example /etc/swu-checkin/notify.env
+sudoedit /etc/swu-checkin/notify.env
+sudo systemctl enable --now swu-checkin-notify.timer
+```
+
+通知服务暂时以 root 运行，因为本机 OpenClaw CLI 使用 root 所有的通道配置与状态；单元仍保留只读 home、空 capability 集合，并仅开放 `/root/.openclaw/state` 和专用 cache 的必要写权限。主签到服务和 probe 继续使用专用 `swu-checkin` 用户。
 
 查看状态与日志：
 
