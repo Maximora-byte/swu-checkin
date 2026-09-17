@@ -4,11 +4,13 @@ from datetime import UTC, datetime
 from unittest.mock import Mock, patch
 
 import pytest
+import requests
 
+from swu_checkin import check_in as run_check_in
 from swu_checkin.cache import CheckinContext
 from swu_checkin.check_in import (
     _business_response_succeeded,
-    _check_vacation_enabled,
+    _check_vacation_status,
     _parse_dormitory_data,
     _record_run_status,
     _submit_checkin,
@@ -16,7 +18,7 @@ from swu_checkin.check_in import (
     probe_check_in,
 )
 from swu_checkin.notify import _build_message
-from swu_checkin.status import CheckinStatus, is_successful_checkin_status
+from swu_checkin.status import CheckinStatus, VacationStatus, is_successful_checkin_status
 
 
 def _context() -> CheckinContext:
@@ -90,19 +92,90 @@ def test_submit_succeeds_only_after_readback(post: Mock, get_transition: Mock, _
 @pytest.mark.parametrize(
     ("now", "expected"),
     [
-        (datetime(2026, 9, 17, 12, 59, tzinfo=UTC), False),
-        (datetime(2026, 9, 17, 13, 0, tzinfo=UTC), True),
-        (datetime(2026, 9, 17, 14, 0, tzinfo=UTC), True),
-        (datetime(2026, 9, 17, 14, 1, tzinfo=UTC), False),
+        (datetime(2026, 9, 17, 12, 59, tzinfo=UTC), VacationStatus.NO_ACTIVE_LEAVE),
+        (datetime(2026, 9, 17, 13, 0, tzinfo=UTC), VacationStatus.ACTIVE_LEAVE),
+        (datetime(2026, 9, 17, 14, 0, tzinfo=UTC), VacationStatus.ACTIVE_LEAVE),
+        (datetime(2026, 9, 17, 14, 1, tzinfo=UTC), VacationStatus.NO_ACTIVE_LEAVE),
     ],
 )
 @patch("swu_checkin.check_in.requests.get")
-def test_vacation_uses_timezone_aware_shanghai_boundaries(get: Mock, now: datetime, expected: bool):
+def test_vacation_uses_timezone_aware_shanghai_boundaries(get: Mock, now: datetime, expected: VacationStatus):
     get.return_value = _response(
         {"data": {"records": [{"lcztmc": "已同意", "kssj": "2026-09-17 21:00", "jssj": "2026-09-17 22:00"}]}}
     )
 
-    assert _check_vacation_enabled(_context(), 10, now=now) is expected
+    assert _check_vacation_status(_context(), 10, now=now) is expected
+
+
+@patch("swu_checkin.check_in.requests.get")
+def test_vacation_checks_all_approved_records(get: Mock):
+    get.return_value = _response(
+        {
+            "data": {
+                "records": [
+                    {"lcztmc": "已同意", "kssj": "2026-09-16 08:00", "jssj": "2026-09-16 09:00"},
+                    {"lcztmc": "审核中"},
+                    {"lcztmc": "已同意", "kssj": "2026-09-17 21:00", "jssj": "2026-09-17 22:00"},
+                ]
+            }
+        }
+    )
+
+    result = _check_vacation_status(_context(), 10, now=datetime(2026, 9, 17, 13, 30, tzinfo=UTC))
+
+    assert result is VacationStatus.ACTIVE_LEAVE
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        None,
+        {},
+        {"data": None},
+        {"data": {}},
+        {"data": {"records": None}},
+        {"data": {"records": [None]}},
+        {"data": {"records": [{"lcztmc": "已同意", "kssj": "invalid", "jssj": "invalid"}]}},
+        {"data": {"records": [{"lcztmc": "已同意", "kssj": "2026-09-18 22:00", "jssj": "2026-09-18 21:00"}]}},
+    ],
+)
+@patch("swu_checkin.check_in.requests.get")
+def test_malformed_vacation_response_is_unknown(get: Mock, payload: object):
+    get.return_value = _response(payload)
+
+    assert _check_vacation_status(_context(), 10) is VacationStatus.UNKNOWN
+
+
+@patch("swu_checkin.check_in.requests.get")
+def test_invalid_vacation_json_is_unknown(get: Mock):
+    get.return_value = _response({"data": {"records": []}})
+    get.return_value.json.side_effect = json.JSONDecodeError("invalid", "", 0)
+
+    assert _check_vacation_status(_context(), 10) is VacationStatus.UNKNOWN
+
+
+@pytest.mark.parametrize("error", [requests.Timeout("timeout"), requests.HTTPError("503")])
+@patch("swu_checkin.check_in.requests.get")
+def test_vacation_api_failures_are_unknown(get: Mock, error: requests.RequestException):
+    if isinstance(error, requests.HTTPError):
+        get.return_value = _response({"data": {"records": []}})
+        get.return_value.raise_for_status.side_effect = error
+    else:
+        get.side_effect = error
+
+    assert _check_vacation_status(_context(), 10) is VacationStatus.UNKNOWN
+
+
+@patch("swu_checkin.check_in.requests.post")
+@patch("swu_checkin.check_in.get_transition_today")
+@patch("swu_checkin.check_in._check_vacation_status", return_value=VacationStatus.UNKNOWN)
+@patch("swu_checkin.check_in.get_token", return_value="test-token")
+def test_unknown_vacation_status_stops_checkin_before_task_lookup(
+    _token: Mock, _vacation: Mock, get_transition: Mock, post: Mock
+):
+    assert run_check_in("student", "password") == CheckinStatus.DATA_ERROR
+    get_transition.assert_not_called()
+    post.assert_not_called()
 
 
 def test_valid_dormitory_coordinates_are_normalized():
@@ -136,7 +209,7 @@ def test_invalid_dormitory_coordinates_are_rejected(latitude: object, longitude:
 
 @patch("swu_checkin.check_in.requests.post")
 @patch("swu_checkin.check_in.get_transition_today")
-@patch("swu_checkin.check_in._check_vacation_enabled", return_value=False)
+@patch("swu_checkin.check_in._check_vacation_status", return_value=VacationStatus.NO_ACTIVE_LEAVE)
 @patch("swu_checkin.check_in.get_token", return_value="test-token")
 def test_probe_never_submits(_token: Mock, _vacation: Mock, get_transition: Mock, post: Mock):
     get_transition.return_value = {"id": "record-1", "formId": "form-1", "qdzt": "未签到"}

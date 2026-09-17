@@ -58,6 +58,9 @@ def test_actions_use_locked_dependencies_and_shanghai_timezone():
     assert "uv run --locked --no-dev swu-checkin" in workflow
     assert "pip install" not in workflow
     assert "uv sync --locked --all-groups --python 3.13" in ci
+    assert "actionlint/cmd/actionlint@v1.7.7" in ci
+    assert "systemd-analyze verify deploy/systemd/*.service deploy/systemd/*.timer" in ci
+    assert "uv run --locked pip-audit -r /dev/stdin" in ci
 
 
 def test_actions_treat_status_5_as_success_and_fail_on_real_errors():

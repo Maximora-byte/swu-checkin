@@ -37,3 +37,23 @@ jobs:
 
       - name: Ruff 格式检查
         run: uv run --locked ruff format --check .
+
+      - name: GitHub Actions 语法检查
+        run: go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.7 .github/workflows/*.yml
+
+      - name: systemd 单元校验
+        run: |
+          if ! id -u swu-checkin >/dev/null 2>&1; then
+            sudo useradd --system --no-create-home --shell /usr/sbin/nologin swu-checkin
+          fi
+          sudo install -d /opt/swu-checkin/.venv/bin /etc/swu-checkin
+          sudo install -m 0755 /usr/bin/true /opt/swu-checkin/.venv/bin/swu-checkin
+          sudo install -m 0755 /usr/bin/true /opt/swu-checkin/.venv/bin/swu-checkin-notify
+          sudo install -m 0600 /dev/null /etc/swu-checkin/credentials.env
+          sudo install -m 0600 /dev/null /etc/swu-checkin/notify.env
+          systemd-analyze verify deploy/systemd/*.service deploy/systemd/*.timer
+
+      - name: 生产依赖漏洞审计
+        run: |
+          uv export --locked --no-dev --no-emit-project --format requirements-txt \
+            | uv run --locked pip-audit -r /dev/stdin

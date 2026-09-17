@@ -1,6 +1,12 @@
 """Shared check-in status definitions for every execution environment."""
 
-from enum import IntEnum
+from enum import Enum, IntEnum
+
+
+class VacationStatus(Enum):
+    NO_ACTIVE_LEAVE = "no_active_leave"
+    ACTIVE_LEAVE = "active_leave"
+    UNKNOWN = "unknown"
 
 
 class CheckinStatus(IntEnum):

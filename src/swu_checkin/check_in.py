@@ -16,6 +16,7 @@ from .status import (
     SUCCESSFUL_CHECKIN_STATUSES,
     SUCCESSFUL_PROBE_STATUSES,
     CheckinStatus,
+    VacationStatus,
     is_successful_checkin_status,
     status_message,
 )
@@ -39,33 +40,66 @@ def _env_int(name: str, default: int) -> int:
     return value if value > 0 else default
 
 
-def _check_vacation_enabled(ctx: CheckinContext, timeout: int, *, now: datetime | None = None) -> bool:
-    """检查是否在请假期间"""
+def _check_vacation_status(
+    ctx: CheckinContext,
+    timeout: int,
+    *,
+    now: datetime | None = None,
+) -> VacationStatus:
+    """Fail closed when the approved-leave state cannot be confirmed."""
     headers = {"fighter-auth-token": ctx.token}
     url = "https://of.swu.edu.cn/gateway/fighter-baida/api/xsqjxj/listSelfLeaveData?pageNum=1&pageSize=10"
 
     try:
         response = requests.get(url=url, headers=headers, timeout=timeout)
         response.raise_for_status()
-        data = response.json().get("data", {})
-        records = data.get("records", [])
+        payload = response.json()
+        if not isinstance(payload, dict):
+            raise ValueError("请假接口响应不是对象")
+        data = payload.get("data")
+        if not isinstance(data, dict):
+            raise ValueError("请假接口缺少 data 对象")
+        records = data.get("records")
+        if not isinstance(records, list):
+            raise ValueError("请假接口 records 不是列表")
 
         if not records:
-            return False
-
-        latest = records[0]
-        if latest.get("lcztmc") != "已同意":
-            return False
+            return VacationStatus.NO_ACTIVE_LEAVE
 
         current = now or now_shanghai()
         if current.tzinfo is None:
             raise ValueError("now must be timezone-aware")
-        start = parse_swu_datetime(latest["kssj"])
-        end = parse_swu_datetime(latest["jssj"])
+        malformed_record = False
+        for record in records:
+            if not isinstance(record, dict):
+                malformed_record = True
+                continue
+            approval_status = record.get("lcztmc")
+            if not isinstance(approval_status, str):
+                malformed_record = True
+                continue
+            if approval_status != "已同意":
+                continue
+            try:
+                start_raw = record["kssj"]
+                end_raw = record["jssj"]
+                if not isinstance(start_raw, str) or not isinstance(end_raw, str):
+                    raise ValueError("请假时间不是字符串")
+                start = parse_swu_datetime(start_raw)
+                end = parse_swu_datetime(end_raw)
+                if end < start:
+                    raise ValueError("请假结束时间早于开始时间")
+            except (KeyError, TypeError, ValueError):
+                malformed_record = True
+                continue
+            if start <= current.astimezone(start.tzinfo) <= end:
+                return VacationStatus.ACTIVE_LEAVE
 
-        return start <= current.astimezone(start.tzinfo) <= end
+        if malformed_record:
+            return VacationStatus.UNKNOWN
+        return VacationStatus.NO_ACTIVE_LEAVE
     except (requests.exceptions.RequestException, json.JSONDecodeError, KeyError, ValueError, TypeError):
-        return False
+        return VacationStatus.UNKNOWN
 
 
 def _parse_coordinate(value: object, *, name: str, minimum: float, maximum: float) -> float:
@@ -258,7 +292,10 @@ def check_in(username: str, password: str, timeout: int = 10) -> CheckinStatus:
             return CheckinStatus.LOGIN_FAILED
 
         # 步骤2: 检查请假状态（只调用一次）
-        if _check_vacation_enabled(ctx, timeout):
+        vacation_status = _check_vacation_status(ctx, timeout)
+        if vacation_status is VacationStatus.UNKNOWN:
+            return CheckinStatus.DATA_ERROR
+        if vacation_status is VacationStatus.ACTIVE_LEAVE:
             return CheckinStatus.ON_LEAVE
 
         # 步骤3: 获取今日签到任务（只调用一次，存入上下文）
@@ -287,7 +324,10 @@ def probe_check_in(username: str, password: str, timeout: int = 10) -> CheckinSt
         ctx.token = get_token(username, password, timeout)
         if not ctx.token:
             return CheckinStatus.LOGIN_FAILED
-        if _check_vacation_enabled(ctx, timeout):
+        vacation_status = _check_vacation_status(ctx, timeout)
+        if vacation_status is VacationStatus.UNKNOWN:
+            return CheckinStatus.DATA_ERROR
+        if vacation_status is VacationStatus.ACTIVE_LEAVE:
             return CheckinStatus.ON_LEAVE
         ctx.transition = get_transition_today(ctx.token, timeout)
         if not ctx.transition:
