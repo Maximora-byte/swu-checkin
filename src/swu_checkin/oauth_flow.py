@@ -229,12 +229,12 @@ def _validate_legacy_authorize_url(value: str, expected_authorize_url: str) -> N
         port = parsed.port
     except ValueError as error:
         raise OAuthDiscoveryError("登录表单 goto 无效") from error
+    valid_port = (parsed.scheme == "http" and port in (None, 80)) or (parsed.scheme == "https" and port in (None, 443))
     if (
-        parsed.scheme not in {"http", "https"}
+        not valid_port
         or parsed.hostname != "idm.swu.edu.cn"
         or parsed.username is not None
         or parsed.password is not None
-        or port not in (None, 80, 443)
         or parsed.path != "/am/oauth2/authorize"
         or parsed.fragment
     ):

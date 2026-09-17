@@ -298,6 +298,41 @@ def test_legacy_idm_http_redirect_is_upgraded_but_other_http_is_rejected():
         oauth_flow._resolve_legacy_idm_login_redirect(invalid)
 
 
+@pytest.mark.parametrize(
+    ("scheme", "port"),
+    [
+        ("http", None),
+        ("http", 80),
+        ("https", None),
+        ("https", 443),
+    ],
+)
+def test_legacy_authorize_url_accepts_only_matching_default_ports(scheme: str, port: int | None):
+    cas_login_url = _cas_login_url(_authorize_url())
+    expected = oauth_flow._build_idm_authorize_url(cas_login_url)
+    parsed = urllib.parse.urlsplit(expected)
+    netloc = parsed.hostname if port is None else f"{parsed.hostname}:{port}"
+    legacy = urllib.parse.urlunsplit((scheme, netloc, parsed.path, parsed.query, ""))
+
+    oauth_flow._validate_legacy_authorize_url(legacy, expected)
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "http://idm.swu.edu.cn:443/am/oauth2/authorize",
+        "https://idm.swu.edu.cn:80/am/oauth2/authorize",
+    ],
+)
+def test_legacy_authorize_url_rejects_mismatched_scheme_and_port(url: str):
+    cas_login_url = _cas_login_url(_authorize_url())
+    expected = oauth_flow._build_idm_authorize_url(cas_login_url)
+    query = urllib.parse.urlsplit(expected).query
+
+    with pytest.raises(oauth_flow.OAuthDiscoveryError):
+        oauth_flow._validate_legacy_authorize_url(f"{url}?{query}", expected)
+
+
 def test_callback_builder_uses_discovered_callback_and_state():
     session, _, _, _ = _valid_discovery_session()
     flow = oauth_flow.discover_login_flow(session)
