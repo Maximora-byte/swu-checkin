@@ -190,15 +190,29 @@ def extract_ticket_from_url(url: str) -> str | None:
     return urllib.parse.unquote(url).split("ticket=")[1]
 
 
+def _uses_default_https_port(parsed: urllib.parse.SplitResult) -> bool:
+    try:
+        return (
+            parsed.scheme == "https"
+            and parsed.username is None
+            and parsed.password is None
+            and parsed.port in (None, 443)
+        )
+    except ValueError:
+        return False
+
+
 def validate_idm_login_response(response: requests.Response) -> None:
     """Accept SWU's ticket-bearing 412 callback, but reject every other HTTP error."""
     if response.status_code == 412:
         parsed = urllib.parse.urlsplit(response.url)
         query = urllib.parse.parse_qs(parsed.query)
         if (
-            parsed.scheme == "https"
+            _uses_default_https_port(parsed)
             and parsed.hostname == "uaaap.swu.edu.cn"
             and parsed.path == "/cas/oauth2.0/callbackAuthorize"
+            and not parsed.fragment
+            and set(query) == {"ticket"}
             and query.get("ticket")
         ):
             return
@@ -209,7 +223,14 @@ def validate_cas_callback_response(response: requests.Response) -> None:
     """Accept SWU's ticket-bearing 404 landing page, but reject every other HTTP error."""
     if response.status_code == 404:
         parsed = urllib.parse.urlsplit(response.url)
-        if parsed.scheme == "https" and parsed.hostname == "of.swu.edu.cn" and extract_ticket_from_url(response.url):
+        if (
+            _uses_default_https_port(parsed)
+            and parsed.hostname == "of.swu.edu.cn"
+            and re.fullmatch(r"/&ticket=[^/?#]+", parsed.path)
+            and not parsed.query
+            and not parsed.fragment
+            and extract_ticket_from_url(response.url)
+        ):
             return
     response.raise_for_status()
 

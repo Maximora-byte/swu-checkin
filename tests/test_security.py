@@ -71,11 +71,15 @@ def test_short_and_empty_values_are_fully_masked():
     assert mask_sensitive_data("") == "****"
 
 
-def test_ticket_bearing_swu_412_callback_is_accepted():
-    response = Mock(
-        status_code=412,
-        url="https://uaaap.swu.edu.cn/cas/oauth2.0/callbackAuthorize?ticket=ST-test",
-    )
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://uaaap.swu.edu.cn/cas/oauth2.0/callbackAuthorize?ticket=ST-test",
+        "https://uaaap.swu.edu.cn:443/cas/oauth2.0/callbackAuthorize?ticket=ST-test",
+    ],
+)
+def test_ticket_bearing_swu_412_callback_is_accepted(url: str):
+    response = Mock(status_code=412, url=url)
 
     validate_idm_login_response(response)
 
@@ -89,6 +93,7 @@ def test_ticket_bearing_swu_412_callback_is_accepted():
         "http://uaaap.swu.edu.cn/cas/oauth2.0/callbackAuthorize?ticket=ST-test",
         "https://example.invalid/cas/oauth2.0/callbackAuthorize?ticket=ST-test",
         "https://uaaap.swu.edu.cn/unexpected?ticket=ST-test",
+        "https://uaaap.swu.edu.cn:444/cas/oauth2.0/callbackAuthorize?ticket=ST-test",
     ],
 )
 def test_untrusted_or_ticketless_412_callback_is_rejected(url: str):
@@ -99,11 +104,15 @@ def test_untrusted_or_ticketless_412_callback_is_rejected(url: str):
         validate_idm_login_response(response)
 
 
-def test_ticket_bearing_swu_404_landing_page_is_accepted():
-    response = Mock(
-        status_code=404,
-        url="https://of.swu.edu.cn/&ticket=ST-test",
-    )
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://of.swu.edu.cn/&ticket=ST-test",
+        "https://of.swu.edu.cn:443/&ticket=ST-test",
+    ],
+)
+def test_ticket_bearing_swu_404_landing_page_is_accepted(url: str):
+    response = Mock(status_code=404, url=url)
 
     validate_cas_callback_response(response)
 
@@ -116,6 +125,9 @@ def test_ticket_bearing_swu_404_landing_page_is_accepted():
         "https://of.swu.edu.cn/",
         "http://of.swu.edu.cn/&ticket=ST-test",
         "https://example.invalid/&ticket=ST-test",
+        "https://of.swu.edu.cn/unexpected?ticket=ST-test",
+        "https://of.swu.edu.cn/cas/oauth/callback?ticket=ST-test",
+        "https://of.swu.edu.cn:444/&ticket=ST-test",
     ],
 )
 def test_untrusted_or_ticketless_404_landing_page_is_rejected(url: str):
