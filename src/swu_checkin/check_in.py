@@ -1,8 +1,11 @@
 import json
 import os
+import tempfile
 import time
 from datetime import datetime
 from getpass import getpass
+from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import requests
 
@@ -25,6 +28,8 @@ RETRYABLE_STATUS = {0, 3, 4}
 DEFAULT_MAX_ATTEMPTS = 3
 DEFAULT_RETRY_DELAY = 8
 SUCCESS_CODES = {"0", "200", "20000", "00000", "success", "ok", "true"}
+SUCCESSFUL_CHECKIN_RESULTS = {1, 2, 5}
+SHANGHAI_TIMEZONE = ZoneInfo("Asia/Shanghai")
 
 
 def _env_int(name: str, default: int) -> int:
@@ -308,13 +313,65 @@ def check_in_with_retry(
     return last_result
 
 
+def _record_run_status(status_path: str, result: int) -> None:
+    """Record non-sensitive per-day results for the Telegram summary job."""
+    path = Path(status_path)
+    now = datetime.now(SHANGHAI_TIMEZONE)
+    today = now.date().isoformat()
+    current: dict = {}
+    try:
+        current = json.loads(path.read_text(encoding="utf-8"))
+    except (FileNotFoundError, json.JSONDecodeError, OSError, TypeError):
+        pass
+
+    attempts = current.get("attempts", []) if current.get("date") == today else []
+    if not isinstance(attempts, list):
+        attempts = []
+    attempts.append(
+        {
+            "at": now.isoformat(timespec="seconds"),
+            "code": result,
+            "message": STATUS_MESSAGES.get(result, "未知状态"),
+        }
+    )
+    attempts = attempts[-10:]
+    payload = {
+        "date": today,
+        "attempts": attempts,
+        "successful": any(attempt.get("code") in SUCCESSFUL_CHECKIN_RESULTS for attempt in attempts),
+    }
+
+    path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+    descriptor, temporary_name = tempfile.mkstemp(prefix=".status.", dir=path.parent, text=True)
+    try:
+        os.fchmod(descriptor, 0o600)
+        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+            json.dump(payload, handle, ensure_ascii=False, separators=(",", ":"))
+            handle.write("\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary_name, path)
+    except BaseException:
+        try:
+            os.unlink(temporary_name)
+        except FileNotFoundError:
+            pass
+        raise
+
+
 def main() -> int:
     username = os.getenv("SWUDK_USERNAME") or input("校园网账号：").strip()
     password = os.getenv("SWUDK_PASSWORD") or getpass("校园网密码：")
     probe_only = os.getenv("SWUDK_PROBE_ONLY") == "1"
     result = probe_check_in(username, password, 10) if probe_only else check_in_with_retry(username, password, 10)
     print(f"[{result}] {STATUS_MESSAGES.get(result, '未知状态')}")
-    successful_results = {0, 2, 5, 6} if probe_only else {1, 2}
+    status_file = os.getenv("SWUDK_STATUS_FILE")
+    if status_file and not probe_only:
+        try:
+            _record_run_status(status_file, result)
+        except OSError as error:
+            print(f"状态记录失败：{type(error).__name__}")
+    successful_results = {0, 2, 5, 6} if probe_only else SUCCESSFUL_CHECKIN_RESULTS
     return 0 if result in successful_results else 1
 
 

@@ -23,6 +23,7 @@ dev = [
 
 [project.scripts]
 swu-checkin = "swu_checkin.check_in:main"
+swu-checkin-notify = "swu_checkin.notify:main"
 
 [build-system]
 requires = ["hatchling"]

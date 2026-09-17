@@ -1,0 +1,34 @@
+[Unit]
+Description=Send the daily SWU check-in result to Telegram
+Documentation=https://github.com/Maximora-byte/swu-checkin
+After=network-online.target swu-checkin.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+WorkingDirectory=/opt/swu-checkin
+Environment=TZ=Asia/Shanghai
+Environment=SWUDK_STATE_DIR=/var/lib/swu-checkin
+Environment=SWUDK_NOTIFY_CHANNEL=telegram
+Environment=SWUDK_NOTIFY_ACCOUNT=default
+Environment=SWUDK_NOTIFY_TARGET=5823996119
+ExecStart=/opt/swu-checkin/.venv/bin/swu-checkin-notify
+StateDirectory=swu-checkin
+StateDirectoryMode=0700
+UMask=0077
+TimeoutStartSec=90
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=read-only
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+CapabilityBoundingSet=
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6

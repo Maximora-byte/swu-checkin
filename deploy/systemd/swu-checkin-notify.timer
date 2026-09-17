@@ -1,0 +1,12 @@
+[Unit]
+Description=Send the final SWU check-in result each evening
+
+[Timer]
+OnCalendar=*-*-* 21:50:00 Asia/Shanghai
+AccuracySec=30s
+RandomizedDelaySec=0
+Persistent=false
+Unit=swu-checkin-notify.service
+
+[Install]
+WantedBy=timers.target

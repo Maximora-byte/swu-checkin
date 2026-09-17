@@ -9,6 +9,7 @@
 - 服务进程明确设置 `TZ=Asia/Shanghai`。
 - timer 不启用持久补跑，避免服务器在签到窗口外启动后提交过期任务。
 - 部署前先运行 `swu-checkin-probe.service` 做只读探测；该服务只登录并读取任务，不提交签到。
+- 签到任务把非敏感结果写入 `/var/lib/swu-checkin/status.json`；通知 timer 每天 21:50 汇总一次并发送 Telegram。
 
 部署完成后，在服务器终端运行凭据录入器：
 
@@ -31,12 +32,15 @@ SWUDK_PASSWORD=密码
 systemctl start swu-checkin-probe.service
 systemctl status swu-checkin-probe.service
 systemctl status swu-checkin.timer
+systemctl status swu-checkin-notify.timer
 systemctl list-timers swu-checkin.timer
 journalctl -u swu-checkin.service
+journalctl -u swu-checkin-notify.service
 ```
 
 停用：
 
 ```bash
 sudo systemctl disable --now swu-checkin.timer
+sudo systemctl disable --now swu-checkin-notify.timer
 ```

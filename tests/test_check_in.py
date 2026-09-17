@@ -1,7 +1,9 @@
+import json
 from unittest.mock import Mock, patch
 
 from swu_checkin.cache import CheckinContext
-from swu_checkin.check_in import _business_response_succeeded, _submit_checkin, probe_check_in
+from swu_checkin.check_in import _business_response_succeeded, _record_run_status, _submit_checkin, probe_check_in
+from swu_checkin.notify import _build_message
 
 
 def _context() -> CheckinContext:
@@ -62,3 +64,26 @@ def test_probe_never_submits(_token: Mock, _vacation: Mock, get_transition: Mock
 
     assert probe_check_in("student", "password") == 6
     post.assert_not_called()
+
+
+def test_status_record_preserves_an_earlier_success(tmp_path):
+    status_file = tmp_path / "status.json"
+
+    _record_run_status(str(status_file), 1)
+    _record_run_status(str(status_file), 4)
+
+    payload = json.loads(status_file.read_text(encoding="utf-8"))
+    assert payload["successful"] is True
+    assert [attempt["code"] for attempt in payload["attempts"]] == [1, 4]
+
+
+def test_notification_prefers_any_successful_attempt():
+    attempts = [
+        {"code": 1, "message": "签到成功"},
+        {"code": 4, "message": "网络错误或数据异常"},
+    ]
+
+    message = _build_message(attempts, "2026-09-17", "")
+
+    assert message.startswith("✅ SWU 宿舍签到成功")
+    assert "今日执行：2 次" in message
