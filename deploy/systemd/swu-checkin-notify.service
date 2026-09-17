@@ -14,9 +14,12 @@ Environment=SWUDK_STATE_DIR=/var/lib/swu-checkin
 Environment=SWUDK_NOTIFY_CHANNEL=telegram
 Environment=SWUDK_NOTIFY_ACCOUNT=default
 Environment=SWUDK_NOTIFY_TARGET=5823996119
+Environment=XDG_CACHE_HOME=/var/cache/swu-checkin
 ExecStart=/opt/swu-checkin/.venv/bin/swu-checkin-notify
 StateDirectory=swu-checkin
 StateDirectoryMode=0700
+CacheDirectory=swu-checkin
+CacheDirectoryMode=0700
 UMask=0077
 TimeoutStartSec=90
 NoNewPrivileges=true
@@ -24,6 +27,7 @@ PrivateTmp=true
 PrivateDevices=true
 ProtectSystem=strict
 ProtectHome=read-only
+ReadWritePaths=/root/.openclaw/state
 ProtectKernelTunables=true
 ProtectKernelModules=true
 ProtectKernelLogs=true
