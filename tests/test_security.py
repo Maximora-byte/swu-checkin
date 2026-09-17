@@ -1,6 +1,15 @@
-import pytest
+from unittest.mock import Mock
 
-from swu_checkin.get_info import debug_print, mask_sensitive_data, safe_print
+import pytest
+import requests
+
+from swu_checkin.get_info import (
+    debug_print,
+    mask_sensitive_data,
+    safe_print,
+    validate_cas_callback_response,
+    validate_idm_login_response,
+)
 
 
 def test_safe_print_suppresses_sensitive_values(capsys: pytest.CaptureFixture[str]):
@@ -60,3 +69,58 @@ def test_mask_sensitive_data(value: str, show_chars: int, expected_prefix: str, 
 def test_short_and_empty_values_are_fully_masked():
     assert mask_sensitive_data("abc") == "****"
     assert mask_sensitive_data("") == "****"
+
+
+def test_ticket_bearing_swu_412_callback_is_accepted():
+    response = Mock(
+        status_code=412,
+        url="https://uaaap.swu.edu.cn/cas/oauth2.0/callbackAuthorize?ticket=ST-test",
+    )
+
+    validate_idm_login_response(response)
+
+    response.raise_for_status.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://uaaap.swu.edu.cn/cas/oauth2.0/callbackAuthorize",
+        "http://uaaap.swu.edu.cn/cas/oauth2.0/callbackAuthorize?ticket=ST-test",
+        "https://example.invalid/cas/oauth2.0/callbackAuthorize?ticket=ST-test",
+        "https://uaaap.swu.edu.cn/unexpected?ticket=ST-test",
+    ],
+)
+def test_untrusted_or_ticketless_412_callback_is_rejected(url: str):
+    response = Mock(status_code=412, url=url)
+    response.raise_for_status.side_effect = requests.HTTPError("412")
+
+    with pytest.raises(requests.HTTPError):
+        validate_idm_login_response(response)
+
+
+def test_ticket_bearing_swu_404_landing_page_is_accepted():
+    response = Mock(
+        status_code=404,
+        url="https://of.swu.edu.cn/&ticket=ST-test",
+    )
+
+    validate_cas_callback_response(response)
+
+    response.raise_for_status.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://of.swu.edu.cn/",
+        "http://of.swu.edu.cn/&ticket=ST-test",
+        "https://example.invalid/&ticket=ST-test",
+    ],
+)
+def test_untrusted_or_ticketless_404_landing_page_is_rejected(url: str):
+    response = Mock(status_code=404, url=url)
+    response.raise_for_status.side_effect = requests.HTTPError("404")
+
+    with pytest.raises(requests.HTTPError):
+        validate_cas_callback_response(response)

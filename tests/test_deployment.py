@@ -20,9 +20,9 @@ def test_notifier_keeps_required_openclaw_access_narrow():
     unit = _read("deploy/systemd/swu-checkin-notify.service")
 
     assert "User=root" in unit
-    assert "Group=root" in unit
+    assert "Group=swu-checkin" in unit
     assert "ProtectHome=read-only" in unit
-    assert "ReadWritePaths=/root/.openclaw/state" in unit
+    assert "ReadWritePaths=/var/lib/swu-checkin /root/.openclaw/state" in unit
     assert "CacheDirectory=swu-checkin" in unit
     assert "StateDirectory=" not in unit
 
@@ -34,7 +34,7 @@ def test_checkin_service_uses_dedicated_account_and_private_state():
     assert "User=swu-checkin" in unit
     assert "Group=swu-checkin" in unit
     assert "StateDirectory=swu-checkin" in unit
-    assert "StateDirectoryMode=0700" in unit
+    assert "StateDirectoryMode=0770" in unit
     assert "User=swu-checkin" in probe
     assert "Group=swu-checkin" in probe
 

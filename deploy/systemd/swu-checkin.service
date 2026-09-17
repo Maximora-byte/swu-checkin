@@ -18,7 +18,7 @@ Environment=SWUDK_RETRY_DELAY=8
 Environment=SWUDK_STATUS_FILE=/var/lib/swu-checkin/status.json
 ExecStart=/opt/swu-checkin/.venv/bin/swu-checkin
 StateDirectory=swu-checkin
-StateDirectoryMode=0700
+StateDirectoryMode=0770
 UMask=0077
 NoNewPrivileges=true
 PrivateTmp=true

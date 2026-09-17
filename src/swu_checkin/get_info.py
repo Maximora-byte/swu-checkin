@@ -190,6 +190,30 @@ def extract_ticket_from_url(url: str) -> str | None:
     return urllib.parse.unquote(url).split("ticket=")[1]
 
 
+def validate_idm_login_response(response: requests.Response) -> None:
+    """Accept SWU's ticket-bearing 412 callback, but reject every other HTTP error."""
+    if response.status_code == 412:
+        parsed = urllib.parse.urlsplit(response.url)
+        query = urllib.parse.parse_qs(parsed.query)
+        if (
+            parsed.scheme == "https"
+            and parsed.hostname == "uaaap.swu.edu.cn"
+            and parsed.path == "/cas/oauth2.0/callbackAuthorize"
+            and query.get("ticket")
+        ):
+            return
+    response.raise_for_status()
+
+
+def validate_cas_callback_response(response: requests.Response) -> None:
+    """Accept SWU's ticket-bearing 404 landing page, but reject every other HTTP error."""
+    if response.status_code == 404:
+        parsed = urllib.parse.urlsplit(response.url)
+        if parsed.scheme == "https" and parsed.hostname == "of.swu.edu.cn" and extract_ticket_from_url(response.url):
+            return
+    response.raise_for_status()
+
+
 # ===== 主要登录流程 =====
 def get_token(username: str, password: str, timeout: int = 10) -> str:
     """
@@ -266,7 +290,7 @@ def _get_token(username: str, password: str, timeout: int, max_login_attempts: i
             # 步骤 5: 提交登录表单
             form_data = build_login_form_data(encrypted_username, encrypted_password, captcha)
             response = session.post(f"{IDM_BASE_URL}/UI/Login", data=form_data, timeout=timeout)
-            response.raise_for_status()
+            validate_idm_login_response(response)
 
             # 检查是否因验证码错误导致登录失败
             if "验证码" in response.text or "validateCode" in response.text:
@@ -296,7 +320,7 @@ def _get_token(username: str, password: str, timeout: int, max_login_attempts: i
             # 步骤 8a: 使用转换后的 ticket 访问回调
             callback_url = f"{CAS_CALLBACK_URL}?code={ticket_cd}@@hxbeat&state={state}"
             response = session.get(callback_url, timeout=timeout)
-            response.raise_for_status()
+            validate_cas_callback_response(response)
 
             # 步骤 8b: 从最终回调 URL 获取 token ticket
             token_st = extract_ticket_from_url(response.url)
