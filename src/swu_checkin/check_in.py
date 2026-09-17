@@ -405,7 +405,7 @@ def _record_run_status(status_path: str, result: CheckinStatus | int) -> None:
     path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
     descriptor, temporary_name = tempfile.mkstemp(prefix=".status.", dir=path.parent, text=True)
     try:
-        os.fchmod(descriptor, 0o600)
+        os.fchmod(descriptor, 0o640)
         with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
             json.dump(payload, handle, ensure_ascii=False, separators=(",", ":"))
             handle.write("\n")

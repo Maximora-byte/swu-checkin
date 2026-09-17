@@ -20,11 +20,14 @@ def test_notifier_keeps_required_openclaw_access_narrow():
     unit = _read("deploy/systemd/swu-checkin-notify.service")
 
     assert "User=root" in unit
-    assert "Group=root" in unit
+    assert "Group=swu-checkin" in unit
     assert "ProtectHome=read-only" in unit
-    assert "ReadWritePaths=/root/.openclaw/state" in unit
+    assert "ReadWritePaths=/var/lib/swu-checkin /root/.openclaw/state" in unit
     assert "CacheDirectory=swu-checkin" in unit
     assert "StateDirectory=" not in unit
+    assert "CapabilityBoundingSet=" in unit
+    assert "CAP_DAC_OVERRIDE" not in unit
+    assert "CAP_DAC_READ_SEARCH" not in unit
 
 
 def test_checkin_service_uses_dedicated_account_and_private_state():
@@ -34,7 +37,7 @@ def test_checkin_service_uses_dedicated_account_and_private_state():
     assert "User=swu-checkin" in unit
     assert "Group=swu-checkin" in unit
     assert "StateDirectory=swu-checkin" in unit
-    assert "StateDirectoryMode=0700" in unit
+    assert "StateDirectoryMode=0770" in unit
     assert "User=swu-checkin" in probe
     assert "Group=swu-checkin" in probe
 
@@ -61,6 +64,7 @@ def test_actions_use_locked_dependencies_and_shanghai_timezone():
     assert "actionlint/cmd/actionlint@v1.7.7" in ci
     assert "systemd-analyze verify deploy/systemd/*.service deploy/systemd/*.timer" in ci
     assert "uv run --locked pip-audit -r /dev/stdin" in ci
+    assert "verify-state-permissions.sh" in ci
 
 
 def test_actions_treat_status_5_as_success_and_fail_on_real_errors():

@@ -1,5 +1,6 @@
 import importlib
 import json
+import stat
 from datetime import UTC, datetime
 from unittest.mock import Mock, patch
 
@@ -244,6 +245,7 @@ def test_status_record_preserves_an_earlier_success(tmp_path):
     payload = json.loads(status_file.read_text(encoding="utf-8"))
     assert payload["successful"] is True
     assert [attempt["code"] for attempt in payload["attempts"]] == [1, 4]
+    assert stat.S_IMODE(status_file.stat().st_mode) == 0o640
 
 
 @pytest.mark.parametrize(

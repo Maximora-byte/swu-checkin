@@ -8,7 +8,7 @@ Wants=network-online.target
 Type=oneshot
 # OpenClaw is installed for root and reads root-owned channel configuration/state.
 User=root
-Group=root
+Group=swu-checkin
 WorkingDirectory=/opt/swu-checkin
 EnvironmentFile=/etc/swu-checkin/notify.env
 Environment=TZ=Asia/Shanghai
@@ -26,7 +26,7 @@ PrivateTmp=true
 PrivateDevices=true
 ProtectSystem=strict
 ProtectHome=read-only
-ReadWritePaths=/root/.openclaw/state
+ReadWritePaths=/var/lib/swu-checkin /root/.openclaw/state
 ProtectKernelTunables=true
 ProtectKernelModules=true
 ProtectKernelLogs=true

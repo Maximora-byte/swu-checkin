@@ -53,6 +53,9 @@ jobs:
           sudo install -m 0600 /dev/null /etc/swu-checkin/notify.env
           systemd-analyze verify deploy/systemd/*.service deploy/systemd/*.timer
 
+      - name: 状态文件 Unix 权限验证
+        run: sudo env SWUDK_TEST_PYTHON="$PWD/.venv/bin/python" bash deploy/verify-state-permissions.sh
+
       - name: 生产依赖漏洞审计
         run: |
           uv export --locked --no-dev --no-emit-project --format requirements-txt \
