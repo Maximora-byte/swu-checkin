@@ -1,0 +1,35 @@
+[Unit]
+Description=SWU dormitory check-in
+Documentation=https://github.com/Maximora-byte/swu-checkin
+After=network-online.target
+Wants=network-online.target
+ConditionPathExists=/etc/swu-checkin/credentials.env
+
+[Service]
+Type=oneshot
+User=swu-checkin
+Group=swu-checkin
+WorkingDirectory=/opt/swu-checkin
+EnvironmentFile=/etc/swu-checkin/credentials.env
+Environment=TZ=Asia/Shanghai
+Environment=PYTHONDONTWRITEBYTECODE=1
+Environment=SWUDK_MAX_ATTEMPTS=3
+Environment=SWUDK_RETRY_DELAY=8
+ExecStart=/opt/swu-checkin/.venv/bin/swu-checkin
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+CapabilityBoundingSet=
+RestrictAddressFamilies=AF_INET AF_INET6
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,31 @@
+[Unit]
+Description=Probe SWU dormitory check-in without submitting
+Documentation=https://github.com/Maximora-byte/swu-checkin
+After=network-online.target
+Wants=network-online.target
+ConditionPathExists=/etc/swu-checkin/credentials.env
+
+[Service]
+Type=oneshot
+User=swu-checkin
+Group=swu-checkin
+WorkingDirectory=/opt/swu-checkin
+EnvironmentFile=/etc/swu-checkin/credentials.env
+Environment=TZ=Asia/Shanghai
+Environment=PYTHONDONTWRITEBYTECODE=1
+Environment=SWUDK_PROBE_ONLY=1
+ExecStart=/opt/swu-checkin/.venv/bin/swu-checkin
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+CapabilityBoundingSet=
+RestrictAddressFamilies=AF_INET AF_INET6

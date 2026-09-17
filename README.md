@@ -22,6 +22,8 @@
 
 ## 快速开始
 
+如需在长期在线的 Linux 主机上准时运行，优先使用 [systemd 部署方式](DEPLOYMENT.md)。
+
 ### 方式一：GitHub Actions 自动签到
 
 ⚠️ **重要提示：GitHub Actions 存在严重的排队延迟问题**

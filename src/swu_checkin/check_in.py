@@ -1,13 +1,13 @@
-from datetime import datetime
-from getpass import getpass
 import json
 import os
 import time
+from datetime import datetime
+from getpass import getpass
 
 import requests
 
-from .get_info import get_dormitory, get_student_id, get_transition_today, get_token, mask_sensitive_data
 from .cache import CheckinContext
+from .get_info import get_dormitory, get_student_id, get_token, get_transition_today
 
 STATUS_MESSAGES = {
     0: "今日无签到记录",
@@ -16,6 +16,7 @@ STATUS_MESSAGES = {
     3: "登录失败",
     4: "网络错误或数据异常",
     5: "请假期间无需签到",
+    6: "检测到待签到任务（未提交）",
 }
 
 # 终态不重试：成功 / 已签到 / 请假
@@ -23,6 +24,7 @@ STATUS_MESSAGES = {
 RETRYABLE_STATUS = {0, 3, 4}
 DEFAULT_MAX_ATTEMPTS = 3
 DEFAULT_RETRY_DELAY = 8
+SUCCESS_CODES = {"0", "200", "20000", "00000", "success", "ok", "true"}
 
 
 def _env_int(name: str, default: int) -> int:
@@ -40,23 +42,23 @@ def _check_vacation_enabled(ctx: CheckinContext, timeout: int) -> bool:
     """检查是否在请假期间"""
     headers = {"fighter-auth-token": ctx.token}
     url = "https://of.swu.edu.cn/gateway/fighter-baida/api/xsqjxj/listSelfLeaveData?pageNum=1&pageSize=10"
-    
+
     try:
         response = requests.get(url=url, headers=headers, timeout=timeout)
         data = response.json().get("data", {})
         records = data.get("records", [])
-        
+
         if not records:
             return False
-        
+
         latest = records[0]
         if latest.get("lcztmc") != "已同意":
             return False
-        
+
         now = datetime.now()
         start = datetime.strptime(latest["kssj"], "%Y-%m-%d %H:%M")
         end = datetime.strptime(latest["jssj"], "%Y-%m-%d %H:%M")
-        
+
         return start <= now <= end
     except (requests.exceptions.RequestException, KeyError, ValueError):
         return False
@@ -70,23 +72,61 @@ def _parse_dormitory_data(dormitory_list: list) -> tuple[dict, str, str]:
     location = None
     building = None
     room = None
-    
+
     for item in dormitory_list:
         prop = item.get("prop", "")
         if prop == "qddz":
-            location = {
-                "latitude": item.get("latitude"),
-                "longitude": item.get("longitude")
-            }
+            location = {"latitude": item.get("latitude"), "longitude": item.get("longitude")}
         elif prop == "qsqddd":
             building = item.get("value")
         elif prop == "qdbj":
             room = item.get("value")
-    
+
     if not all([location, building, room]):
         raise ValueError("宿舍信息不完整")
-    
+
     return location, building, room
+
+
+def _business_response_succeeded(payload: object) -> bool:
+    """仅在响应包含明确成功信号时返回 True。"""
+    if not isinstance(payload, dict):
+        return False
+
+    nested = payload.get("data") if isinstance(payload.get("data"), dict) else {}
+    code_value = payload.get("code", payload.get("status", nested.get("code", nested.get("status"))))
+    result_value = payload.get(
+        "success",
+        payload.get("result", payload.get("ok", nested.get("success", nested.get("result", nested.get("ok"))))),
+    )
+
+    if code_value is not None and str(code_value).strip().lower() not in SUCCESS_CODES:
+        return False
+    if result_value is False or result_value == 0:
+        return False
+    if isinstance(result_value, str) and result_value.strip().lower() in {"false", "0", "fail", "failed", "error"}:
+        return False
+
+    return (
+        code_value is not None
+        or result_value is True
+        or result_value == 1
+        or (isinstance(result_value, str) and result_value.strip().lower() in {"success", "ok", "true", "1"})
+    )
+
+
+def _confirm_checkin(token: str, timeout: int) -> bool:
+    """提交后短暂轮询，确认服务端状态确实变为“已签到”。"""
+    for delay in (0, 0.3, 0.6, 1.0):
+        if delay:
+            time.sleep(delay)
+        try:
+            transition = get_transition_today(token, timeout)
+        except (requests.exceptions.RequestException, KeyError, ValueError, TypeError, json.JSONDecodeError):
+            continue
+        if transition and transition.get("qdzt") == "已签到":
+            return True
+    return False
 
 
 def _submit_checkin(ctx: CheckinContext, timeout: int) -> int:
@@ -98,31 +138,28 @@ def _submit_checkin(ctx: CheckinContext, timeout: int) -> int:
         # 从上下文获取已缓存的数据
         form_id = ctx.transition["formId"]
         record_id = ctx.transition["id"]
-        
+
         # 如果宿舍信息未缓存，则获取
         if not ctx.has_dormitory_info():
             dorm_response = get_dormitory(ctx.token, timeout)
             column_list = dorm_response.get("data", {}).get("columnList", [])
             location, building, room = _parse_dormitory_data(column_list)
-            
+
             # 缓存到上下文
             ctx.dormitory_data = dorm_response
             ctx.building = building
             ctx.room = room
             ctx.latitude = location["latitude"]
             ctx.longitude = location["longitude"]
-        
+
         # 如果学号未缓存，则获取
         if not ctx.has_student_id():
             ctx.student_id = get_student_id(ctx.token, timeout)
-        
-        headers = {
-            "fighter-auth-token": ctx.token,
-            "Content-Type": "application/json;charset=UTF-8"
-        }
+
+        headers = {"fighter-auth-token": ctx.token, "Content-Type": "application/json;charset=UTF-8"}
         url = "https://of.swu.edu.cn/gateway/fighter-baida/api/form-instance/save"
         params = {"formId": form_id, "isSubmitProcess": False}
-        
+
         payload = {
             "id": record_id,
             "formId": form_id,
@@ -148,20 +185,23 @@ def _submit_checkin(ctx: CheckinContext, timeout: int) -> int:
                 "cityAdCode": "023",
                 "districtAdCode": "500109",
                 "isArea": True,
-                "tip": "当前在签到范围内"
-            }
+                "tip": "当前在签到范围内",
+            },
         }
-        
-        response = requests.post(
-            url,
-            headers=headers,
-            params=params,
-            data=json.dumps(payload),
-            timeout=timeout
-        )
+
+        response = requests.post(url, headers=headers, params=params, data=json.dumps(payload), timeout=timeout)
         response.raise_for_status()
-        return 1
-        
+        payload = response.json()
+        business_success = _business_response_succeeded(payload)
+        confirmed = _confirm_checkin(ctx.token, timeout)
+        if confirmed:
+            return 1
+        if business_success:
+            print("签到请求已提交，但未能确认服务端签到状态")
+        else:
+            print("签到接口未返回明确成功状态，且服务端状态未变更")
+        return 4
+
     except requests.exceptions.RequestException:
         return 4
     except (KeyError, ValueError, TypeError):
@@ -183,7 +223,7 @@ def check_in(username: str, password: str, timeout: int = 10) -> int:
     try:
         # 创建会话上下文，避免一次 action 中重复调用
         ctx = CheckinContext()
-        
+
         # 步骤1: 登录获取 token（只调用一次）
         ctx.token = get_token(username, password, timeout)
         if not ctx.token:
@@ -205,7 +245,30 @@ def check_in(username: str, password: str, timeout: int = 10) -> int:
         # 步骤5: 执行签到（使用上下文中已缓存的数据）
         result = _submit_checkin(ctx, timeout)
         return result
-        
+
+    except (KeyboardInterrupt, SystemExit):
+        raise
+    except (requests.exceptions.RequestException, KeyError, ValueError, TypeError, json.JSONDecodeError):
+        return 4
+    except Exception:
+        return 4
+
+
+def probe_check_in(username: str, password: str, timeout: int = 10) -> int:
+    """只验证登录并读取任务状态，绝不提交签到。"""
+    try:
+        ctx = CheckinContext()
+        ctx.token = get_token(username, password, timeout)
+        if not ctx.token:
+            return 3
+        if _check_vacation_enabled(ctx, timeout):
+            return 5
+        ctx.transition = get_transition_today(ctx.token, timeout)
+        if not ctx.transition:
+            return 0
+        if ctx.transition.get("qdzt") == "已签到":
+            return 2
+        return 6
     except (KeyboardInterrupt, SystemExit):
         raise
     except (requests.exceptions.RequestException, KeyError, ValueError, TypeError, json.JSONDecodeError):
@@ -248,9 +311,11 @@ def check_in_with_retry(
 def main() -> int:
     username = os.getenv("SWUDK_USERNAME") or input("校园网账号：").strip()
     password = os.getenv("SWUDK_PASSWORD") or getpass("校园网密码：")
-    result = check_in_with_retry(username, password, 10)
+    probe_only = os.getenv("SWUDK_PROBE_ONLY") == "1"
+    result = probe_check_in(username, password, 10) if probe_only else check_in_with_retry(username, password, 10)
     print(f"[{result}] {STATUS_MESSAGES.get(result, '未知状态')}")
-    return 0 if result in {1, 2} else 1
+    successful_results = {0, 2, 5, 6} if probe_only else {1, 2}
+    return 0 if result in successful_results else 1
 
 
 if __name__ == "__main__":

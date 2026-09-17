@@ -1,0 +1,13 @@
+[Unit]
+Description=Run SWU dormitory check-in twice each evening
+
+[Timer]
+OnCalendar=*-*-* 21:15:00 Asia/Shanghai
+OnCalendar=*-*-* 21:45:00 Asia/Shanghai
+AccuracySec=30s
+RandomizedDelaySec=0
+Persistent=false
+Unit=swu-checkin.service
+
+[Install]
+WantedBy=timers.target
