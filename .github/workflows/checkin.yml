@@ -83,10 +83,12 @@ jobs:
             echo "请在 GitHub Secrets 中配置："
             echo "  - ${{ matrix.account.username_secret }}"
             echo "  - ${{ matrix.account.password_secret }}"
-            echo "status_code=CONFIG_ERROR" >> "$GITHUB_OUTPUT"
-            echo "status_msg=账号或密码未配置" >> "$GITHUB_OUTPUT"
-            echo "full_result=账号或密码未配置" >> "$GITHUB_OUTPUT"
-            echo "exit_code=1" >> "$GITHUB_OUTPUT"
+            {
+              echo "status_code=CONFIG_ERROR"
+              echo "status_msg=账号或密码未配置"
+              echo "full_result=账号或密码未配置"
+              echo "exit_code=1"
+            } >> "$GITHUB_OUTPUT"
             exit 1
           fi
           
@@ -113,10 +115,12 @@ jobs:
             status_msg="无法解析签到程序输出"
           fi
           
-          echo "status_code=$status_code" >> "$GITHUB_OUTPUT"
-          echo "status_msg=$status_msg" >> "$GITHUB_OUTPUT"
-          echo "full_result=$result_line" >> "$GITHUB_OUTPUT"
-          echo "exit_code=$exit_code" >> "$GITHUB_OUTPUT"
+          {
+            echo "status_code=$status_code"
+            echo "status_msg=$status_msg"
+            echo "full_result=$result_line"
+            echo "exit_code=$exit_code"
+          } >> "$GITHUB_OUTPUT"
           
           echo "========================================="
           echo "状态码: $status_code"
