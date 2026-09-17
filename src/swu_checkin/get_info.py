@@ -1,17 +1,17 @@
-from bs4 import BeautifulSoup
-from io import BytesIO
-from PIL import Image
-import urllib.parse
-import requests
-import os
-import ddddocr
 import json
+import os
 import re
 import time
+import urllib.parse
+from io import BytesIO
+
+import ddddocr
+import requests
+from bs4 import BeautifulSoup
+from PIL import Image
 
 from .des import des
 from .identity import submit_identity_selection_if_needed
-
 
 # ===== 常量定义 =====
 CAS_LOGIN_URL = "https://of.swu.edu.cn/cas/oauth/login/SWU_CAS2_FEDERAL"
@@ -26,6 +26,8 @@ DORMITORY_URL = "https://of.swu.edu.cn/gateway/fighter-baida/api/cqlc/getDormito
 TRANSITION_TODAY_URL = "https://of.swu.edu.cn//gateway/fighter-baida/api/cqtj/getTransitionByToday"
 
 # OAuth2 固定参数
+# TODO: Replace hard-coded OAuth flow metadata with trusted HTTPS discovery.
+# See docs/oauth-login-discovery.md for the follow-up scope and acceptance criteria.
 OAUTH_GOTO_BASE64 = "aHR0cDovL2lkbS5zd3UuZWR1LmNuL2FtL29hdXRoMi9hdXRob3JpemU/c2VydmljZT1pbml0U2VydmljZSZyZXNwb25zZV90eXBlPWNvZGUmY2xpZW50X2lkPTdjMXpva29samw5YmJpaG82eXVvJnNjb3BlPXVpZCtjbit1c2VySWRDb2RlJnJlZGlyZWN0X3VyaT1odHRwcyUzQSUyRiUyRnVhYWFwLnN3dS5lZHUuY24lMkZjYXMlMkZsb2dpbiUzRnNlcnZpY2UlM0RodHRwcyUyNTNBJTI1MkYlMjUyRnVhYWFwLnN3dS5lZHUuY24lMjUyRmNhcyUyNTJGb2F1dGgyLjAlMjUyRmNhbGxiYWNrQXV0aG9yaXplJTI2b3JpZ2luYWxSZXF1ZXN0VXJsJTNEaHR0cHMlMjUzQSUyNTJGJTI1MkZ1YWFhcC5zd3UuZWR1LmNuJTI1MkZjYXMlMjUyRm9hdXRoMi4wJTI1MkZhdXRob3JpemUlMjUzRnJlc3BvbnNlX3R5cGUlMjUzRGNvZGUlMjUyNmNsaWVudF9pZCUyNTNEY2FzNiUyNTI2cmVkaXJlY3RfdXJpJTI1M0RodHRwcyUyNTI1M0ElMjUyNTJGJTI1MjUyRm9mLnN3dS5lZHUuY24lMjUyNTNBNDQzJTI1MjUyRmNhcyUyNTI1MkZvYXV0aCUyNTI1MkZjYWxsYmFjayUyNTI1MkZTV1VfQ0FTMl9GRURFUkFMJTI1MjZzdGF0ZSUyNTNEZTFlMTczODhlNzU4MjY3YjFiNzI2ZjM4Mjg0NDM5MWElMjUyNnNjb3BlJTI1M0RzaW1wbGUlMjZmZWRlcmFsRW5hYmxlJTNEdHJ1ZSZkZWNpc2lvbj1BbGxvdw=="
 
 
@@ -33,47 +35,39 @@ OAUTH_GOTO_BASE64 = "aHR0cDovL2lkbS5zd3UuZWR1LmNuL2FtL29hdXRoMi9hdXRob3JpemU/c2V
 def mask_sensitive_data(data: str, show_chars: int = 4) -> str:
     """
     脱敏处理敏感数据
-    
+
     Args:
         data: 敏感字符串
         show_chars: 显示的字符数（前后各显示一半）
-    
+
     Returns:
         脱敏后的字符串，例如：abc***xyz
     """
     if not data or len(data) <= show_chars:
         return "****"
-    
+
     half = show_chars // 2
     return f"{data[:half]}{'*' * (len(data) - show_chars)}{data[-half:]}"
 
 
-def safe_print(message: str, sensitive_keywords: list[str] = None) -> None:
-    """
-    安全打印，自动脱敏敏感信息
-    
-    Args:
-        message: 要打印的消息
-        sensitive_keywords: 敏感关键词列表（如 token、ticket）
-    """
-    # 在非调试模式下，不输出包含敏感信息的日志
-    if os.getenv("SWUDK_DEBUG_CREDENTIALS") != "1":
-        if sensitive_keywords:
-            for keyword in sensitive_keywords:
-                if keyword.lower() in message.lower():
-                    return  # 直接跳过包含敏感关键词的输出
+SENSITIVE_LOG_PATTERNS = (
+    re.compile(r"(?i)\b(?:password|token|ticket|captcha|state|random)\s*[:=]\s*\S+"),
+    re.compile(r"验证码\s*[:=]\s*\S+"),
+    re.compile(r"(?i)https?://\S*(?:token|ticket|code|state)=\S+"),
+)
+
+
+def safe_print(message: str) -> None:
+    """输出不包含凭据值的消息。"""
+    if any(pattern.search(message) for pattern in SENSITIVE_LOG_PATTERNS):
+        return
     print(message)
 
 
 def debug_print(message: object) -> None:
-    """
-    调试模式输出（仅在 SWUDK_DEBUG_CREDENTIALS=1 时输出）
-    
-    ⚠️ 警告：调试模式会输出敏感信息（token、密码等），仅用于本地开发
-    绝不要在 GitHub Actions 或生产环境中启用此模式
-    """
+    """在显式启用时输出不含凭据的诊断信息。"""
     if os.getenv("SWUDK_DEBUG_CREDENTIALS") == "1":
-        print(f"[DEBUG] {message}")
+        safe_print(f"[DEBUG] {message}")
 
 
 def transform_ticket(ticket: str) -> str:
@@ -85,18 +79,18 @@ def transform_ticket(ticket: str) -> str:
     """
     result = ""
     for char in ticket:
-        if char in '-:/':
+        if char in "-:/":
             result += char
-        elif '0' <= char <= '9':
+        elif "0" <= char <= "9":
             result += str((int(char) + 5) % 10)
-        elif 'A' <= char <= 'Z':
+        elif "A" <= char <= "Z":
             new_ord = ord(char) + 10
-            if new_ord > ord('Z'):
+            if new_ord > ord("Z"):
                 new_ord -= 26
             result += chr(new_ord)
-        elif 'a' <= char <= 'z':
+        elif "a" <= char <= "z":
             new_ord = ord(char) + 15
-            if new_ord > ord('z'):
+            if new_ord > ord("z"):
                 new_ord -= 26
             result += chr(new_ord)
         else:
@@ -122,58 +116,59 @@ def build_idm_login_url(state: str) -> str:
     )
 
 
-def extract_state_from_url(url: str) -> str:
+def extract_state_from_url(url: str) -> str | None:
     """从跳转 URL 提取 state 参数"""
-    match = re.search(r'state%3D([a-f0-9]{32})', url)
+    match = re.search(r"state%3D([a-f0-9]{32})", url)
     return match.group(1) if match else None
 
 
-def parse_code_random(html: str) -> str:
+def parse_code_random(html: str) -> str | None:
     """从登录页 HTML 解析 codeRandom"""
-    soup = BeautifulSoup(html, 'html.parser')
-    code_random = soup.find('input', {'id': 'codeRandom'})
-    return code_random.get('value') if code_random else None
+    soup = BeautifulSoup(html, "html.parser")
+    code_random = soup.find("input", {"id": "codeRandom"})
+    return code_random.get("value") if code_random else None
 
 
 def recognize_captcha(session: requests.Session, timeout: int = 10, max_attempts: int = 3) -> str:
     """
     OCR 识别验证码，支持重试机制
-    
+
     Args:
         session: requests 会话
         timeout: 超时时间
         max_attempts: 最大尝试次数
-    
+
     Returns:
         识别出的验证码字符串
-    
+
     Raises:
         ValueError: 多次尝试后仍无法识别
     """
     ocr = ddddocr.DdddOcr(show_ad=False, use_gpu=False)
-    
+
     for attempt in range(1, max_attempts + 1):
         try:
             response = session.get(IDM_VALIDATE_CODE_URL, timeout=timeout)
+            response.raise_for_status()
             img = Image.open(BytesIO(response.content))
             result = ocr.classification(img)
-            
+
             # 验证码基本验证：应该是4位数字或字母
             if result and len(result) >= 3:
-                debug_print(f"验证码识别成功 (尝试 {attempt}/{max_attempts}): {result}")
+                debug_print(f"验证码识别成功 (尝试 {attempt}/{max_attempts})")
                 return result
             else:
-                safe_print(f"验证码识别结果异常 (尝试 {attempt}/{max_attempts})，重新获取", ["captcha"])
-        except Exception as e:
-            safe_print(f"验证码识别失败 (尝试 {attempt}/{max_attempts}): {type(e).__name__}", ["error"])
-        
+                safe_print(f"验证码识别结果异常 (尝试 {attempt}/{max_attempts})，重新获取")
+        except (requests.exceptions.RequestException, OSError, RuntimeError, TypeError, ValueError) as error:
+            safe_print(f"验证码识别失败 (尝试 {attempt}/{max_attempts}): {type(error).__name__}")
+
         if attempt < max_attempts:
             time.sleep(0.5)  # 短暂延迟后重试
-    
+
     raise ValueError("验证码识别失败，已达到最大重试次数")
 
 
-def build_login_form_data(username: str, password: str, captcha: str) -> dict:
+def build_login_form_data(username: str, password: str, captcha: str) -> dict[str, str]:
     """构建登录表单数据"""
     return {
         "IDToken1": username,
@@ -184,11 +179,11 @@ def build_login_form_data(username: str, password: str, captcha: str) -> dict:
         "validateCode": captcha,
         "sunQueryParamsString": "cmVhbG09LyZzZXJ2aWNlPWluaXRTZXJ2aWNlJg==",
         "encoded": "true",
-        "gx_charset": "UTF-8"
+        "gx_charset": "UTF-8",
     }
 
 
-def extract_ticket_from_url(url: str) -> str:
+def extract_ticket_from_url(url: str) -> str | None:
     """从回调 URL 提取 ticket"""
     if "ticket=" not in url:
         return None
@@ -199,7 +194,7 @@ def extract_ticket_from_url(url: str) -> str:
 def get_token(username: str, password: str, timeout: int = 10) -> str:
     """
     执行完整登录流程，获取 fighter-auth-token
-    
+
     流程:
         1. 访问 CAS 登录页，获取 OAuth state
         2. 跳转 IDM 登录页，解析 codeRandom
@@ -209,7 +204,7 @@ def get_token(username: str, password: str, timeout: int = 10) -> str:
         6. 处理身份选择（研究生/本科生）
         7. 从回调 URL 提取 ticket，转换编码
         8. 用 ticket 换取 token
-    
+
     返回:
         成功返回 token，失败返回空字符串
     """
@@ -222,68 +217,63 @@ def get_token(username: str, password: str, timeout: int = 10) -> str:
 def _get_token(username: str, password: str, timeout: int, max_login_attempts: int = 3) -> str:
     """
     内部登录实现，支持验证码错误重试
-    
+
     Args:
         username: 用户名
         password: 密码
         timeout: 超时时间
         max_login_attempts: 最大登录尝试次数（验证码错误时重试）
-    
+
     Returns:
         成功返回 token，失败返回空字符串
     """
     for login_attempt in range(1, max_login_attempts + 1):
         try:
             session = requests.Session()
-            
+
             # 步骤 1: 获取 OAuth state
             response = session.get(CAS_LOGIN_ENTRY_URL, timeout=timeout)
+            response.raise_for_status()
             state = extract_state_from_url(response.url)
-            debug_print(f"state: {state}")
-            
+            debug_print("已解析 OAuth state")
+
             if not state:
-                safe_print(f"获取 OAuth state 失败 (尝试 {login_attempt}/{max_login_attempts})", [])
+                safe_print(f"获取 OAuth state 失败 (尝试 {login_attempt}/{max_login_attempts})")
                 continue
-            
+
             # 步骤 2: 访问 IDM 登录页
             idm_login_url = build_idm_login_url(state)
             response = session.get(idm_login_url, timeout=timeout)
+            response.raise_for_status()
             code_random = parse_code_random(response.text)
-            debug_print(f"random: {code_random}")
-            
+            debug_print("已解析登录随机参数")
+
             if not code_random:
-                safe_print(f"解析 codeRandom 失败 (尝试 {login_attempt}/{max_login_attempts})", [])
+                safe_print(f"解析 codeRandom 失败 (尝试 {login_attempt}/{max_login_attempts})")
                 continue
-            
+
             # 步骤 3: DES 加密凭证
             encrypted_username, encrypted_password = des(username, password, code_random)
-            
+
             # 步骤 4: OCR 识别验证码（带重试）
             try:
                 captcha = recognize_captcha(session, timeout, max_attempts=3)
-                debug_print(f"验证码: {captcha}")
-            except ValueError as e:
-                safe_print(f"验证码识别失败 (尝试 {login_attempt}/{max_login_attempts}): {e}", [])
+                debug_print("验证码已识别")
+            except ValueError:
+                safe_print(f"验证码识别失败 (尝试 {login_attempt}/{max_login_attempts})")
                 continue
-            
+
             # 步骤 5: 提交登录表单
-            form_data = build_login_form_data(
-                encrypted_username,
-                encrypted_password,
-                captcha
-            )
-            response = session.post(
-                f"{IDM_BASE_URL}/UI/Login",
-                data=form_data,
-                timeout=timeout
-            )
-            
+            form_data = build_login_form_data(encrypted_username, encrypted_password, captcha)
+            response = session.post(f"{IDM_BASE_URL}/UI/Login", data=form_data, timeout=timeout)
+            response.raise_for_status()
+
             # 检查是否因验证码错误导致登录失败
             if "验证码" in response.text or "validateCode" in response.text:
-                safe_print(f"验证码可能错误，重新尝试登录 (尝试 {login_attempt}/{max_login_attempts})", [])
+                safe_print(f"验证码可能错误，重新尝试登录 (尝试 {login_attempt}/{max_login_attempts})")
                 time.sleep(1)  # 短暂延迟
                 continue
-            
+
             # 步骤 6: 处理身份选择
             response = submit_identity_selection_if_needed(
                 session,
@@ -292,75 +282,67 @@ def _get_token(username: str, password: str, timeout: int, max_login_attempts: i
                 goto_value=OAUTH_GOTO_BASE64,
                 timeout=timeout,
             )
-            
-            debug_print(f"回调 URL: {response.url}")
-            
+
+            debug_print("身份选择流程已完成")
+
             # 步骤 7: 提取并转换 ticket
             ticket_st = extract_ticket_from_url(response.url)
             if not ticket_st:
-                safe_print(f"未能从回调 URL 提取 ticket (尝试 {login_attempt}/{max_login_attempts})", ["ticket"])
+                safe_print(f"未能从回调 URL 提取 ticket (尝试 {login_attempt}/{max_login_attempts})")
                 continue
-            
+
             ticket_cd = transform_ticket(ticket_st)
-            
+
             # 步骤 8a: 使用转换后的 ticket 访问回调
             callback_url = f"{CAS_CALLBACK_URL}?code={ticket_cd}@@hxbeat&state={state}"
             response = session.get(callback_url, timeout=timeout)
-            
+            response.raise_for_status()
+
             # 步骤 8b: 从最终回调 URL 获取 token ticket
             token_st = extract_ticket_from_url(response.url)
             if not token_st:
-                safe_print(f"未能获取 token ticket (尝试 {login_attempt}/{max_login_attempts})", ["token"])
+                safe_print(f"未能获取 token ticket (尝试 {login_attempt}/{max_login_attempts})")
                 continue
-            
+
             # 步骤 8c: 用 token ticket 换取最终 token
             exchange_url = f"{TOKEN_EXCHANGE_URL}?token={token_st}&remember=true"
-            token_response = session.get(exchange_url, timeout=timeout).json()
-            
+            response = session.get(exchange_url, timeout=timeout)
+            response.raise_for_status()
+            token_response = response.json()
+
             if "data" not in token_response:
-                safe_print(f"token 交换失败 (尝试 {login_attempt}/{max_login_attempts})", ["token"])
+                safe_print(f"token 交换失败 (尝试 {login_attempt}/{max_login_attempts})")
                 continue
-            
+
             token = token_response["data"]
-            debug_print(f"登录成功，获取到 token")
-            
+            debug_print("登录成功")
+
             return token
-            
-        except (requests.exceptions.RequestException, KeyError, ValueError, TypeError) as e:
-            safe_print(f"登录过程异常 (尝试 {login_attempt}/{max_login_attempts}): {type(e).__name__}", [])
+
+        except (requests.exceptions.RequestException, json.JSONDecodeError, KeyError, ValueError, TypeError) as error:
+            safe_print(f"登录过程异常 (尝试 {login_attempt}/{max_login_attempts}): {type(error).__name__}")
             if login_attempt < max_login_attempts:
                 time.sleep(1)
             continue
-    
+
     # 所有尝试都失败
-    safe_print(f"登录失败，已用尽 {max_login_attempts} 次尝试", [])
+    safe_print(f"登录失败，已用尽 {max_login_attempts} 次尝试")
     return ""
 
 
 def get_student_id(token: str, timeout: int = 10) -> str:
     """获取学号"""
     headers = {"fighter-auth-token": token}
-    response = requests.get(
-        USER_INFO_URL,
-        params={"appType": "fighter-portal"},
-        headers=headers,
-        timeout=timeout
-    )
+    response = requests.get(USER_INFO_URL, params={"appType": "fighter-portal"}, headers=headers, timeout=timeout)
+    response.raise_for_status()
     return response.json()["data"]["subject"]["username"]
 
 
 def get_dormitory(token: str, timeout: int = 10) -> dict:
     """获取宿舍信息"""
-    headers = {
-        "fighter-auth-token": token,
-        "Content-Type": "application/json;charset=UTF-8"
-    }
-    response = requests.post(
-        DORMITORY_URL,
-        headers=headers,
-        data=json.dumps({}),
-        timeout=timeout
-    )
+    headers = {"fighter-auth-token": token, "Content-Type": "application/json;charset=UTF-8"}
+    response = requests.post(DORMITORY_URL, headers=headers, data=json.dumps({}), timeout=timeout)
+    response.raise_for_status()
     return response.json()
 
 
@@ -368,12 +350,9 @@ def get_transition_today(token: str, timeout: int = 10) -> dict | None:
     """获取今日签到任务"""
     headers = {"fighter-auth-token": token}
     data = {"pageNum": 1, "pageSize": 1}
-    response = requests.post(
-        TRANSITION_TODAY_URL,
-        headers=headers,
-        data=data,
-        timeout=timeout
-    ).json()
-    
-    records = response.get("data", {}).get("records", [])
+    response = requests.post(TRANSITION_TODAY_URL, headers=headers, data=data, timeout=timeout)
+    response.raise_for_status()
+    payload = response.json()
+
+    records = payload.get("data", {}).get("records", [])
     return records[0] if records else None

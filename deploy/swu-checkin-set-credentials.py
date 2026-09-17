@@ -12,6 +12,7 @@ from pathlib import Path
 
 CREDENTIAL_DIR = Path("/etc/swu-checkin")
 CREDENTIAL_FILE = CREDENTIAL_DIR / "credentials.env"
+NOTIFY_FILE = CREDENTIAL_DIR / "notify.env"
 
 
 def _quote_environment_value(value: str) -> str:
@@ -69,6 +70,11 @@ def main() -> int:
 
     subprocess.run(["systemctl", "enable", "--now", "swu-checkin.timer"], check=True)
     print("只读探测通过，swu-checkin.timer 已启用。")
+    if NOTIFY_FILE.exists():
+        subprocess.run(["systemctl", "enable", "--now", "swu-checkin-notify.timer"], check=True)
+        print("检测到 Telegram 通知配置，swu-checkin-notify.timer 已启用。")
+    else:
+        print("未检测到 /etc/swu-checkin/notify.env；Telegram 通知 timer 保持未启用。")
     subprocess.run(["systemctl", "list-timers", "swu-checkin.timer", "--no-pager"], check=False)
     return 0
 

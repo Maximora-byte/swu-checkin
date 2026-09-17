@@ -1,35 +1,32 @@
 import json
+import math
 import os
 import tempfile
 import time
 from datetime import datetime
 from getpass import getpass
 from pathlib import Path
-from zoneinfo import ZoneInfo
 
 import requests
 
 from .cache import CheckinContext
 from .get_info import get_dormitory, get_student_id, get_token, get_transition_today
-
-STATUS_MESSAGES = {
-    0: "今日无签到记录",
-    1: "签到成功",
-    2: "已签到",
-    3: "登录失败",
-    4: "网络错误或数据异常",
-    5: "请假期间无需签到",
-    6: "检测到待签到任务（未提交）",
-}
+from .status import (
+    RETRYABLE_STATUSES,
+    SUCCESSFUL_CHECKIN_STATUSES,
+    SUCCESSFUL_PROBE_STATUSES,
+    CheckinStatus,
+    VacationStatus,
+    is_successful_checkin_status,
+    status_message,
+)
+from .time_utils import epoch_milliseconds, now_shanghai, parse_swu_datetime, today_shanghai
 
 # 终态不重试：成功 / 已签到 / 请假
 # 其余（无记录、登录失败、网络异常）可能是抖动，打满次数才算失败
-RETRYABLE_STATUS = {0, 3, 4}
 DEFAULT_MAX_ATTEMPTS = 3
 DEFAULT_RETRY_DELAY = 8
 SUCCESS_CODES = {"0", "200", "20000", "00000", "success", "ok", "true"}
-SUCCESSFUL_CHECKIN_RESULTS = {1, 2, 5}
-SHANGHAI_TIMEZONE = ZoneInfo("Asia/Shanghai")
 
 
 def _env_int(name: str, default: int) -> int:
@@ -43,33 +40,81 @@ def _env_int(name: str, default: int) -> int:
     return value if value > 0 else default
 
 
-def _check_vacation_enabled(ctx: CheckinContext, timeout: int) -> bool:
-    """检查是否在请假期间"""
+def _check_vacation_status(
+    ctx: CheckinContext,
+    timeout: int,
+    *,
+    now: datetime | None = None,
+) -> VacationStatus:
+    """Fail closed when the approved-leave state cannot be confirmed."""
     headers = {"fighter-auth-token": ctx.token}
     url = "https://of.swu.edu.cn/gateway/fighter-baida/api/xsqjxj/listSelfLeaveData?pageNum=1&pageSize=10"
 
     try:
         response = requests.get(url=url, headers=headers, timeout=timeout)
-        data = response.json().get("data", {})
-        records = data.get("records", [])
+        response.raise_for_status()
+        payload = response.json()
+        if not isinstance(payload, dict):
+            raise ValueError("请假接口响应不是对象")
+        data = payload.get("data")
+        if not isinstance(data, dict):
+            raise ValueError("请假接口缺少 data 对象")
+        records = data.get("records")
+        if not isinstance(records, list):
+            raise ValueError("请假接口 records 不是列表")
 
         if not records:
-            return False
+            return VacationStatus.NO_ACTIVE_LEAVE
 
-        latest = records[0]
-        if latest.get("lcztmc") != "已同意":
-            return False
+        current = now or now_shanghai()
+        if current.tzinfo is None:
+            raise ValueError("now must be timezone-aware")
+        malformed_record = False
+        for record in records:
+            if not isinstance(record, dict):
+                malformed_record = True
+                continue
+            approval_status = record.get("lcztmc")
+            if not isinstance(approval_status, str):
+                malformed_record = True
+                continue
+            if approval_status != "已同意":
+                continue
+            try:
+                start_raw = record["kssj"]
+                end_raw = record["jssj"]
+                if not isinstance(start_raw, str) or not isinstance(end_raw, str):
+                    raise ValueError("请假时间不是字符串")
+                start = parse_swu_datetime(start_raw)
+                end = parse_swu_datetime(end_raw)
+                if end < start:
+                    raise ValueError("请假结束时间早于开始时间")
+            except (KeyError, TypeError, ValueError):
+                malformed_record = True
+                continue
+            if start <= current.astimezone(start.tzinfo) <= end:
+                return VacationStatus.ACTIVE_LEAVE
 
-        now = datetime.now()
-        start = datetime.strptime(latest["kssj"], "%Y-%m-%d %H:%M")
-        end = datetime.strptime(latest["jssj"], "%Y-%m-%d %H:%M")
-
-        return start <= now <= end
-    except (requests.exceptions.RequestException, KeyError, ValueError):
-        return False
+        if malformed_record:
+            return VacationStatus.UNKNOWN
+        return VacationStatus.NO_ACTIVE_LEAVE
+    except (requests.exceptions.RequestException, json.JSONDecodeError, KeyError, ValueError, TypeError):
+        return VacationStatus.UNKNOWN
 
 
-def _parse_dormitory_data(dormitory_list: list) -> tuple[dict, str, str]:
+def _parse_coordinate(value: object, *, name: str, minimum: float, maximum: float) -> float:
+    if isinstance(value, bool):
+        raise ValueError(f"{name} 不是有效坐标")
+    try:
+        coordinate = float(value)
+    except (TypeError, ValueError) as error:
+        raise ValueError(f"{name} 不是有效坐标") from error
+    if not math.isfinite(coordinate) or not minimum <= coordinate <= maximum:
+        raise ValueError(f"{name} 超出有效范围")
+    return coordinate
+
+
+def _parse_dormitory_data(dormitory_list: list[dict[str, object]]) -> tuple[dict[str, float], str, str]:
     """
     从 getDormitory 返回的 columnList 解析签到数据
     返回: (位置信息, 宿舍楼名, 房间号)
@@ -79,6 +124,8 @@ def _parse_dormitory_data(dormitory_list: list) -> tuple[dict, str, str]:
     room = None
 
     for item in dormitory_list:
+        if not isinstance(item, dict):
+            continue
         prop = item.get("prop", "")
         if prop == "qddz":
             location = {"latitude": item.get("latitude"), "longitude": item.get("longitude")}
@@ -87,10 +134,20 @@ def _parse_dormitory_data(dormitory_list: list) -> tuple[dict, str, str]:
         elif prop == "qdbj":
             room = item.get("value")
 
-    if not all([location, building, room]):
+    if (
+        not location
+        or not isinstance(building, str)
+        or not building.strip()
+        or not isinstance(room, str)
+        or not room.strip()
+    ):
         raise ValueError("宿舍信息不完整")
 
-    return location, building, room
+    validated_location = {
+        "latitude": _parse_coordinate(location.get("latitude"), name="latitude", minimum=-90, maximum=90),
+        "longitude": _parse_coordinate(location.get("longitude"), name="longitude", minimum=-180, maximum=180),
+    }
+    return validated_location, building.strip(), room.strip()
 
 
 def _business_response_succeeded(payload: object) -> bool:
@@ -134,7 +191,7 @@ def _confirm_checkin(token: str, timeout: int) -> bool:
     return False
 
 
-def _submit_checkin(ctx: CheckinContext, timeout: int) -> int:
+def _submit_checkin(ctx: CheckinContext, timeout: int) -> CheckinStatus:
     """
     执行签到请求（使用上下文中已缓存的数据，避免重复调用）
     返回: 1=成功, 4=网络错误
@@ -168,7 +225,7 @@ def _submit_checkin(ctx: CheckinContext, timeout: int) -> int:
         payload = {
             "id": record_id,
             "formId": form_id,
-            "tsrq": time.strftime("%Y-%m-%d"),
+            "tsrq": today_shanghai(),
             "xh": ctx.student_id,
             "qdsj": ["21:00", "23:30"],
             "qsqddd": ctx.building,
@@ -180,7 +237,7 @@ def _submit_checkin(ctx: CheckinContext, timeout: int) -> int:
                 "netType": "wifi",
                 "operatorType": "unknown",
                 "imei": "imei",
-                "time": int(time.time() * 1000),
+                "time": epoch_milliseconds(),
                 "provider": "lbs",
                 "isFromMock": False,
                 "isGpsEnabled": True,
@@ -200,20 +257,20 @@ def _submit_checkin(ctx: CheckinContext, timeout: int) -> int:
         business_success = _business_response_succeeded(payload)
         confirmed = _confirm_checkin(ctx.token, timeout)
         if confirmed:
-            return 1
+            return CheckinStatus.SUCCESS
         if business_success:
             print("签到请求已提交，但未能确认服务端签到状态")
         else:
             print("签到接口未返回明确成功状态，且服务端状态未变更")
-        return 4
+        return CheckinStatus.DATA_ERROR
 
     except requests.exceptions.RequestException:
-        return 4
-    except (KeyError, ValueError, TypeError):
-        return 4
+        return CheckinStatus.DATA_ERROR
+    except (json.JSONDecodeError, KeyError, ValueError, TypeError):
+        return CheckinStatus.DATA_ERROR
 
 
-def check_in(username: str, password: str, timeout: int = 10) -> int:
+def check_in(username: str, password: str, timeout: int = 10) -> CheckinStatus:
     """
     执行一次宿舍签到。
 
@@ -232,20 +289,23 @@ def check_in(username: str, password: str, timeout: int = 10) -> int:
         # 步骤1: 登录获取 token（只调用一次）
         ctx.token = get_token(username, password, timeout)
         if not ctx.token:
-            return 3
+            return CheckinStatus.LOGIN_FAILED
 
         # 步骤2: 检查请假状态（只调用一次）
-        if _check_vacation_enabled(ctx, timeout):
-            return 5
+        vacation_status = _check_vacation_status(ctx, timeout)
+        if vacation_status is VacationStatus.UNKNOWN:
+            return CheckinStatus.DATA_ERROR
+        if vacation_status is VacationStatus.ACTIVE_LEAVE:
+            return CheckinStatus.ON_LEAVE
 
         # 步骤3: 获取今日签到任务（只调用一次，存入上下文）
         ctx.transition = get_transition_today(ctx.token, timeout)
         if not ctx.transition:
-            return 0
+            return CheckinStatus.NO_TASK
 
         # 步骤4: 检查是否已签到
         if ctx.transition.get("qdzt") == "已签到":
-            return 2
+            return CheckinStatus.ALREADY_CHECKED_IN
 
         # 步骤5: 执行签到（使用上下文中已缓存的数据）
         result = _submit_checkin(ctx, timeout)
@@ -254,32 +314,31 @@ def check_in(username: str, password: str, timeout: int = 10) -> int:
     except (KeyboardInterrupt, SystemExit):
         raise
     except (requests.exceptions.RequestException, KeyError, ValueError, TypeError, json.JSONDecodeError):
-        return 4
-    except Exception:
-        return 4
+        return CheckinStatus.DATA_ERROR
 
 
-def probe_check_in(username: str, password: str, timeout: int = 10) -> int:
+def probe_check_in(username: str, password: str, timeout: int = 10) -> CheckinStatus:
     """只验证登录并读取任务状态，绝不提交签到。"""
     try:
         ctx = CheckinContext()
         ctx.token = get_token(username, password, timeout)
         if not ctx.token:
-            return 3
-        if _check_vacation_enabled(ctx, timeout):
-            return 5
+            return CheckinStatus.LOGIN_FAILED
+        vacation_status = _check_vacation_status(ctx, timeout)
+        if vacation_status is VacationStatus.UNKNOWN:
+            return CheckinStatus.DATA_ERROR
+        if vacation_status is VacationStatus.ACTIVE_LEAVE:
+            return CheckinStatus.ON_LEAVE
         ctx.transition = get_transition_today(ctx.token, timeout)
         if not ctx.transition:
-            return 0
+            return CheckinStatus.NO_TASK
         if ctx.transition.get("qdzt") == "已签到":
-            return 2
-        return 6
+            return CheckinStatus.ALREADY_CHECKED_IN
+        return CheckinStatus.PROBE_PENDING
     except (KeyboardInterrupt, SystemExit):
         raise
     except (requests.exceptions.RequestException, KeyError, ValueError, TypeError, json.JSONDecodeError):
-        return 4
-    except Exception:
-        return 4
+        return CheckinStatus.DATA_ERROR
 
 
 def check_in_with_retry(
@@ -288,7 +347,7 @@ def check_in_with_retry(
     timeout: int = 10,
     max_attempts: int | None = None,
     retry_delay: int | None = None,
-) -> int:
+) -> CheckinStatus:
     """
     执行签到，瞬时失败自动重试。
 
@@ -298,25 +357,25 @@ def check_in_with_retry(
     """
     attempts = max_attempts or _env_int("SWUDK_MAX_ATTEMPTS", DEFAULT_MAX_ATTEMPTS)
     delay = retry_delay or _env_int("SWUDK_RETRY_DELAY", DEFAULT_RETRY_DELAY)
-    last_result = 4
+    last_result = CheckinStatus.DATA_ERROR
 
     for attempt in range(1, attempts + 1):
         last_result = check_in(username, password, timeout)
-        if last_result not in RETRYABLE_STATUS or attempt >= attempts:
+        if last_result not in RETRYABLE_STATUSES or attempt >= attempts:
             return last_result
 
         wait = delay * (2 ** (attempt - 1))
-        reason = STATUS_MESSAGES.get(last_result, "未知状态")
+        reason = status_message(last_result)
         print(f"第 {attempt}/{attempts} 次失败（{reason}），{wait} 秒后重试")
         time.sleep(wait)
 
     return last_result
 
 
-def _record_run_status(status_path: str, result: int) -> None:
+def _record_run_status(status_path: str, result: CheckinStatus | int) -> None:
     """Record non-sensitive per-day results for the Telegram summary job."""
     path = Path(status_path)
-    now = datetime.now(SHANGHAI_TIMEZONE)
+    now = now_shanghai()
     today = now.date().isoformat()
     current: dict = {}
     try:
@@ -330,15 +389,17 @@ def _record_run_status(status_path: str, result: int) -> None:
     attempts.append(
         {
             "at": now.isoformat(timespec="seconds"),
-            "code": result,
-            "message": STATUS_MESSAGES.get(result, "未知状态"),
+            "code": int(result),
+            "message": status_message(result),
         }
     )
     attempts = attempts[-10:]
     payload = {
         "date": today,
         "attempts": attempts,
-        "successful": any(attempt.get("code") in SUCCESSFUL_CHECKIN_RESULTS for attempt in attempts),
+        "successful": any(
+            is_successful_checkin_status(attempt.get("code")) for attempt in attempts if isinstance(attempt, dict)
+        ),
     }
 
     path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
@@ -363,15 +424,21 @@ def main() -> int:
     username = os.getenv("SWUDK_USERNAME") or input("校园网账号：").strip()
     password = os.getenv("SWUDK_PASSWORD") or getpass("校园网密码：")
     probe_only = os.getenv("SWUDK_PROBE_ONLY") == "1"
-    result = probe_check_in(username, password, 10) if probe_only else check_in_with_retry(username, password, 10)
-    print(f"[{result}] {STATUS_MESSAGES.get(result, '未知状态')}")
+    try:
+        result = probe_check_in(username, password, 10) if probe_only else check_in_with_retry(username, password, 10)
+    except (KeyboardInterrupt, SystemExit):
+        raise
+    except Exception as error:
+        result = CheckinStatus.DATA_ERROR
+        print(f"未预期错误：{type(error).__name__}")
+    print(f"[{int(result)}] {status_message(result)}")
     status_file = os.getenv("SWUDK_STATUS_FILE")
     if status_file and not probe_only:
         try:
             _record_run_status(status_file, result)
         except OSError as error:
             print(f"状态记录失败：{type(error).__name__}")
-    successful_results = {0, 2, 5, 6} if probe_only else SUCCESSFUL_CHECKIN_RESULTS
+    successful_results = SUCCESSFUL_PROBE_STATUSES if probe_only else SUCCESSFUL_CHECKIN_STATUSES
     return 0 if result in successful_results else 1
 
 

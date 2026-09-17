@@ -6,13 +6,13 @@ import json
 import os
 import subprocess
 import sys
-from datetime import datetime
 from pathlib import Path
-from zoneinfo import ZoneInfo
 
-SHANGHAI_TIMEZONE = ZoneInfo("Asia/Shanghai")
-SUCCESS_CODES = {1, 2}
-LEAVE_CODE = 5
+from .status import CheckinStatus
+from .time_utils import today_shanghai
+
+SUCCESS_CODES = {int(CheckinStatus.SUCCESS), int(CheckinStatus.ALREADY_CHECKED_IN)}
+LEAVE_CODE = int(CheckinStatus.ON_LEAVE)
 
 
 def _load_status(path: Path, today: str) -> tuple[list[dict], str]:
@@ -22,7 +22,10 @@ def _load_status(path: Path, today: str) -> tuple[list[dict], str]:
         return [], "没有读取到今天的任务结果"
     if payload.get("date") != today or not isinstance(payload.get("attempts"), list):
         return [], "今天没有产生有效的任务结果"
-    return payload["attempts"], ""
+    attempts = [attempt for attempt in payload["attempts"] if isinstance(attempt, dict)]
+    if not attempts:
+        return [], "今天没有产生有效的任务结果"
+    return attempts, ""
 
 
 def _build_message(attempts: list[dict], today: str, error: str) -> str:
@@ -44,7 +47,7 @@ def _build_message(attempts: list[dict], today: str, error: str) -> str:
 
 def main() -> int:
     state_dir = Path(os.getenv("SWUDK_STATE_DIR", "/var/lib/swu-checkin"))
-    today = datetime.now(SHANGHAI_TIMEZONE).date().isoformat()
+    today = today_shanghai()
     marker = state_dir / f"notified-{today}"
     if marker.exists():
         print(f"{today} 已发送过通知，跳过")
@@ -52,6 +55,11 @@ def main() -> int:
 
     attempts, error = _load_status(state_dir / "status.json", today)
     message = _build_message(attempts, today, error)
+    target = os.getenv("SWUDK_NOTIFY_TARGET", "").strip()
+    if not target:
+        print("Telegram 通知未配置：缺少 SWUDK_NOTIFY_TARGET", file=sys.stderr)
+        return 2
+
     command = [
         "/usr/bin/openclaw",
         "message",
@@ -61,7 +69,7 @@ def main() -> int:
         "--account",
         os.getenv("SWUDK_NOTIFY_ACCOUNT", "default"),
         "--target",
-        os.environ["SWUDK_NOTIFY_TARGET"],
+        target,
         "--message",
         message,
         "--json",
@@ -69,7 +77,11 @@ def main() -> int:
     if os.getenv("SWUDK_NOTIFY_DRY_RUN") == "1":
         command.append("--dry-run")
 
-    result = subprocess.run(command, capture_output=True, text=True, timeout=60, check=False)
+    try:
+        result = subprocess.run(command, capture_output=True, text=True, timeout=60, check=False)
+    except subprocess.TimeoutExpired:
+        print("Telegram 通知发送超时", file=sys.stderr)
+        return 1
     if result.returncode != 0:
         print(f"Telegram 通知发送失败（退出码 {result.returncode}）", file=sys.stderr)
         return 1
