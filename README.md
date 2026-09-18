@@ -2,14 +2,14 @@
 
 西南大学钉钉查寝自动打卡脚本，支持 GitHub Actions 以及受限 systemd timer 部署。
 
-> 本仓库是 [Sorynthia/swu-checkin](https://github.com/Sorynthia/swu-checkin) 的增强维护版，保留原项目的核心签到流程和 MIT 许可证，并重点加强认证安全、结果校验、部署可靠性与可测试性。下文“上游原版”以本文更新时的上游 `main` 为比较基准。
+> 本仓库是 [Sorynthia/swu-checkin](https://github.com/Sorynthia/swu-checkin) 的增强维护版，保留原项目的核心签到流程和 MIT 许可证，并重点加强认证安全、结果校验、部署可靠性与可测试性。下文“上游原版”以 **2026-09-18** 的上游 `main` 为比较基准。
 
 ## 与上游原版的主要区别
 
 | 方面 | 上游原版 | 本增强版 |
 |---|---|---|
 | 统一身份认证 | 使用固定 OAuth/CAS 元数据 | 从可信 SWU HTTPS 响应逐跳发现 Redirect、state、form 和 hidden input；未知主机、降级 HTTP、异常端口或歧义参数均 fail closed |
-| 特殊回调 | 依赖默认 HTTP 跳转行为 | 对学校实际出现的 412 / 404 回调使用精确 host、path、port 和 ticket 规则，其他 HTTP 错误继续失败 |
+| 特殊回调 | 依赖 `requests` 默认自动重定向和最终响应 URL | 对学校实际出现的 412 / 404 回调使用精确 host、path、port 和 ticket 规则，其他 HTTP 错误继续失败 |
 | 签到成功判断 | 主要依赖请求结果 | 同时检查 HTTP、业务响应，并在提交后回读“已签到”状态，避免 HTTP 200 假成功 |
 | 请假检测 | 基础记录判断 | 遍历有效记录；网络、HTTP、JSON 或字段异常时返回数据错误并停止提交，避免 fail-open |
 | 时间处理 | 依赖运行环境本地时间 | 统一使用 timezone-aware `Asia/Shanghai`，本地、systemd 与 Actions 语义一致 |
@@ -90,6 +90,8 @@ export SWUDK_USERNAME="你的学号"
 export SWUDK_PASSWORD="你的密码"
 swu-checkin
 ```
+
+本地交互运行时也可以直接执行 `swu-checkin`；如果未设置上述环境变量，程序会分别通过 `input()` 和 `getpass()` 安全询问账号与密码。GitHub Actions、systemd 等无人值守部署必须通过 Secrets 或受限环境文件提供凭据。
 
 只验证登录与任务读取、不执行签到：
 
@@ -179,9 +181,11 @@ swu-checkin
 
 ## 环境变量配置
 
-### 必需配置
+### 自动化运行的必需配置
 - `SWUDK_USERNAME` - 校园网账号（学号）
 - `SWUDK_PASSWORD` - 校园网密码
+
+本地交互运行可不设置这两个变量，程序会在启动后询问账号和密码；无人值守运行不能依赖交互输入。
 
 ### 可选配置
 - `SWUDK_MAX_ATTEMPTS` - 签到失败重试次数（默认 3 次）
@@ -193,10 +197,10 @@ swu-checkin
 ## 注意事项
 
 ### 安全性
-- ⚠️ **脚本仅从环境变量读取账号密码，切勿硬编码或提交到仓库**
+- ⚠️ **自动化部署从环境变量、GitHub Secrets 或 root-only 环境文件读取凭据；本地运行在环境变量缺失时使用 `input()` / `getpass()` 交互输入。任何方式都不得硬编码或提交凭据**
 - ⚠️ **GitHub Actions 使用 Secrets 存储敏感信息，代码不会主动打印账号或凭据值**
 - ⚠️ **正常与诊断模式都不会输出密码、token、ticket、验证码、OAuth state/code 或完整回调 URL**
-- ⚠️ **认证发现仅允许明确的 SWU 官方 HTTPS 主机；失败时不会回退到猜测 URL**
+- ⚠️ **所有实际认证请求只发送到 allowlist 中的 SWU 官方 HTTPS 主机；精确匹配的 legacy IDM HTTP Location 仅作为服务端数据接受校验并原地升级为 HTTPS，客户端绝不向 HTTP 地址发请求；发现失败时不会回退到猜测 URL**
 - ⚠️ **项目只验证并使用学校接口返回的位置数据，不提供 GPS 欺骗、反检测或绕过安全机制的功能**
 
 认证链的可信主机、剩余固定参数和排障边界见 [OAuth 登录发现说明](docs/oauth-login-discovery.md)。服务器凭据与权限模型见 [部署文档](DEPLOYMENT.md)。
