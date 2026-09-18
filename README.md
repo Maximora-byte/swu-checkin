@@ -35,6 +35,7 @@
 - ✅ 全链路使用北京时间语义，统一 CLI、Actions、systemd 和通知状态码
 - ✅ 日志不输出账号、密码、验证码、state、code、ticket、token 或完整回调 URL
 - ✅ 只读 probe 可验证登录和任务查询，绝不提交签到
+- ✅ 提供 schema v1 结构化 JSON 结果，供脚本和 GitHub Actions 稳定解析
 
 ### 自动化与运维
 
@@ -96,8 +97,19 @@ swu-checkin
 只验证登录与任务读取、不执行签到：
 
 ```bash
-SWUDK_PROBE_ONLY=1 swu-checkin
+swu-checkin --probe
 ```
+
+`SWUDK_PROBE_ONLY=1 swu-checkin` 仍保持兼容，语义与 `--probe` 相同。
+
+需要机器可读结果时使用 JSON 模式：
+
+```bash
+swu-checkin --json
+swu-checkin --probe --json
+```
+
+JSON 模式的 stdout 只包含一个 `schema_version=1` JSON document；重试和诊断信息写入 stderr。退出码与人类可读模式完全一致。
 
 或作为 Python 模块调用：
 
@@ -139,6 +151,12 @@ swu-checkin
 
 > 状态 `1`、`2`、`5` 是正式签到的正常终态；状态 `6` 仅由只读 probe 返回。状态 `4` 同时表示网络错误或服务端数据无法安全确认。
 
+结构化结果示例：
+
+```json
+{"schema_version":1,"mode":"checkin","status":"success","code":1,"message":"签到成功","attempts":1,"duration_ms":1842}
+```
+
 ## 项目结构
 
 ```
@@ -149,8 +167,14 @@ swu-checkin
 ├── src/
 │   └── swu_checkin/
 │       ├── __init__.py
-│       ├── check_in.py       # 主打卡脚本
-│       ├── get_info.py       # 信息获取模块
+│       ├── cli.py            # 参数、凭据、输出、退出码与状态记录
+│       ├── models.py         # 稳定的 CheckinResult / JSON schema v1
+│       ├── client.py         # 已认证 SWU 业务 HTTP API
+│       ├── service.py        # 签到、probe、重试与业务决策
+│       ├── storage.py        # notifier 兼容的原子状态文件
+│       ├── actions_result.py # GitHub Actions JSON 严格解析器
+│       ├── check_in.py       # 旧公共 API 与模块入口兼容层
+│       ├── get_info.py       # OAuth 登录及旧信息 API 兼容层
 │       ├── oauth_flow.py      # 可信 SWU OAuth/CAS 登录链发现与校验
 │       ├── notify.py          # Telegram 每日汇总通知
 │       ├── status.py         # 统一状态码语义
@@ -173,11 +197,19 @@ swu-checkin
 
 ## 工作流程
 
-1. 从可信 SWU HTTPS 入口逐跳发现并校验统一身份认证流程
-2. 通过 OCR 识别验证码自动登录
-3. 获取 token 和打卡任务信息
-4. 检测请假状态
-5. 自动填写宿舍位置信息并提交打卡
+```text
+OAuth / get_token
+       ↓
+    SwuClient
+       ↓
+ CheckinService
+       ↓
+ CheckinResult
+       ↓
+CLI / JSON / systemd / Actions
+```
+
+`SwuClient` 只处理带 token 的 HTTP transport 与基础响应结构；`CheckinService` 负责请假、任务、payload、提交后回读和重试；CLI 负责展示与状态文件。旧 `check_in()`、`probe_check_in()`、`check_in_with_retry()` 继续返回 `CheckinStatus`。
 
 ## 环境变量配置
 

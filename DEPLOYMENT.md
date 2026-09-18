@@ -9,6 +9,7 @@
 - 服务进程明确设置 `TZ=Asia/Shanghai`。
 - timer 不启用持久补跑，避免服务器在签到窗口外启动后提交过期任务。
 - 部署前先运行 `swu-checkin-probe.service` 做只读探测；该服务只登录并读取任务，不提交签到。
+- 命令行也可使用 `swu-checkin --probe`；需要自动化解析时使用 `swu-checkin --probe --json`，stdout 仅包含 schema v1 JSON。
 - 签到任务把非敏感结果写入 `/var/lib/swu-checkin/status.json`；通知 timer 每天 21:50 汇总一次并发送 Telegram。
 - Telegram target 仅写入 `/etc/swu-checkin/notify.env`，权限设为 `0600 root:root`，不要提交到 Git。
 
@@ -49,6 +50,8 @@ systemctl list-timers swu-checkin.timer
 journalctl -u swu-checkin.service
 journalctl -u swu-checkin-notify.service
 ```
+
+systemd 单元继续调用稳定的 `swu-checkin` console script。项目内部已将 CLI 展示、业务服务、HTTP client 与状态存储解耦；这不改变 timer 时间、环境变量、退出码或 `/var/lib/swu-checkin/status.json` 格式。
 
 停用：
 

@@ -140,6 +140,21 @@ matrix:
 
 邮件包含账号名称、状态码、详细原因和处理建议。
 
+## 结构化结果解析
+
+工作流使用 `swu-checkin --json > checkin_result.json`，再由 Python 标准库和仓库内的严格解析器读取 schema v1 结果，不再依赖 stdout 最后一行、`tail -1` 或正则表达式。
+
+解析器会校验：
+
+- JSON document 可以完整解码；
+- `schema_version == 1`；
+- `mode == "checkin"`；
+- 必需字段存在，`code` 属于 0–6；
+- `status`、中文 `message` 与状态码一致；
+- `attempts >= 1`、`duration_ms >= 0`。
+
+畸形 JSON、字段缺失、未知状态码或 schema 不匹配都会 fail closed，使当前 job 失败并进入既有邮件通知路径。正式签到仍仅将状态 1、2、5 视为正常终态，同时要求 CLI 退出码为 0。
+
 ---
 
 ## 常见邮箱配置
@@ -218,7 +233,7 @@ MAIL_PASSWORD: 邮箱密码或应用密码
 时间: 2024-01-15 21:00:15
 =========================================
 
-[1] 签到成功
+{"schema_version":1,"mode":"checkin","status":"success","code":1,"message":"签到成功","attempts":1,"duration_ms":1842}
 
 ✅ 签到正常完成
 ```
@@ -227,7 +242,7 @@ MAIL_PASSWORD: 邮箱密码或应用密码
 ```
 第 1/3 次失败（登录失败），8 秒后重试
 第 2/3 次失败（网络错误或数据异常），16 秒后重试
-[1] 签到成功
+{"schema_version":1,"mode":"checkin","status":"success","code":1,"message":"签到成功","attempts":3,"duration_ms":24197}
 
 ✅ 签到正常完成
 ```

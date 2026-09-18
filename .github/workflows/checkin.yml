@@ -92,44 +92,45 @@ jobs:
             exit 1
           fi
           
-          # main() 对签到异常状态返回 1；关闭 errexit，确保仍能读取并解析结果
+          # CLI 对签到异常状态返回 1；关闭 errexit，确保仍能验证结构化结果
           set +e
-          uv run --locked --no-dev swu-checkin > checkin_result.txt 2>&1
+          uv run --locked --no-dev swu-checkin --json > checkin_result.json
           exit_code=$?
           set -e
-          
+
+          if ! uv run --locked --no-dev python -m swu_checkin.actions_result \
+            checkin_result.json "$GITHUB_OUTPUT"; then
+            {
+              echo "status_code=OUTPUT_ERROR"
+              echo "status_msg=结构化签到结果无效"
+              echo "status_name=output_error"
+              echo "full_result=结构化签到结果无效"
+              echo "exit_code=$exit_code"
+            } >> "$GITHUB_OUTPUT"
+            echo "❌ 签到程序未产生有效的 schema_version=1 JSON 结果"
+            exit 1
+          fi
+
+          echo "exit_code=$exit_code" >> "$GITHUB_OUTPUT"
+          status_code=$(uv run --locked --no-dev python -c 'import json; print(json.load(open("checkin_result.json", encoding="utf-8"))["code"])')
+          status_msg=$(uv run --locked --no-dev python -c 'import json; print(json.load(open("checkin_result.json", encoding="utf-8"))["message"])')
+
           echo ""
           echo "========================================="
           echo "签到结果"
           echo "========================================="
-          cat checkin_result.txt
+          uv run --locked --no-dev python -m json.tool checkin_result.json
           echo ""
-          
-          # 提取返回码和消息
-          result_line=$(tail -1 checkin_result.txt)
-          if [[ "$result_line" =~ ^\[([0-9]+)\]\ (.*)$ ]]; then
-            status_code="${BASH_REMATCH[1]}"
-            status_msg="${BASH_REMATCH[2]}"
-          else
-            status_code="OUTPUT_ERROR"
-            status_msg="无法解析签到程序输出"
-          fi
-          
-          {
-            echo "status_code=$status_code"
-            echo "status_msg=$status_msg"
-            echo "full_result=$result_line"
-            echo "exit_code=$exit_code"
-          } >> "$GITHUB_OUTPUT"
-          
+
           echo "========================================="
           echo "状态码: $status_code"
           echo "状态信息: $status_msg"
           echo "退出码: $exit_code"
           echo "========================================="
-          
+
           # 1=成功, 2=已签到, 5=请假期间无需签到
-          if [[ "$status_code" != "1" && "$status_code" != "2" && "$status_code" != "5" ]]; then
+          if [[ "$status_code" != "1" && "$status_code" != "2" && "$status_code" != "5" ]] || \
+            [[ "$exit_code" != "0" ]]; then
             echo ""
             echo "⚠️  多次重试后仍异常，准备发送通知邮件"
             exit 1

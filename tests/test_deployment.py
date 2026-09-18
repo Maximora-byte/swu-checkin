@@ -58,7 +58,10 @@ def test_actions_use_locked_dependencies_and_shanghai_timezone():
 
     assert "TZ: Asia/Shanghai" in workflow
     assert "uv sync --locked --no-dev --python 3.13" in workflow
-    assert "uv run --locked --no-dev swu-checkin" in workflow
+    assert "uv run --locked --no-dev swu-checkin --json" in workflow
+    assert "python -m swu_checkin.actions_result" in workflow
+    assert "tail -1" not in workflow
+    assert "BASH_REMATCH" not in workflow
     assert "pip install" not in workflow
     assert "uv sync --locked --all-groups --python 3.13" in ci
     assert "actionlint/cmd/actionlint@v1.7.7" in ci
@@ -74,3 +77,9 @@ def test_actions_treat_status_5_as_success_and_fail_on_real_errors():
     assert "steps.checkin.outputs.status_code != '5'" in workflow
     assert 'steps.checkin.outputs.status_code }}" = "5"' in workflow
     assert "exit 1" in workflow
+
+
+def test_console_script_uses_the_single_cli_entrypoint():
+    project = _read("pyproject.toml")
+
+    assert 'swu-checkin = "swu_checkin.cli:main"' in project
