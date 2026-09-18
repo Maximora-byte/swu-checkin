@@ -36,10 +36,26 @@ def test_actions_parser_accepts_valid_json_and_writes_outputs(tmp_path):
         None,
         {},
         {**_payload(), "schema_version": 2},
+        {**_payload(), "schema_version": 1.0},
+        {**_payload(), "schema_version": True},
+        {**_payload(), "schema_version": "1"},
+        {**_payload(), "extra": "not-allowed"},
         {key: value for key, value in _payload().items() if key != "code"},
         {**_payload(), "code": 99},
         {**_payload(), "status": "success", "code": 4},
         {**_payload(), "mode": "probe"},
+        CheckinResult.from_status(
+            CheckinStatus.PROBE_PENDING,
+            attempts=1,
+            duration_ms=0,
+            mode="probe",
+        ).to_dict(),
+        {
+            **_payload(),
+            "status": "probe_pending",
+            "code": int(CheckinStatus.PROBE_PENDING),
+            "message": "检测到待签到任务（未提交）",
+        },
     ],
 )
 def test_actions_parser_rejects_invalid_or_inconsistent_results(payload):

@@ -6,37 +6,14 @@ import json
 import sys
 from pathlib import Path
 
-from .models import SCHEMA_VERSION, STATUS_NAMES
-from .status import CheckinStatus, status_message
-
-_REQUIRED_FIELDS = frozenset({"schema_version", "mode", "status", "code", "message", "attempts", "duration_ms"})
+from .models import CheckinResult
 
 
 def parse_checkin_result(payload: object) -> dict[str, object]:
-    if not isinstance(payload, dict) or not _REQUIRED_FIELDS.issubset(payload):
-        raise ValueError("missing required result fields")
-    if isinstance(payload["schema_version"], bool) or payload["schema_version"] != SCHEMA_VERSION:
-        raise ValueError("unsupported schema version")
-    if payload["mode"] != "checkin":
+    result = CheckinResult.from_dict(payload)
+    if result.mode != "checkin":
         raise ValueError("Actions requires checkin mode")
-    code = payload["code"]
-    if isinstance(code, bool) or not isinstance(code, int):
-        raise ValueError("status code must be an integer")
-    try:
-        status = CheckinStatus(code)
-    except ValueError as error:
-        raise ValueError("unknown status code") from error
-    if not isinstance(payload["status"], str) or not isinstance(payload["message"], str):
-        raise ValueError("status fields must be strings")
-    if payload["status"] != STATUS_NAMES[status] or payload["message"] != status_message(status):
-        raise ValueError("status fields are inconsistent")
-    attempts = payload["attempts"]
-    duration_ms = payload["duration_ms"]
-    if isinstance(attempts, bool) or not isinstance(attempts, int) or attempts < 1:
-        raise ValueError("invalid attempts")
-    if isinstance(duration_ms, bool) or not isinstance(duration_ms, int) or duration_ms < 0:
-        raise ValueError("invalid duration")
-    return payload
+    return result.to_dict()
 
 
 def load_checkin_result(path: Path) -> dict[str, object]:
