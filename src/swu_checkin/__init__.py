@@ -1,6 +1,8 @@
 """SWU 查寝打卡模块"""
 
 from .check_in import check_in
+from .models import CheckinResult
+from .service import run_checkin, run_probe
 
 __version__ = "1.0.0"
-__all__ = ["check_in"]
+__all__ = ["CheckinResult", "check_in", "run_checkin", "run_probe"]

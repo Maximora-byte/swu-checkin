@@ -8,6 +8,7 @@ import ddddocr
 import requests
 from PIL import Image
 
+from .client import SwuClient
 from .des import des
 from .identity import submit_identity_selection_if_needed
 from .oauth_flow import (
@@ -24,9 +25,6 @@ from .oauth_flow import (
 
 # ===== 常量定义 =====
 TOKEN_EXCHANGE_URL = "https://of.swu.edu.cn/gateway/fighter-middle/api/integrate/uaap/cas/exchange-token"
-USER_INFO_URL = "https://of.swu.edu.cn/gateway/fighter-middle/api/auth/user"
-DORMITORY_URL = "https://of.swu.edu.cn/gateway/fighter-baida/api/cqlc/getDormitory"
-TRANSITION_TODAY_URL = "https://of.swu.edu.cn//gateway/fighter-baida/api/cqtj/getTransitionByToday"
 
 
 # ===== 辅助函数 =====
@@ -292,28 +290,15 @@ def _get_token(username: str, password: str, timeout: int, max_login_attempts: i
 
 
 def get_student_id(token: str, timeout: int = 10) -> str:
-    """获取学号"""
-    headers = {"fighter-auth-token": token}
-    response = requests.get(USER_INFO_URL, params={"appType": "fighter-portal"}, headers=headers, timeout=timeout)
-    response.raise_for_status()
-    return response.json()["data"]["subject"]["username"]
+    """Compatibility wrapper for obtaining the student identifier."""
+    return SwuClient(token, timeout).get_student_id()
 
 
 def get_dormitory(token: str, timeout: int = 10) -> dict:
-    """获取宿舍信息"""
-    headers = {"fighter-auth-token": token, "Content-Type": "application/json;charset=UTF-8"}
-    response = requests.post(DORMITORY_URL, headers=headers, data=json.dumps({}), timeout=timeout)
-    response.raise_for_status()
-    return response.json()
+    """Compatibility wrapper for obtaining dormitory data."""
+    return SwuClient(token, timeout).get_dormitory()
 
 
 def get_transition_today(token: str, timeout: int = 10) -> dict | None:
-    """获取今日签到任务"""
-    headers = {"fighter-auth-token": token}
-    data = {"pageNum": 1, "pageSize": 1}
-    response = requests.post(TRANSITION_TODAY_URL, headers=headers, data=data, timeout=timeout)
-    response.raise_for_status()
-    payload = response.json()
-
-    records = payload.get("data", {}).get("records", [])
-    return records[0] if records else None
+    """Compatibility wrapper for obtaining today's check-in task."""
+    return SwuClient(token, timeout).get_transition_today()

@@ -1,24 +1,21 @@
-import importlib
 import json
 import stat
 from datetime import UTC, datetime
-from unittest.mock import Mock, patch
+from unittest.mock import Mock
 
 import pytest
 import requests
 
-from swu_checkin import check_in as run_check_in
 from swu_checkin.cache import CheckinContext
 from swu_checkin.check_in import (
     _business_response_succeeded,
-    _check_vacation_status,
     _parse_dormitory_data,
     _record_run_status,
-    _submit_checkin,
-    main,
-    probe_check_in,
 )
+from swu_checkin.client import SwuClient
+from swu_checkin.models import CheckinResult
 from swu_checkin.notify import _build_message
+from swu_checkin.service import EXPECTED_DATA_ERRORS, CheckinService, evaluate_vacation_records
 from swu_checkin.status import CheckinStatus, VacationStatus, is_successful_checkin_status
 
 
@@ -49,6 +46,55 @@ def _dormitory(latitude: object, longitude: object) -> list[dict[str, object]]:
     ]
 
 
+class _FakeClient:
+    def __init__(
+        self,
+        transitions: list[dict | None],
+        *,
+        leave_records: list[dict | object] | None = None,
+        submit_response: object | None = None,
+    ):
+        self.transitions = list(transitions)
+        self.leave_records = [] if leave_records is None else leave_records
+        self.submit_response = {"code": 200} if submit_response is None else submit_response
+        self.submit_calls = 0
+
+    def get_leave_records(self):
+        return self.leave_records
+
+    def get_transition_today(self):
+        return self.transitions.pop(0) if self.transitions else {"qdzt": "未签到"}
+
+    def get_dormitory(self):
+        return {"data": {"columnList": _dormitory(29, 106)}}
+
+    def get_student_id(self):
+        return "20260000000"
+
+    def submit_checkin_form(self, **_kwargs):
+        self.submit_calls += 1
+        return self.submit_response
+
+
+def _service(client: _FakeClient) -> CheckinService:
+    return CheckinService(
+        token_provider=lambda *_args: "test-token",
+        client_factory=lambda *_args: client,
+        sleep=lambda _seconds: None,
+        clock=lambda: 0.0,
+    )
+
+
+def _vacation_status(payload: object) -> VacationStatus:
+    session = Mock()
+    session.get.return_value = _response(payload)
+    try:
+        records = SwuClient("test-token", session=session).get_leave_records()
+        return evaluate_vacation_records(records)
+    except EXPECTED_DATA_ERRORS:
+        return VacationStatus.UNKNOWN
+
+
 def test_business_response_requires_explicit_success_signal():
     assert _business_response_succeeded({"code": 200, "message": "保存成功"})
     assert _business_response_succeeded({"success": True})
@@ -57,37 +103,27 @@ def test_business_response_requires_explicit_success_signal():
     assert not _business_response_succeeded("保存成功")
 
 
-@patch("swu_checkin.check_in.time.sleep", return_value=None)
-@patch("swu_checkin.check_in.get_transition_today")
-@patch("swu_checkin.check_in.requests.post")
-def test_http_200_business_failure_is_not_success(post: Mock, get_transition: Mock, _sleep: Mock):
-    post.return_value = _response({"code": 500, "message": "保存失败"})
-    get_transition.return_value = {"qdzt": "未签到"}
+def test_http_200_business_failure_is_not_success():
+    pending = {"id": "record-1", "formId": "form-1", "qdzt": "未签到"}
+    client = _FakeClient([pending] * 5, submit_response={"code": 500, "message": "保存失败"})
 
-    assert _submit_checkin(_context(), 10) == CheckinStatus.DATA_ERROR
-    assert get_transition.call_count == 4
+    assert _service(client).check_in_once("student", "password") == CheckinStatus.DATA_ERROR
+    assert client.submit_calls == 1
 
 
-@patch("swu_checkin.check_in.time.sleep", return_value=None)
-@patch("swu_checkin.check_in.get_transition_today")
-@patch("swu_checkin.check_in.requests.post")
-def test_submit_success_without_readback_confirmation_is_failure(post: Mock, get_transition: Mock, _sleep: Mock):
-    post.return_value = _response({"code": 200, "message": "保存成功"})
-    get_transition.return_value = {"qdzt": "未签到"}
+def test_submit_success_without_readback_confirmation_is_failure():
+    pending = {"id": "record-1", "formId": "form-1", "qdzt": "未签到"}
+    client = _FakeClient([pending] * 5, submit_response={"code": 200, "message": "保存成功"})
 
-    assert _submit_checkin(_context(), 10) == CheckinStatus.DATA_ERROR
-    assert get_transition.call_count == 4
+    assert _service(client).check_in_once("student", "password") == CheckinStatus.DATA_ERROR
 
 
-@patch("swu_checkin.check_in.time.sleep", return_value=None)
-@patch("swu_checkin.check_in.get_transition_today")
-@patch("swu_checkin.check_in.requests.post")
-def test_submit_succeeds_only_after_readback(post: Mock, get_transition: Mock, _sleep: Mock):
-    post.return_value = _response({"code": 200, "message": "保存成功"})
-    get_transition.side_effect = [{"qdzt": "未签到"}, {"qdzt": "已签到"}]
+def test_submit_succeeds_only_after_readback():
+    pending = {"id": "record-1", "formId": "form-1", "qdzt": "未签到"}
+    client = _FakeClient([pending, {"qdzt": "未签到"}, {"qdzt": "已签到"}])
 
-    assert _submit_checkin(_context(), 10) == CheckinStatus.SUCCESS
-    assert get_transition.call_count == 2
+    assert _service(client).check_in_once("student", "password") == CheckinStatus.SUCCESS
+    assert client.submit_calls == 1
 
 
 @pytest.mark.parametrize(
@@ -99,30 +135,20 @@ def test_submit_succeeds_only_after_readback(post: Mock, get_transition: Mock, _
         (datetime(2026, 9, 17, 14, 1, tzinfo=UTC), VacationStatus.NO_ACTIVE_LEAVE),
     ],
 )
-@patch("swu_checkin.check_in.requests.get")
-def test_vacation_uses_timezone_aware_shanghai_boundaries(get: Mock, now: datetime, expected: VacationStatus):
-    get.return_value = _response(
-        {"data": {"records": [{"lcztmc": "已同意", "kssj": "2026-09-17 21:00", "jssj": "2026-09-17 22:00"}]}}
-    )
+def test_vacation_uses_timezone_aware_shanghai_boundaries(now: datetime, expected: VacationStatus):
+    records = [{"lcztmc": "已同意", "kssj": "2026-09-17 21:00", "jssj": "2026-09-17 22:00"}]
 
-    assert _check_vacation_status(_context(), 10, now=now) is expected
+    assert evaluate_vacation_records(records, now=now) is expected
 
 
-@patch("swu_checkin.check_in.requests.get")
-def test_vacation_checks_all_approved_records(get: Mock):
-    get.return_value = _response(
-        {
-            "data": {
-                "records": [
-                    {"lcztmc": "已同意", "kssj": "2026-09-16 08:00", "jssj": "2026-09-16 09:00"},
-                    {"lcztmc": "审核中"},
-                    {"lcztmc": "已同意", "kssj": "2026-09-17 21:00", "jssj": "2026-09-17 22:00"},
-                ]
-            }
-        }
-    )
+def test_vacation_checks_all_approved_records():
+    records = [
+        {"lcztmc": "已同意", "kssj": "2026-09-16 08:00", "jssj": "2026-09-16 09:00"},
+        {"lcztmc": "审核中"},
+        {"lcztmc": "已同意", "kssj": "2026-09-17 21:00", "jssj": "2026-09-17 22:00"},
+    ]
 
-    result = _check_vacation_status(_context(), 10, now=datetime(2026, 9, 17, 13, 30, tzinfo=UTC))
+    result = evaluate_vacation_records(records, now=datetime(2026, 9, 17, 13, 30, tzinfo=UTC))
 
     assert result is VacationStatus.ACTIVE_LEAVE
 
@@ -140,43 +166,34 @@ def test_vacation_checks_all_approved_records(get: Mock):
         {"data": {"records": [{"lcztmc": "已同意", "kssj": "2026-09-18 22:00", "jssj": "2026-09-18 21:00"}]}},
     ],
 )
-@patch("swu_checkin.check_in.requests.get")
-def test_malformed_vacation_response_is_unknown(get: Mock, payload: object):
-    get.return_value = _response(payload)
-
-    assert _check_vacation_status(_context(), 10) is VacationStatus.UNKNOWN
+def test_malformed_vacation_response_is_unknown(payload: object):
+    assert _vacation_status(payload) is VacationStatus.UNKNOWN
 
 
-@patch("swu_checkin.check_in.requests.get")
-def test_invalid_vacation_json_is_unknown(get: Mock):
-    get.return_value = _response({"data": {"records": []}})
-    get.return_value.json.side_effect = json.JSONDecodeError("invalid", "", 0)
+def test_invalid_vacation_json_is_unknown():
+    session = Mock()
+    session.get.return_value = _response({"data": {"records": []}})
+    session.get.return_value.json.side_effect = json.JSONDecodeError("invalid", "", 0)
 
-    assert _check_vacation_status(_context(), 10) is VacationStatus.UNKNOWN
+    with pytest.raises(json.JSONDecodeError):
+        SwuClient("test-token", session=session).get_leave_records()
 
 
 @pytest.mark.parametrize("error", [requests.Timeout("timeout"), requests.HTTPError("503")])
-@patch("swu_checkin.check_in.requests.get")
-def test_vacation_api_failures_are_unknown(get: Mock, error: requests.RequestException):
-    if isinstance(error, requests.HTTPError):
-        get.return_value = _response({"data": {"records": []}})
-        get.return_value.raise_for_status.side_effect = error
-    else:
-        get.side_effect = error
+def test_vacation_api_failures_are_data_errors(error: requests.RequestException):
+    client = _FakeClient([])
+    client.get_leave_records = Mock(side_effect=error)
 
-    assert _check_vacation_status(_context(), 10) is VacationStatus.UNKNOWN
+    assert _service(client).check_in_once("student", "password") is CheckinStatus.DATA_ERROR
 
 
-@patch("swu_checkin.check_in.requests.post")
-@patch("swu_checkin.check_in.get_transition_today")
-@patch("swu_checkin.check_in._check_vacation_status", return_value=VacationStatus.UNKNOWN)
-@patch("swu_checkin.check_in.get_token", return_value="test-token")
-def test_unknown_vacation_status_stops_checkin_before_task_lookup(
-    _token: Mock, _vacation: Mock, get_transition: Mock, post: Mock
-):
-    assert run_check_in("student", "password") == CheckinStatus.DATA_ERROR
-    get_transition.assert_not_called()
-    post.assert_not_called()
+def test_unknown_vacation_status_stops_checkin_before_task_lookup():
+    client = _FakeClient([])
+    client.get_leave_records = Mock(return_value=[None])
+    client.get_transition_today = Mock()
+
+    assert _service(client).check_in_once("student", "password") == CheckinStatus.DATA_ERROR
+    client.get_transition_today.assert_not_called()
 
 
 def test_valid_dormitory_coordinates_are_normalized():
@@ -208,15 +225,11 @@ def test_invalid_dormitory_coordinates_are_rejected(latitude: object, longitude:
         _parse_dormitory_data(_dormitory(latitude, longitude))
 
 
-@patch("swu_checkin.check_in.requests.post")
-@patch("swu_checkin.check_in.get_transition_today")
-@patch("swu_checkin.check_in._check_vacation_status", return_value=VacationStatus.NO_ACTIVE_LEAVE)
-@patch("swu_checkin.check_in.get_token", return_value="test-token")
-def test_probe_never_submits(_token: Mock, _vacation: Mock, get_transition: Mock, post: Mock):
-    get_transition.return_value = {"id": "record-1", "formId": "form-1", "qdzt": "未签到"}
+def test_probe_never_submits():
+    client = _FakeClient([{"id": "record-1", "formId": "form-1", "qdzt": "未签到"}])
 
-    assert probe_check_in("student", "password") == CheckinStatus.PROBE_PENDING
-    post.assert_not_called()
+    assert _service(client).probe_once("student", "password") == CheckinStatus.PROBE_PENDING
+    assert client.submit_calls == 0
 
 
 @pytest.mark.parametrize("status", [CheckinStatus.SUCCESS, CheckinStatus.ALREADY_CHECKED_IN, CheckinStatus.ON_LEAVE])
@@ -230,8 +243,12 @@ def test_cli_exits_zero_for_statuses_1_2_5(monkeypatch: pytest.MonkeyPatch, stat
     monkeypatch.setenv("SWUDK_PASSWORD", "secret")
     monkeypatch.delenv("SWUDK_PROBE_ONLY", raising=False)
     monkeypatch.delenv("SWUDK_STATUS_FILE", raising=False)
-    check_in_module = importlib.import_module("swu_checkin.check_in")
-    monkeypatch.setattr(check_in_module, "check_in_with_retry", lambda *_args: status)
+    monkeypatch.setattr(
+        "swu_checkin.cli.run_checkin",
+        lambda *_args, **_kwargs: CheckinResult.from_status(status, attempts=1, duration_ms=0, mode="checkin"),
+    )
+
+    from swu_checkin.check_in import main
 
     assert main() == 0
 

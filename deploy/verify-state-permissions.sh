@@ -17,10 +17,10 @@ chmod 0770 "$state_root"
 PYTHONPATH="$repo_root/src" "$python_bin" - "$state_root/status.json" <<'PY'
 import sys
 
-from swu_checkin.check_in import _record_run_status
 from swu_checkin.status import CheckinStatus
+from swu_checkin.storage import record_run_status
 
-_record_run_status(sys.argv[1], CheckinStatus.SUCCESS)
+record_run_status(sys.argv[1], CheckinStatus.SUCCESS)
 PY
 
 chown swu-checkin:swu-checkin "$state_root/status.json"
