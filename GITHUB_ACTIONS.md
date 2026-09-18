@@ -1,5 +1,7 @@
 # GitHub Actions 自动签到配置指南
 
+> 本指南对应由 [Maximora-byte](https://github.com/Maximora-byte) 独立维护的 [Maximora-byte/swu-checkin](https://github.com/Maximora-byte/swu-checkin) workflow。请从该仓库 fork，并以你所使用 commit 中的 `.github/workflows/checkin.yml` 为准；不要混用上游或其他 fork 的工作流片段。问题请提交到[本仓库 Issues](https://github.com/Maximora-byte/swu-checkin/issues)。
+
 ## ⚠️ 重要提示：GitHub Actions 延迟问题
 
 **GitHub Actions 的定时任务存在严重的排队延迟问题：**
@@ -29,6 +31,8 @@
 ---
 
 ## 快速开始（单账号）
+
+先 fork [Maximora-byte/swu-checkin](https://github.com/Maximora-byte/swu-checkin)，然后在你自己的 fork 中完成以下配置。本仓库不会接收或代为保管用户凭据。
 
 ### 第一步：配置账号密码
 
@@ -298,10 +302,13 @@ schedule:
 - 不要在公开 Issue/PR 中提及凭证
 - 定期更新密码和授权码
 - 如果仓库变为公开，重新检查 Secrets 配置
+- 不要在 Issue、Pull Request、截图或 Actions 日志中公开账号、密码、token、ticket、验证码、位置数据或完整认证回调 URL
 
 ---
 
 ## 故障排查
+
+如果问题只出现在本独立维护版，请在 [Maximora-byte/swu-checkin Issues](https://github.com/Maximora-byte/swu-checkin/issues) 报告，并附 commit SHA、运行方式、状态码和已脱敏的结构信息。原上游作者不负责本 fork 新增的 OAuth 发现、systemd、通知或结构化 JSON 功能。
 
 ### Secret 未配置
 **现象**: 日志显示 `⚠️ 账号未配置`

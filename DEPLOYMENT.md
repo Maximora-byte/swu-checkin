@@ -1,10 +1,13 @@
 # 服务器部署
 
+> 本文档适用于由 [Maximora-byte](https://github.com/Maximora-byte) 独立维护的 [Maximora-byte/swu-checkin](https://github.com/Maximora-byte/swu-checkin)。部署时应以当前仓库对应 commit 的文档和 `uv.lock` 为准，不要混用上游或其他 fork 的 unit、脚本和配置。部署问题请提交到[本仓库 Issues](https://github.com/Maximora-byte/swu-checkin/issues)。
+
 推荐在可信的 Linux 主机上使用 systemd timer 运行本项目。任务是一次性脚本，不需要常驻 Web 服务。
 
 ## 关键要求
 
 - 使用 Python 3.13 与仓库中的 `uv.lock`。
+- 生产部署固定到本仓库已审阅的 commit；升级前先查看该 commit 的 CI 和变更说明，并保留可回滚的旧 release。
 - 凭据仅写入 `/etc/swu-checkin/credentials.env`，权限设为 `0600`，不要提交到 Git。
 - 服务进程明确设置 `TZ=Asia/Shanghai`。
 - timer 不启用持久补跑，避免服务器在签到窗口外启动后提交过期任务。
@@ -52,6 +55,8 @@ journalctl -u swu-checkin-notify.service
 ```
 
 systemd 单元继续调用稳定的 `swu-checkin` console script。项目内部已将 CLI 展示、业务服务、HTTP client 与状态存储解耦；这不改变 timer 时间、环境变量、退出码或 `/var/lib/swu-checkin/status.json` 格式。
+
+本 fork 的部署增强（受限 systemd、只读 probe、状态文件权限和 Telegram 汇总）由 `Maximora-byte/swu-checkin` 独立维护，不应据此要求原上游项目提供兼容或运维支持。
 
 停用：
 
