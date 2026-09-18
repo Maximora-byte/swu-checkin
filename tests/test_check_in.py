@@ -15,7 +15,7 @@ from swu_checkin.check_in import (
 from swu_checkin.client import SwuClient
 from swu_checkin.models import CheckinResult
 from swu_checkin.notify import _build_message
-from swu_checkin.service import EXPECTED_DATA_ERRORS, CheckinService, evaluate_vacation_records
+from swu_checkin.service import EXPECTED_DATA_ERRORS, CheckinService, DormitorySchemaError, evaluate_vacation_records
 from swu_checkin.status import CheckinStatus, VacationStatus, is_successful_checkin_status
 
 
@@ -41,6 +41,19 @@ def _response(payload: object) -> Mock:
 def _dormitory(latitude: object, longitude: object) -> list[dict[str, object]]:
     return [
         {"prop": "qddz", "latitude": latitude, "longitude": longitude},
+        {"prop": "qsqddd", "value": " 橘园 "},
+        {"prop": "qdbj", "value": " 001 "},
+    ]
+
+
+def _current_dormitory(latitude: object, longitude: object) -> list[dict[str, object]]:
+    return [
+        {
+            "address": "示例地址",
+            "latitude": latitude,
+            "longitude": longitude,
+            "qdbj": "范围标记",
+        },
         {"prop": "qsqddd", "value": " 橘园 "},
         {"prop": "qdbj", "value": " 001 "},
     ]
@@ -76,12 +89,13 @@ class _FakeClient:
         return self.submit_response
 
 
-def _service(client: _FakeClient) -> CheckinService:
+def _service(client: _FakeClient, *, diagnostic=print) -> CheckinService:
     return CheckinService(
         token_provider=lambda *_args: "test-token",
         client_factory=lambda *_args: client,
         sleep=lambda _seconds: None,
         clock=lambda: 0.0,
+        diagnostic=diagnostic,
     )
 
 
@@ -204,6 +218,58 @@ def test_valid_dormitory_coordinates_are_normalized():
     assert room == "001"
 
 
+def test_current_dormitory_location_shape_is_accepted():
+    location, building, room = _parse_dormitory_data(_current_dormitory("29.123", "106.456"))
+
+    assert location == {"latitude": 29.123, "longitude": 106.456}
+    assert building == "橘园"
+    assert room == "001"
+
+
+def test_dormitory_without_location_candidate_fails_closed():
+    columns = [
+        {"prop": "qsqddd", "value": "橘园"},
+        {"prop": "qdbj", "value": "001"},
+    ]
+
+    with pytest.raises(DormitorySchemaError, match="invalid or ambiguous"):
+        _parse_dormitory_data(columns)
+
+
+def test_dormitory_with_two_location_candidates_fails_closed():
+    columns = _dormitory(29, 106)
+    columns.insert(1, {"prop": "qddz", "latitude": 29, "longitude": 106})
+
+    with pytest.raises(DormitorySchemaError, match="invalid or ambiguous"):
+        _parse_dormitory_data(columns)
+
+
+def test_dormitory_with_legacy_and_current_location_candidates_fails_closed():
+    columns = _dormitory(29, 106)
+    columns.insert(1, _current_dormitory(29, 106)[0])
+
+    with pytest.raises(DormitorySchemaError, match="invalid or ambiguous"):
+        _parse_dormitory_data(columns)
+
+
+@pytest.mark.parametrize("missing", ["latitude", "longitude"])
+def test_current_dormitory_location_missing_coordinate_fails_closed(missing: str):
+    columns = _current_dormitory(29, 106)
+    del columns[0][missing]
+
+    with pytest.raises(DormitorySchemaError):
+        _parse_dormitory_data(columns)
+
+
+@pytest.mark.parametrize("missing", ["address", "qdbj"])
+def test_no_prop_location_missing_shape_marker_fails_closed(missing: str):
+    columns = _current_dormitory(29, 106)
+    del columns[0][missing]
+
+    with pytest.raises(DormitorySchemaError):
+        _parse_dormitory_data(columns)
+
+
 @pytest.mark.parametrize(
     ("latitude", "longitude"),
     [
@@ -229,6 +295,29 @@ def test_probe_never_submits():
     client = _FakeClient([{"id": "record-1", "formId": "form-1", "qdzt": "未签到"}])
 
     assert _service(client).probe_once("student", "password") == CheckinStatus.PROBE_PENDING
+    assert client.submit_calls == 0
+
+
+def test_probe_reports_dormitory_schema_failure_without_submitting():
+    pending = {"id": "record-1", "formId": "form-1", "qdzt": "未签到"}
+    client = _FakeClient([pending])
+    client.get_dormitory = Mock(return_value={"data": {"columnList": []}})
+    diagnostics = Mock()
+
+    assert _service(client, diagnostic=diagnostics).probe_once("student", "password") == CheckinStatus.DATA_ERROR
+    diagnostics.assert_called_once_with("宿舍数据结构异常")
+    assert client.submit_calls == 0
+
+
+def test_probe_preflight_validates_dormitory_and_student_without_submitting():
+    pending = {"id": "record-1", "formId": "form-1", "qdzt": "未签到"}
+    client = _FakeClient([pending])
+    client.get_dormitory = Mock(return_value={"data": {"columnList": _current_dormitory(29, 106)}})
+    client.get_student_id = Mock(return_value="20260000000")
+
+    assert _service(client).probe_once("student", "password") == CheckinStatus.PROBE_PENDING
+    client.get_dormitory.assert_called_once_with()
+    client.get_student_id.assert_called_once_with()
     assert client.submit_calls == 0
 
 

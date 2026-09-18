@@ -21,6 +21,7 @@ from .time_utils import epoch_milliseconds, now_shanghai, parse_swu_datetime, to
 DEFAULT_MAX_ATTEMPTS = 3
 DEFAULT_RETRY_DELAY = 8
 SUCCESS_CODES = {"0", "200", "20000", "00000", "success", "ok", "true"}
+CURRENT_LOCATION_FIELDS = frozenset({"address", "latitude", "longitude", "qdbj"})
 EXPECTED_DATA_ERRORS = (
     requests.exceptions.RequestException,
     json.JSONDecodeError,
@@ -28,6 +29,10 @@ EXPECTED_DATA_ERRORS = (
     ValueError,
     TypeError,
 )
+
+
+class DormitorySchemaError(ValueError):
+    """The dormitory response cannot be interpreted without ambiguity."""
 
 
 def evaluate_vacation_records(
@@ -83,7 +88,7 @@ def parse_coordinate(value: object, *, name: str, minimum: float, maximum: float
 
 
 def parse_dormitory_data(dormitory_list: list[dict[str, object]]) -> tuple[dict[str, float], str, str]:
-    location = None
+    location_candidates: list[dict[str, object]] = []
     building = None
     room = None
     for item in dormitory_list:
@@ -91,27 +96,30 @@ def parse_dormitory_data(dormitory_list: list[dict[str, object]]) -> tuple[dict[
             continue
         prop = item.get("prop", "")
         if prop == "qddz":
-            location = {"latitude": item.get("latitude"), "longitude": item.get("longitude")}
+            location_candidates.append(item)
+        elif "prop" not in item and CURRENT_LOCATION_FIELDS.issubset(item):
+            location_candidates.append(item)
         elif prop == "qsqddd":
             building = item.get("value")
         elif prop == "qdbj":
             room = item.get("value")
     if (
-        not location
+        len(location_candidates) != 1
         or not isinstance(building, str)
         or not building.strip()
         or not isinstance(room, str)
         or not room.strip()
     ):
-        raise ValueError("dormitory data is incomplete")
-    return (
-        {
+        raise DormitorySchemaError("dormitory response has an invalid or ambiguous schema")
+    location = location_candidates[0]
+    try:
+        coordinates = {
             "latitude": parse_coordinate(location.get("latitude"), name="latitude", minimum=-90, maximum=90),
             "longitude": parse_coordinate(location.get("longitude"), name="longitude", minimum=-180, maximum=180),
-        },
-        building.strip(),
-        room.strip(),
-    )
+        }
+    except ValueError as error:
+        raise DormitorySchemaError(str(error)) from error
+    return coordinates, building.strip(), room.strip()
 
 
 def business_response_succeeded(payload: object) -> bool:
@@ -201,10 +209,10 @@ class CheckinService:
             dormitory = client.get_dormitory()
             data = dormitory.get("data")
             if not isinstance(data, dict):
-                raise ValueError("dormitory response is missing data")
+                raise DormitorySchemaError("dormitory response is missing data")
             column_list = data.get("columnList")
             if not isinstance(column_list, list):
-                raise ValueError("dormitory columns are invalid")
+                raise DormitorySchemaError("dormitory columns are invalid")
             location, building, room = parse_dormitory_data(column_list)
             ctx.dormitory_data = dormitory
             ctx.building = building
@@ -266,15 +274,24 @@ class CheckinService:
             return self._submit_checkin(client, ctx)
         except (KeyboardInterrupt, SystemExit):
             raise
+        except DormitorySchemaError:
+            self._diagnostic("宿舍数据结构异常")
+            return CheckinStatus.DATA_ERROR
         except EXPECTED_DATA_ERRORS:
             return CheckinStatus.DATA_ERROR
 
     def probe_once(self, username: str, password: str) -> CheckinStatus:
         try:
-            status, _client, _transition = self._common_status(username, password)
-            return status if status is not None else CheckinStatus.PROBE_PENDING
+            status, client, transition = self._common_status(username, password)
+            if status is not None:
+                return status
+            self._prepare_context(client, CheckinContext(transition=transition))
+            return CheckinStatus.PROBE_PENDING
         except (KeyboardInterrupt, SystemExit):
             raise
+        except DormitorySchemaError:
+            self._diagnostic("宿舍数据结构异常")
+            return CheckinStatus.DATA_ERROR
         except EXPECTED_DATA_ERRORS:
             return CheckinStatus.DATA_ERROR
 
