@@ -1,5 +1,7 @@
 # SWU OAuth login discovery
 
+> This document describes the authentication implementation independently maintained in [Maximora-byte/swu-checkin](https://github.com/Maximora-byte/swu-checkin). It is not an SWU protocol specification and is not maintained by the original upstream project. Report regressions to the [current repository issue tracker](https://github.com/Maximora-byte/swu-checkin/issues) with structural, redacted evidence only.
+
 ## Why this was changed
 
 The former implementation treated one large `OAUTH_GOTO_BASE64` value and a hand-built `build_idm_login_url()` as the runtime source of truth. Decoding that value showed a complete, stale-prone chain containing an OAuth client ID, nested redirect URIs, one fixed state value, a legacy HTTP IDM URL and CAS-specific parameters. A change at any SWU hop could therefore invalidate the whole client.
@@ -63,7 +65,7 @@ These values cannot currently be derived before starting the flow and remain del
 3. `IDM_OAUTH_CLIENT_ID`
    - This is the registered IDM client for the UAAAP integration. UAAAP redirects expose their own different client ID, not this registration value.
 4. `IDM_OAUTH_SCOPE`
-   - This is the registered IDM attribute contract and is not published separately by the upstream CAS redirects.
+   - This is the registered IDM attribute contract and is not published separately by the SWU CAS redirects.
 5. `TOKEN_EXCHANGE_URL`
    - This is an application API endpoint after authentication, not OAuth redirect metadata.
 

@@ -1,12 +1,15 @@
-# SWU 查寝打卡脚本
+# SWU 查寝打卡脚本（Maximora 独立维护版）
 
 西南大学钉钉查寝自动打卡脚本，支持 GitHub Actions 以及受限 systemd timer 部署。
 
-> 本仓库是 [Sorynthia/swu-checkin](https://github.com/Sorynthia/swu-checkin) 的增强维护版，保留原项目的核心签到流程和 MIT 许可证，并重点加强认证安全、结果校验、部署可靠性与可测试性。下文“上游原版”以 **2026-09-18** 的上游 `main` 为比较基准。
+> [!IMPORTANT]
+> **本仓库由 [Maximora-byte](https://github.com/Maximora-byte) 独立维护。** 项目源自 [Sorynthia/swu-checkin](https://github.com/Sorynthia/swu-checkin)，保留原项目署名与 MIT 许可证，但本 fork 的路线、发布、问题处理和技术支持均由本仓库独立负责。它不是西南大学、钉钉或原上游作者提供的官方服务。
+
+本仓库的权威地址是 **[Maximora-byte/swu-checkin](https://github.com/Maximora-byte/swu-checkin)**。请将本 fork 的问题提交到[本仓库 Issues](https://github.com/Maximora-byte/swu-checkin/issues)，不要要求上游项目为本 fork 的改动提供支持。下文“上游原版”以 **2026-09-18** 的上游 `main` 为比较基准。
 
 ## 与上游原版的主要区别
 
-| 方面 | 上游原版 | 本增强版 |
+| 方面 | 上游原版 | Maximora 独立维护版 |
 |---|---|---|
 | 统一身份认证 | 使用固定 OAuth/CAS 元数据 | 从可信 SWU HTTPS 响应逐跳发现 Redirect、state、form 和 hidden input；未知主机、降级 HTTP、异常端口或歧义参数均 fail closed |
 | 特殊回调 | 依赖 `requests` 默认自动重定向和最终响应 URL | 对学校实际出现的 412 / 404 回调使用精确 host、path、port 和 ticket 规则，其他 HTTP 错误继续失败 |
@@ -53,7 +56,7 @@
 
 推荐按运行环境选择：
 
-- **长期在线 Linux 主机：**优先使用 [systemd 部署方式](DEPLOYMENT.md)，触发时间更稳定，并提供只读 probe、凭据保护和 Telegram 汇总。
+- **长期在线 Linux 主机：**优先使用本仓库的 [systemd 部署方式](DEPLOYMENT.md)，触发时间更稳定，并提供只读 probe、凭据保护和 Telegram 汇总。
 - **不维护服务器：**使用 GitHub Actions，但需接受公共 runner 可能排队延迟。
 - **临时验证：**使用本地命令行运行；正式启用前建议先执行只读 probe。
 
@@ -66,7 +69,7 @@
 - **如对签到时间有严格要求，建议使用云服务器或本地部署**
 
 基本配置：
-1. Fork 本仓库到你的账号
+1. Fork [Maximora-byte/swu-checkin](https://github.com/Maximora-byte/swu-checkin) 到你的账号
 2. 在仓库 **Settings** → **Secrets** 中配置账号密码
 3. 设置每天北京时间 21:15、21:45 自动签到（实际执行时间不可控）
 
@@ -188,6 +191,7 @@ swu-checkin
 ├── docs/
 │   └── oauth-login-discovery.md
 ├── tests/                    # 离线回归、安全与部署测试
+├── MAINTAINERS.md            # 独立维护范围与支持入口
 ├── pyproject.toml            # 项目配置和依赖
 ├── uv.lock                   # 锁定依赖版本
 ├── README.md
@@ -258,23 +262,36 @@ CLI / JSON / systemd / Actions
 
 ## 相关项目
 
+以下链接属于原上游作者的相关项目，不代表它们由本仓库维护：
+
 - **[swu-login](https://github.com/Sorynthia/swu-login)** - 西南大学统一身份认证独立登录模块
 - **[swudk-dingtalk](https://github.com/Sorynthia/swudk-dingtalk)** - 钉钉扫码打卡前端工具
 
+## 独立维护与支持
+
+- **维护者：**[@Maximora-byte](https://github.com/Maximora-byte)
+- **权威仓库：**[Maximora-byte/swu-checkin](https://github.com/Maximora-byte/swu-checkin)
+- **问题反馈：**[GitHub Issues](https://github.com/Maximora-byte/swu-checkin/issues)
+- **代码贡献：**向本仓库 `main` 提交 Pull Request，具体要求见 [CONTRIBUTING.md](CONTRIBUTING.md)
+- **维护策略：**本 fork 按自身安全性、可靠性和部署需求独立演进；上游更新会按需审阅，不承诺自动或即时同步
+- **支持边界：**仅支持本仓库当前 `main` 及明确发布的版本；第三方二次 fork、自行修改的签到 payload 或绕过安全机制的改动不在支持范围内
+
+更完整的维护原则见 [MAINTAINERS.md](MAINTAINERS.md)。
+
 ## 贡献指南
 
-欢迎提交 Issue 和 Pull Request！请查看 [CONTRIBUTING.md](CONTRIBUTING.md) 了解详细信息。
+欢迎向本仓库提交 Issue 和 Pull Request。请先阅读 [CONTRIBUTING.md](CONTRIBUTING.md)，并确保报告中不包含账号、密码、token、ticket、验证码、位置数据或完整认证回调 URL。
 
 ## 引用与归属
 
-如果你在项目中使用或参考了本代码，建议按以下方式标注：
+本 fork 的独立维护不改变原项目的著作权与许可证要求。如果你使用或参考本代码，建议同时标注原始来源和当前维护版本：
 
 ```
-基于 Sorynthia/swu-checkin 开发
-GitHub: https://github.com/Sorynthia/swu-checkin
+原始项目: Sorynthia/swu-checkin
+独立维护 fork: Maximora-byte/swu-checkin
 ```
 
-本项目采用 MIT 许可证，欢迎使用和修改，但请保留原作者信息。
+本项目采用 MIT 许可证。使用、复制或修改时请保留许可证文本及原作者信息；`Maximora-byte` 是本 fork 的维护者，不声称拥有原上游代码的原始作者身份。
 
 ## 许可证
 
