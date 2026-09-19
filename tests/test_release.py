@@ -43,7 +43,7 @@ def test_package_version_matches_project_metadata():
     with (ROOT / "pyproject.toml").open("rb") as source:
         version = tomllib.load(source)["project"]["version"]
 
-    assert swu_checkin.__version__ == version == "1.1.0"
+    assert swu_checkin.__version__ == version
 
 
 def test_release_tag_matches_project_version(tmp_path: Path):
