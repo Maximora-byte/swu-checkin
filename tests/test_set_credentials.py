@@ -77,7 +77,8 @@ def test_main_keeps_notify_timer_disabled_on_read_error(
 
     assert call(["systemctl", "enable", "--now", "swu-checkin.timer"], check=True) in run.call_args_list
     assert call(["systemctl", "enable", "--now", "swu-checkin-notify.timer"], check=True) not in run.call_args_list
-    assert "通知 timer 未启用" in capsys.readouterr().out
+    assert call(["systemctl", "disable", "--now", "swu-checkin-notify.timer"], check=True) in run.call_args_list
+    assert "swu-checkin-notify.timer 已保持禁用" in capsys.readouterr().out
 
 
 @pytest.mark.parametrize(
@@ -91,7 +92,7 @@ def test_main_keeps_notify_timer_disabled_on_read_error(
         "SWUDK_NOTIFY_TARGET=secret-target\nmalformed\nAPI_TOKEN=secret-token\n",
     ],
 )
-def test_main_keeps_checkin_timer_enabled_but_rejects_invalid_notify_config(
+def test_invalid_notify_config_disables_previously_enabled_notify_timer(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
@@ -106,8 +107,9 @@ def test_main_keeps_checkin_timer_enabled_but_rejects_invalid_notify_config(
 
     assert call(["systemctl", "enable", "--now", "swu-checkin.timer"], check=True) in run.call_args_list
     assert call(["systemctl", "enable", "--now", "swu-checkin-notify.timer"], check=True) not in run.call_args_list
+    assert call(["systemctl", "disable", "--now", "swu-checkin-notify.timer"], check=True) in run.call_args_list
     output = capsys.readouterr().out
-    assert "通知 timer 未启用" in output
+    assert "swu-checkin-notify.timer 已保持禁用" in output
     assert "do-not-print" not in output
     assert "SENSITIVE_TOKEN" not in output
     assert "secret-target" not in output
@@ -126,6 +128,7 @@ def test_main_keeps_notify_timer_disabled_when_file_is_missing(
 
     assert call(["systemctl", "enable", "--now", "swu-checkin.timer"], check=True) in run.call_args_list
     assert call(["systemctl", "enable", "--now", "swu-checkin-notify.timer"], check=True) not in run.call_args_list
+    assert call(["systemctl", "disable", "--now", "swu-checkin-notify.timer"], check=True) in run.call_args_list
     assert "未检测到 /etc/swu-checkin/notify.env" in capsys.readouterr().out
 
 
@@ -148,6 +151,7 @@ def test_main_enables_both_timers_for_valid_notify_target(
 
     assert call(["systemctl", "enable", "--now", "swu-checkin.timer"], check=True) in run.call_args_list
     assert call(["systemctl", "enable", "--now", "swu-checkin-notify.timer"], check=True) in run.call_args_list
+    assert call(["systemctl", "disable", "--now", "swu-checkin-notify.timer"], check=True) not in run.call_args_list
 
 
 def _prepare_successful_setup(monkeypatch: pytest.MonkeyPatch, module: ModuleType, notify_file: Path) -> Mock:
