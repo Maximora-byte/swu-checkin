@@ -26,7 +26,7 @@ from .cache import CheckinContext
 from .client import SwuClient
 from .get_info import authenticate_token
 from .models import CheckinResult
-from .status import RETRYABLE_STATUSES, CheckinStatus, VacationStatus, status_message
+from .status import CheckinStatus, VacationStatus, status_message
 from .time_utils import epoch_milliseconds, today_shanghai
 from .token_store import TokenStore, TokenStoreError, TokenStoreProtocol
 
@@ -45,6 +45,14 @@ EXPECTED_DATA_ERRORS = (
 
 class _TokenInvalid(Exception):
     """The validation endpoint explicitly rejected a bearer token."""
+
+
+@dataclass(frozen=True)
+class _AttemptOutcome:
+    """Internal single-attempt result with an explicit retry decision."""
+
+    status: CheckinStatus
+    retryable: bool
 
 
 @dataclass(frozen=True)
@@ -212,6 +220,26 @@ class CheckinService:
         except (OSError, TokenStoreError):
             pass
 
+    @staticmethod
+    def _is_transient_request_error(error: requests.exceptions.RequestException) -> bool:
+        if isinstance(error, (requests.exceptions.Timeout, requests.exceptions.ConnectionError)):
+            return True
+        if isinstance(error, requests.exceptions.HTTPError):
+            status_code = error.response.status_code if error.response is not None else None
+            return status_code in {408, 425, 429} or (status_code is not None and 500 <= status_code <= 599)
+        return False
+
+    @staticmethod
+    def _auth_outcome(error: AuthError) -> _AttemptOutcome:
+        return _AttemptOutcome(
+            status=auth_failure_status(error.reason),
+            retryable=error.reason is AuthFailureReason.NETWORK_ERROR,
+        )
+
+    @staticmethod
+    def _status_outcome(status: CheckinStatus) -> _AttemptOutcome:
+        return _AttemptOutcome(status=status, retryable=status is CheckinStatus.NO_TASK)
+
     def _validate_token(self, token: str) -> tuple[SwuClient, str]:
         client = self._client_factory(token, self.timeout)
         try:
@@ -220,9 +248,19 @@ class CheckinService:
             status_code = error.response.status_code if error.response is not None else None
             if status_code in {401, 403}:
                 raise _TokenInvalid from None
-            raise AuthError(AuthFailureReason.NETWORK_ERROR) from None
-        except requests.exceptions.RequestException:
-            raise AuthError(AuthFailureReason.NETWORK_ERROR) from None
+            reason = (
+                AuthFailureReason.NETWORK_ERROR
+                if self._is_transient_request_error(error)
+                else AuthFailureReason.TOKEN_EXCHANGE_FAILED
+            )
+            raise AuthError(reason) from None
+        except requests.exceptions.RequestException as error:
+            reason = (
+                AuthFailureReason.NETWORK_ERROR
+                if self._is_transient_request_error(error)
+                else AuthFailureReason.TOKEN_EXCHANGE_FAILED
+            )
+            raise AuthError(reason) from None
         except EXPECTED_DATA_ERRORS:
             raise AuthError(AuthFailureReason.TOKEN_EXCHANGE_FAILED) from None
         return client, student_id
@@ -364,24 +402,31 @@ class CheckinService:
             return CheckinStatus.ALREADY_CHECKED_IN, client, transition
         return None, client, transition
 
-    def check_in_once(self, username: str, password: str) -> CheckinStatus:
+    def _check_in_attempt(self, username: str, password: str) -> _AttemptOutcome:
         try:
             status, client, transition = self._common_status(username, password)
             if status is not None:
-                return status
+                return self._status_outcome(status)
             if client is None or transition is None:
-                return CheckinStatus.DATA_ERROR
+                return _AttemptOutcome(CheckinStatus.DATA_ERROR, retryable=False)
             submission = self._prepare_context(client, transition)
-            return self._submit_checkin(client, submission)
+            return self._status_outcome(self._submit_checkin(client, submission))
         except (KeyboardInterrupt, SystemExit):
             raise
         except AuthError as error:
-            return auth_failure_status(error.reason)
+            return self._auth_outcome(error)
         except DormitorySchemaError:
             self._diagnostic("宿舍数据结构异常")
-            return CheckinStatus.DATA_ERROR
+            return _AttemptOutcome(CheckinStatus.DATA_ERROR, retryable=False)
+        except requests.exceptions.RequestException as error:
+            return _AttemptOutcome(CheckinStatus.DATA_ERROR, retryable=self._is_transient_request_error(error))
         except EXPECTED_DATA_ERRORS:
-            return CheckinStatus.DATA_ERROR
+            return _AttemptOutcome(CheckinStatus.DATA_ERROR, retryable=False)
+
+    def check_in_once(self, username: str, password: str) -> CheckinStatus:
+        """Execute one attempt while preserving the historical status-only API."""
+
+        return self._check_in_attempt(username, password).status
 
     def probe_once(self, username: str, password: str) -> CheckinStatus:
         try:
@@ -411,19 +456,21 @@ class CheckinService:
         retry_delay: int = DEFAULT_RETRY_DELAY,
     ) -> CheckinResult:
         started = self._clock()
-        last_status = CheckinStatus.DATA_ERROR
+        last_outcome = _AttemptOutcome(CheckinStatus.DATA_ERROR, retryable=False)
         completed_attempts = 0
         for attempt in range(1, max_attempts + 1):
             completed_attempts = attempt
-            last_status = self.check_in_once(username, password)
-            if last_status not in RETRYABLE_STATUSES or attempt >= max_attempts:
+            last_outcome = self._check_in_attempt(username, password)
+            if not last_outcome.retryable or attempt >= max_attempts:
                 break
             wait = retry_delay * (2 ** (attempt - 1))
-            self._diagnostic(f"第 {attempt}/{max_attempts} 次失败（{status_message(last_status)}），{wait} 秒后重试")
+            self._diagnostic(
+                f"第 {attempt}/{max_attempts} 次失败（{status_message(last_outcome.status)}），{wait} 秒后重试"
+            )
             self._sleep(wait)
         duration_ms = max(0, int((self._clock() - started) * 1000))
         return CheckinResult.from_status(
-            last_status,
+            last_outcome.status,
             attempts=completed_attempts,
             duration_ms=duration_ms,
             mode="checkin",
