@@ -1,0 +1,69 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    name: release
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+
+      - name: 安装固定版本 uv 与 Python
+        uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6
+        with:
+          version: "0.12.15"
+          enable-cache: true
+
+      - name: 按锁文件安装依赖
+        run: |
+          uv python install 3.13
+          uv sync --locked --all-groups --python 3.13
+
+      - name: 验证 tag 与项目版本
+        run: |
+          project_version="$(uv run --locked python scripts/release/verify_release_tag.py --tag "$GITHUB_REF_NAME")"
+          echo "PROJECT_VERSION=$project_version" >> "$GITHUB_ENV"
+
+      - name: 运行完整质量门禁
+        run: |
+          uv run --locked pytest -q
+          uv run --locked ruff check .
+          uv run --locked ruff format --check .
+          uv run --locked mypy src/swu_checkin
+          uv lock --check
+
+      - name: 构建并验证发布 artifacts
+        run: |
+          uv build
+          uv run --locked python scripts/release/verify_artifacts.py --expected-version "$PROJECT_VERSION"
+
+      - name: 拒绝覆盖已有 Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            echo "Release $GITHUB_REF_NAME already exists; refusing to overwrite immutable artifacts." >&2
+            exit 1
+          fi
+
+      - name: 创建 GitHub Release 并上传 artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" dist/*.whl dist/*.tar.gz \
+            --verify-tag \
+            --title "$GITHUB_REF_NAME" \
+            --generate-notes
