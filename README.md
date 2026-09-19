@@ -89,13 +89,37 @@ uv sync --locked --no-dev --python 3.13
 安装后可直接使用命令行工具：
 
 ```bash
-# 设置环境变量后运行
-export SWUDK_USERNAME="你的学号"
-export SWUDK_PASSWORD="你的密码"
-swu-checkin
+# 首次使用：交互验证账号和只读接口，不保存密码
+swu-checkin setup
+
+# 只读诊断运行环境、认证和接口
+swu-checkin doctor
+
+# 读取已有的本地状态文件（不发网络请求）
+swu-checkin status
+
+# 明确执行正式签到
+swu-checkin run
+
+# 只读检测，不提交签到
+swu-checkin probe
 ```
 
-本地交互运行时也可以直接执行 `swu-checkin`；如果未设置上述环境变量，程序会分别通过 `input()` 和 `getpass()` 安全询问账号与密码。GitHub Actions、systemd 等无人值守部署必须通过 Secrets 或受限环境文件提供凭据。
+`setup` 复用现有 Service/Client 执行完整只读 preflight，验证认证、请假接口与策略、学生信息、宿舍 schema 和今日任务接口；它不会调用签到提交接口。本版本尚未实现跨平台安全 credential store，因此不会把密码写入 JSON、TOML、YAML 或其他配置文件。自动化部署仍应使用 GitHub Secrets 或权限受限的 systemd 环境文件。
+
+`status` 不会创建状态数据：systemd 部署默认读取 `/var/lib/swu-checkin/status.json`；普通本地 `swu-checkin run` 只有在设置 `SWUDK_STATUS_FILE` 时才会记录状态。Windows 或普通本地用户若未配置该变量，看到“尚无本地运行状态”属于正常行为。
+
+也可以先设置环境变量，避免 `run`、`probe` 和 `doctor` 重复询问凭据：
+
+```bash
+export SWUDK_USERNAME="你的学号"
+export SWUDK_PASSWORD="你的密码"
+swu-checkin run
+```
+
+如果未设置上述环境变量，程序会分别通过 `input()` 和 `getpass()` 安全询问账号与密码。GitHub Actions、systemd 等无人值守部署必须通过 Secrets 或受限环境文件提供凭据。
+
+原有命令全部保持兼容：不带子命令的 `swu-checkin` 等价于正式签到，旧 `--probe` 和 JSON 参数仍可使用。
 
 只验证登录与任务读取、不执行签到：
 
@@ -110,6 +134,8 @@ swu-checkin --probe
 ```bash
 swu-checkin --json
 swu-checkin --probe --json
+swu-checkin run --json
+swu-checkin probe --json
 ```
 
 JSON 模式的 stdout 只包含一个 `schema_version=1` JSON document；重试和诊断信息写入 stderr。退出码与人类可读模式完全一致。
@@ -226,7 +252,7 @@ CLI / JSON / systemd / Actions
 ### 可选配置
 - `SWUDK_MAX_ATTEMPTS` - 签到失败重试次数（默认 3 次）
 - `SWUDK_RETRY_DELAY` - 首次重试等待秒数，后续指数退避（默认 8 秒）
-- `SWUDK_PROBE_ONLY` - 设为 `1` 时只登录并读取任务，绝不提交签到
+- `SWUDK_PROBE_ONLY` - 设为 `1` 时禁止正式提交：旧无子命令入口执行只读 probe，显式 `run` 会 fail closed
 - `SWUDK_STATUS_FILE` - 可选的非敏感运行状态文件路径，主要供 systemd 通知任务使用
 - `SWUDK_DEBUG_CREDENTIALS` - 输出不含凭据值的结构化诊断信息（`1` 启用，默认关闭）
 
