@@ -37,7 +37,7 @@ SWUDK_PASSWORD=密码
 sudo install -d -m 0700 -o root -g root /etc/swu-checkin
 sudo install -m 0600 -o root -g root deploy/notify.env.example /etc/swu-checkin/notify.env
 sudoedit /etc/swu-checkin/notify.env
-sudo systemctl enable --now swu-checkin-notify.timer
+sudo swu-checkin-set-credentials --sync-notify
 ```
 
 通知服务暂时以 root 运行，因为本机 OpenClaw CLI 使用 root 所有的通道配置与状态；单元仍保留只读 home、空 capability 集合，并仅开放 `/root/.openclaw/state` 和专用 cache 的必要写权限。主签到服务和 probe 继续使用专用 `swu-checkin` 用户。
