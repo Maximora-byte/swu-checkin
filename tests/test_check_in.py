@@ -6,6 +6,7 @@ from unittest.mock import Mock
 import pytest
 import requests
 
+from swu_checkin.api_models import DormitoryInfo, LeaveRecords, StudentProfile, Transition
 from swu_checkin.cache import CheckinContext
 from swu_checkin.check_in import (
     _business_response_succeeded,
@@ -75,14 +76,35 @@ class _FakeClient:
     def get_leave_records(self):
         return self.leave_records
 
+    def get_leave_record_set(self):
+        return LeaveRecords.from_items(self.leave_records)
+
     def get_transition_today(self):
         return self.transitions.pop(0) if self.transitions else {"qdzt": "未签到"}
+
+    def get_transition(self):
+        value = self.get_transition_today()
+        if value is None:
+            return None
+        return Transition.from_record(
+            {
+                "id": value.get("id", "record-1"),
+                "formId": value.get("formId", "form-1"),
+                "qdzt": value.get("qdzt", "未签到"),
+            }
+        )
 
     def get_dormitory(self):
         return {"data": {"columnList": _dormitory(29, 106)}}
 
+    def get_dormitory_info(self):
+        return DormitoryInfo.from_response(self.get_dormitory())
+
     def get_student_id(self):
         return "20260000000"
+
+    def get_student_profile(self):
+        return StudentProfile(self.get_student_id())
 
     def submit_checkin_form(self, **_kwargs):
         self.submit_calls += 1
@@ -196,18 +218,18 @@ def test_invalid_vacation_json_is_unknown():
 @pytest.mark.parametrize("error", [requests.Timeout("timeout"), requests.HTTPError("503")])
 def test_vacation_api_failures_are_data_errors(error: requests.RequestException):
     client = _FakeClient([])
-    client.get_leave_records = Mock(side_effect=error)
+    client.get_leave_record_set = Mock(side_effect=error)
 
     assert _service(client).check_in_once("student", "password") is CheckinStatus.DATA_ERROR
 
 
 def test_unknown_vacation_status_stops_checkin_before_task_lookup():
     client = _FakeClient([])
-    client.get_leave_records = Mock(return_value=[None])
-    client.get_transition_today = Mock()
+    client.get_leave_record_set = Mock(return_value=LeaveRecords.from_items([None]))
+    client.get_transition = Mock()
 
     assert _service(client).check_in_once("student", "password") == CheckinStatus.DATA_ERROR
-    client.get_transition_today.assert_not_called()
+    client.get_transition.assert_not_called()
 
 
 def test_valid_dormitory_coordinates_are_normalized():
@@ -301,7 +323,7 @@ def test_probe_never_submits():
 def test_probe_reports_dormitory_schema_failure_without_submitting():
     pending = {"id": "record-1", "formId": "form-1", "qdzt": "未签到"}
     client = _FakeClient([pending])
-    client.get_dormitory = Mock(return_value={"data": {"columnList": []}})
+    client.get_dormitory_info = Mock(side_effect=DormitorySchemaError("invalid schema"))
     diagnostics = Mock()
 
     assert _service(client, diagnostic=diagnostics).probe_once("student", "password") == CheckinStatus.DATA_ERROR
@@ -312,12 +334,12 @@ def test_probe_reports_dormitory_schema_failure_without_submitting():
 def test_probe_preflight_validates_dormitory_and_student_without_submitting():
     pending = {"id": "record-1", "formId": "form-1", "qdzt": "未签到"}
     client = _FakeClient([pending])
-    client.get_dormitory = Mock(return_value={"data": {"columnList": _current_dormitory(29, 106)}})
-    client.get_student_id = Mock(return_value="20260000000")
+    client.get_dormitory_info = Mock(return_value=DormitoryInfo(29.0, 106.0, "橘园", "001"))
+    client.get_student_profile = Mock(return_value=StudentProfile("20260000000"))
 
     assert _service(client).probe_once("student", "password") == CheckinStatus.PROBE_PENDING
-    client.get_dormitory.assert_called_once_with()
-    client.get_student_id.assert_called_once_with()
+    client.get_dormitory_info.assert_called_once_with()
+    client.get_student_profile.assert_called_once_with()
     assert client.submit_calls == 0
 
 

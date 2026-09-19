@@ -4,7 +4,9 @@ from __future__ import annotations
 def strEnc(data: str, firstKey: str, secondKey: str, thirdKey: str) -> str:
     leng = len(data)
     encData = ""
-    firstKeyBt = secondKeyBt = thirdKeyBt = None
+    firstKeyBt: list[list[int]] = []
+    secondKeyBt: list[list[int]] = []
+    thirdKeyBt: list[list[int]] = []
     firstLength = secondLength = thirdLength = 0
     if firstKey:
         firstKeyBt = getKeyBytes(firstKey)
@@ -106,7 +108,9 @@ def strEnc(data: str, firstKey: str, secondKey: str, thirdKey: str) -> str:
 def strDec(data: str, firstKey: str, secondKey: str, thirdKey: str) -> str:
     leng = len(data)
     decStr = ""
-    firstKeyBt = secondKeyBt = thirdKeyBt = None
+    firstKeyBt: list[list[int]] = []
+    secondKeyBt: list[list[int]] = []
+    thirdKeyBt: list[list[int]] = []
     firstLength = secondLength = thirdLength = 0
     if firstKey:
         firstKeyBt = getKeyBytes(firstKey)
@@ -150,8 +154,8 @@ def strDec(data: str, firstKey: str, secondKey: str, thirdKey: str) -> str:
     return decStr
 
 
-def getKeyBytes(key: str):
-    keyBytes = []
+def getKeyBytes(key: str) -> list[list[int]]:
+    keyBytes: list[list[int]] = []
     leng = len(key)
     iterator = leng // 4
     remainder = leng % 4
@@ -162,7 +166,7 @@ def getKeyBytes(key: str):
     return keyBytes
 
 
-def strToBt(s: str):
+def strToBt(s: str) -> list[int]:
     leng = len(s)
     bt = [0] * 64
     if leng < 4:

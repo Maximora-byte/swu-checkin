@@ -555,6 +555,7 @@ def follow_trusted_auth_redirects(
             target = resolve_trusted_redirect(response)
         except OAuthDiscoveryError as error:
             parsed = urllib.parse.urlsplit(raw_target)
+            parsed_port: int | str | None
             try:
                 parsed_port = parsed.port
             except ValueError:
