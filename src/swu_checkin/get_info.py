@@ -136,9 +136,14 @@ def recognize_captcha(
     for attempt in range(1, max_attempts + 1):
         try:
             response = session.get(captcha_url, timeout=timeout, allow_redirects=False)
+            try:
+                response.raise_for_status()
+            except requests.exceptions.HTTPError:
+                if response.status_code in {408, 425, 429} or 500 <= response.status_code <= 599:
+                    raise
+                raise OAuthDiscoveryError("验证码端点未返回成功响应") from None
             if response.status_code != 200:
                 raise OAuthDiscoveryError("验证码端点未返回成功响应")
-            response.raise_for_status()
             img = Image.open(BytesIO(response.content))
             result = ocr.classification(img)
 
@@ -195,33 +200,34 @@ def authenticate_token(username: str, password: str, timeout: int = 10) -> str:
 
 def _get_token(username: str, password: str, timeout: int, max_login_attempts: int = 3) -> str:
     """
-    内部登录实现，支持验证码错误重试
+    内部登录实现；完整认证重试由 CheckinService 负责。
 
     Args:
         username: 用户名
         password: 密码
         timeout: 超时时间
-        max_login_attempts: 最大登录尝试次数（验证码错误时重试）
+        max_login_attempts: 服务端明确拒绝验证码后的最大提交次数
 
     Returns:
         成功返回 token
 
     Raises:
-        AuthError: 所有尝试均失败后的分类结果
+        AuthError: 当前完整认证失败后的分类结果
     """
-    last_error = AuthError(AuthFailureReason.UNKNOWN)
-    for login_attempt in range(1, max_login_attempts + 1):
-        try:
-            session = requests.Session()
+    try:
+        session = requests.Session()
 
-            # 步骤 1: 从可信 SWU HTTPS 响应发现 OAuth state、回调与登录 form
-            flow = discover_login_flow(session, timeout)
-            debug_print("已从可信响应发现登录流程")
+        # 步骤 1: 从可信 SWU HTTPS 响应发现 OAuth state、回调与登录 form
+        flow = discover_login_flow(session, timeout)
+        debug_print("已从可信响应发现登录流程")
 
-            # 步骤 2: DES 加密凭证
-            encrypted_username, encrypted_password = des(username, password, flow.code_random)
+        # 步骤 2: DES 加密凭证
+        encrypted_username, encrypted_password = des(username, password, flow.code_random)
 
-            # 步骤 3: OCR 识别验证码（带重试）
+        if max_login_attempts < 1:
+            raise AuthError(AuthFailureReason.CAPTCHA_FAILED)
+        for captcha_submit_attempt in range(1, max_login_attempts + 1):
+            # 步骤 3: OCR 识别验证码（图片获取与 OCR 自身带有限重试）
             captcha = recognize_captcha(session, flow.captcha_url, timeout, max_attempts=3)
             debug_print("验证码已识别")
 
@@ -237,89 +243,82 @@ def _get_token(username: str, password: str, timeout: int, max_login_attempts: i
             debug_print(f"登录提交响应: {describe_auth_response(response)}")
             validate_idm_login_response(response)
 
-            validate_login_result_text(response.text)
-
-            # 步骤 5: 处理身份选择
-            response = submit_identity_selection_if_needed(
-                session,
-                response,
-                login_url=flow.form_action,
-                goto_value=flow.goto_value,
-                timeout=timeout,
-                allow_redirects=False,
-            )
-            response = follow_trusted_auth_redirects(session, response, timeout=timeout)
-            debug_print(f"身份选择响应: {describe_auth_response(response)}")
-            validate_idm_login_response(response)
-
-            debug_print("身份选择流程已完成")
-
-            # 步骤 6: 提取并转换 ticket
-            ticket_st = extract_ticket_from_url(response.url)
-            if not ticket_st:
-                raise AuthError(AuthFailureReason.TICKET_FAILED)
-
-            ticket_cd = transform_ticket(ticket_st)
-
-            # 步骤 7a: 使用服务端发现的 callback 与 state 访问回调
-            callback_url = build_cas_callback_url(flow, ticket_cd)
-            response = session.get(callback_url, timeout=timeout, allow_redirects=False)
-            response = follow_trusted_auth_redirects(session, response, timeout=timeout)
-            debug_print(f"CAS callback 响应: {describe_auth_response(response)}")
-            validate_cas_callback_response(response)
-
-            # 步骤 7b: 从最终回调 URL 获取 token ticket
-            token_st = extract_ticket_from_url(response.url)
-            if not token_st:
-                raise AuthError(AuthFailureReason.TICKET_FAILED)
-
-            # 步骤 7c: 用 token ticket 换取最终 token
-            response = session.get(
-                TOKEN_EXCHANGE_URL,
-                params={"token": token_st, "remember": "true"},
-                timeout=timeout,
-            )
-            response.raise_for_status()
             try:
-                token_response = response.json()
-            except (ValueError, TypeError):
-                raise AuthError(AuthFailureReason.TOKEN_EXCHANGE_FAILED) from None
+                validate_login_result_text(response.text)
+            except AuthError as error:
+                if error.reason is not AuthFailureReason.CAPTCHA_FAILED or captcha_submit_attempt >= max_login_attempts:
+                    raise
+                safe_print(f"验证码被服务器拒绝 (尝试 {captcha_submit_attempt}/{max_login_attempts})，重新获取")
+                time.sleep(1)
+                continue
+            break
 
-            if not isinstance(token_response, dict) or "data" not in token_response:
-                raise AuthError(AuthFailureReason.TOKEN_EXCHANGE_FAILED)
+        # 步骤 5: 处理身份选择
+        response = submit_identity_selection_if_needed(
+            session,
+            response,
+            login_url=flow.form_action,
+            goto_value=flow.goto_value,
+            timeout=timeout,
+            allow_redirects=False,
+        )
+        response = follow_trusted_auth_redirects(session, response, timeout=timeout)
+        debug_print(f"身份选择响应: {describe_auth_response(response)}")
+        validate_idm_login_response(response)
 
-            token = token_response["data"]
-            if not isinstance(token, str) or not token:
-                raise AuthError(AuthFailureReason.TOKEN_EXCHANGE_FAILED)
-            debug_print("登录成功，认证结果已确认")
+        debug_print("身份选择流程已完成")
 
-            return token
+        # 步骤 6: 提取并转换 ticket
+        ticket_st = extract_ticket_from_url(response.url)
+        if not ticket_st:
+            raise AuthError(AuthFailureReason.TICKET_FAILED)
 
-        except requests.exceptions.RequestException as error:
-            last_error = AuthError(AuthFailureReason.NETWORK_ERROR)
-            safe_print(f"登录过程异常 (尝试 {login_attempt}/{max_login_attempts}): {type(error).__name__}")
-        except OAuthDiscoveryError as error:
-            last_error = AuthError(error.reason)
-            safe_print(f"登录过程异常 (尝试 {login_attempt}/{max_login_attempts}): {type(error).__name__}")
-        except AuthError as error:
-            last_error = error
-            safe_print(f"登录过程异常 (尝试 {login_attempt}/{max_login_attempts}): {type(error).__name__}")
-        except (KeyError, ValueError, TypeError) as error:
-            last_error = AuthError(AuthFailureReason.UNKNOWN)
-            safe_print(f"登录过程异常 (尝试 {login_attempt}/{max_login_attempts}): {type(error).__name__}")
+        ticket_cd = transform_ticket(ticket_st)
 
-        if last_error.reason in {
-            AuthFailureReason.CREDENTIAL_REJECTED,
-            AuthFailureReason.LOGIN_PAGE_CHANGED,
-            AuthFailureReason.OAUTH_FLOW_CHANGED,
-        }:
-            raise last_error from None
-        if login_attempt < max_login_attempts:
-            time.sleep(1)
+        # 步骤 7a: 使用服务端发现的 callback 与 state 访问回调
+        callback_url = build_cas_callback_url(flow, ticket_cd)
+        response = session.get(callback_url, timeout=timeout, allow_redirects=False)
+        response = follow_trusted_auth_redirects(session, response, timeout=timeout)
+        debug_print(f"CAS callback 响应: {describe_auth_response(response)}")
+        validate_cas_callback_response(response)
 
-    # 所有尝试都失败
-    safe_print(f"登录失败，已用尽 {max_login_attempts} 次尝试")
-    raise last_error from None
+        # 步骤 7b: 从最终回调 URL 获取 token ticket
+        token_st = extract_ticket_from_url(response.url)
+        if not token_st:
+            raise AuthError(AuthFailureReason.TICKET_FAILED)
+
+        # 步骤 7c: 用 token ticket 换取最终 token
+        response = session.get(
+            TOKEN_EXCHANGE_URL,
+            params={"token": token_st, "remember": "true"},
+            timeout=timeout,
+        )
+        response.raise_for_status()
+        try:
+            token_response = response.json()
+        except (ValueError, TypeError):
+            raise AuthError(AuthFailureReason.TOKEN_EXCHANGE_FAILED) from None
+
+        if not isinstance(token_response, dict) or "data" not in token_response:
+            raise AuthError(AuthFailureReason.TOKEN_EXCHANGE_FAILED)
+
+        token = token_response["data"]
+        if not isinstance(token, str) or not token:
+            raise AuthError(AuthFailureReason.TOKEN_EXCHANGE_FAILED)
+        debug_print("登录成功，认证结果已确认")
+        return token
+    except requests.exceptions.RequestException as error:
+        safe_print(f"登录过程异常: {type(error).__name__}")
+        raise AuthError(AuthFailureReason.NETWORK_ERROR) from None
+    except OAuthDiscoveryError as error:
+        safe_print(f"登录过程异常: {type(error).__name__}")
+        raise AuthError(error.reason) from None
+    except AuthError as error:
+        safe_print(f"登录过程异常: {type(error).__name__}")
+        raise
+    except (KeyError, ValueError, TypeError) as error:
+        safe_print(f"登录过程异常: {type(error).__name__}")
+        raise AuthError(AuthFailureReason.UNKNOWN) from None
 
 
 def get_student_id(token: str, timeout: int = 10) -> str:
