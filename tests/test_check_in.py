@@ -95,7 +95,7 @@ class _FakeClient:
         return DormitoryInfo.from_response(self.get_dormitory())
 
     def get_student_id(self):
-        return "20260000000"
+        return "student"
 
     def get_student_profile(self):
         return StudentProfile(self.get_student_id())

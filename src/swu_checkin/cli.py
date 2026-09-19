@@ -128,7 +128,7 @@ def _setup() -> int:
         print("配置验证失败：账号和密码不能为空")
         return 1
     try:
-        report = CheckinService(timeout=10).diagnose(username, password)
+        report = CheckinService(timeout=10).diagnose(username, password, use_token_cache=False)
     except (KeyboardInterrupt, SystemExit):
         raise
     except Exception as error:
@@ -171,7 +171,7 @@ def _doctor() -> int:
     credentials = bool(username and password)
     runtime = sys.version_info >= (3, 13)
     try:
-        report = CheckinService(timeout=10).diagnose(username, password) if credentials else None
+        report = CheckinService(timeout=10).diagnose(username, password, use_token_cache=False) if credentials else None
     except (KeyboardInterrupt, SystemExit):
         raise
     except Exception as error:

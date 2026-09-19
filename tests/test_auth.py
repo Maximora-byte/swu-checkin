@@ -4,7 +4,7 @@ import pytest
 import requests
 
 from swu_checkin.auth import AuthError, AuthFailureReason, auth_failure_status
-from swu_checkin.get_info import _get_token, validate_login_result_text
+from swu_checkin.get_info import _get_token, get_token, validate_login_result_text
 from swu_checkin.oauth_flow import OAuthDiscoveryError
 from swu_checkin.service import CheckinService
 from swu_checkin.status import CheckinStatus
@@ -121,3 +121,12 @@ def test_auth_error_discards_unreviewed_sensitive_message():
 
     assert all(value not in str(error) for value in sensitive_values)
     assert str(error) == "认证过程发生未知错误"
+
+
+def test_legacy_get_token_still_returns_empty_string_on_failure(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(
+        "swu_checkin.get_info.authenticate_token",
+        Mock(side_effect=AuthError(AuthFailureReason.CREDENTIAL_REJECTED)),
+    )
+
+    assert get_token("student", "wrong-password") == ""

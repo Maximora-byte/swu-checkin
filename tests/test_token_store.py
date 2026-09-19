@@ -6,8 +6,10 @@ import pytest
 import requests
 
 from swu_checkin import token_store
+from swu_checkin.api_models import LeaveRecords
 from swu_checkin.auth import AuthError, AuthFailureReason
 from swu_checkin.service import CheckinService
+from swu_checkin.status import CheckinStatus
 from swu_checkin.token_store import CachedToken, TokenStore, TokenStoreError
 
 
@@ -19,6 +21,12 @@ class _ReversingProtector:
 
     def unprotect(self, data: bytes) -> bytes:
         return data[::-1]
+
+
+def _http_error(status_code: int) -> requests.HTTPError:
+    response = requests.Response()
+    response.status_code = status_code
+    return requests.HTTPError("sensitive response text", response=response)
 
 
 def test_posix_token_cache_is_atomic_and_owner_only(tmp_path: Path):
@@ -96,16 +104,17 @@ def test_cache_hit_is_validated_and_skips_login():
         token_store=store,
     )
 
-    assert service._authenticated_client("student", "password") is client
+    assert service._authenticated_client("20260000000", "password") is client
     login.assert_not_called()
     store.save.assert_not_called()
 
 
-def test_invalid_cache_is_deleted_then_login_is_validated_and_saved():
+@pytest.mark.parametrize("status_code", [401, 403])
+def test_cached_auth_rejection_is_deleted_then_login_is_validated_and_saved(status_code: int):
     store = Mock()
-    store.get.return_value = CachedToken("stale-token", "old-student")
+    store.get.return_value = CachedToken("stale-token", "20260000000")
     stale_client = Mock()
-    stale_client.get_student_id.side_effect = ValueError("invalid token")
+    stale_client.get_student_id.side_effect = _http_error(status_code)
     fresh_client = Mock()
     fresh_client.get_student_id.return_value = "20260000000"
     clients = iter([stale_client, fresh_client])
@@ -116,17 +125,25 @@ def test_invalid_cache_is_deleted_then_login_is_validated_and_saved():
         token_store=store,
     )
 
-    assert service._authenticated_client("student", "password") is fresh_client
-    store.delete.assert_called_once_with("student")
-    login.assert_called_once_with("student", "password", 10)
-    store.save.assert_called_once_with("student", "fresh-token", "20260000000")
+    assert service._authenticated_client("20260000000", "password") is fresh_client
+    store.delete.assert_called_once_with("20260000000")
+    login.assert_called_once_with("20260000000", "password", 10)
+    store.save.assert_called_once_with("20260000000", "fresh-token", "20260000000")
 
 
-def test_cache_validation_timeout_keeps_cache_and_does_not_mask_network_error():
+@pytest.mark.parametrize(
+    "failure",
+    [
+        requests.Timeout("timeout password=secret"),
+        requests.ConnectionError("connection token=secret"),
+        _http_error(503),
+    ],
+)
+def test_transient_cache_validation_failure_keeps_cache_and_skips_login(failure: requests.RequestException):
     store = Mock()
     store.get.return_value = CachedToken("cached-token", "20260000000")
     client = Mock()
-    client.get_student_id.side_effect = requests.Timeout("ticket=secret")
+    client.get_student_id.side_effect = failure
     login = Mock()
     service = CheckinService(
         token_provider=login,
@@ -135,9 +152,10 @@ def test_cache_validation_timeout_keeps_cache_and_does_not_mask_network_error():
     )
 
     with pytest.raises(AuthError) as caught:
-        service._authenticated_client("student", "password")
+        service._authenticated_client("20260000000", "password")
 
     assert caught.value.reason is AuthFailureReason.NETWORK_ERROR
+    assert "secret" not in str(caught.value)
     store.delete.assert_not_called()
     login.assert_not_called()
 
@@ -154,19 +172,38 @@ def test_candidate_token_is_not_saved_before_identity_validation():
     )
 
     with pytest.raises(AuthError) as caught:
-        service._authenticated_client("student", "password")
+        service._authenticated_client("20260000000", "password")
 
     assert caught.value.reason is AuthFailureReason.TOKEN_EXCHANGE_FAILED
     store.save.assert_not_called()
 
 
-def test_cache_identity_mismatch_is_deleted_and_reauthenticated():
+def test_fresh_token_identity_mismatch_fails_closed_without_saving():
     store = Mock()
-    store.get.return_value = CachedToken("cached-token", "expected-student")
+    store.get.return_value = None
+    client = Mock()
+    client.get_student_id.return_value = "wrong-student"
+    service = CheckinService(
+        token_provider=Mock(return_value="candidate-token"),
+        client_factory=lambda *_args: client,
+        token_store=store,
+    )
+
+    with pytest.raises(AuthError) as caught:
+        service._authenticated_client("20260000000", "password")
+
+    assert caught.value.reason is AuthFailureReason.TOKEN_EXCHANGE_FAILED
+    store.delete.assert_not_called()
+    store.save.assert_not_called()
+
+
+def test_cached_identity_must_also_match_requested_username_before_use():
+    store = Mock()
+    store.get.return_value = CachedToken("cached-token", "other-student")
     cached_client = Mock()
-    cached_client.get_student_id.return_value = "different-student"
+    cached_client.get_student_id.return_value = "other-student"
     fresh_client = Mock()
-    fresh_client.get_student_id.return_value = "fresh-student"
+    fresh_client.get_student_id.return_value = "20260000000"
     clients = iter([cached_client, fresh_client])
     service = CheckinService(
         token_provider=Mock(return_value="fresh-token"),
@@ -174,6 +211,62 @@ def test_cache_identity_mismatch_is_deleted_and_reauthenticated():
         token_store=store,
     )
 
-    assert service._authenticated_client("student", "password") is fresh_client
-    store.delete.assert_called_once_with("student")
-    store.save.assert_called_once_with("student", "fresh-token", "fresh-student")
+    assert service._authenticated_client("20260000000", "password") is fresh_client
+    store.delete.assert_called_once_with("20260000000")
+    store.save.assert_called_once_with("20260000000", "fresh-token", "20260000000")
+
+
+def test_wrong_identity_after_stale_cache_fails_closed_without_saving():
+    store = Mock()
+    store.get.return_value = CachedToken("stale-token", "20260000000")
+    stale_client = Mock()
+    stale_client.get_student_id.side_effect = _http_error(401)
+    wrong_client = Mock()
+    wrong_client.get_student_id.return_value = "wrong-student"
+    clients = iter([stale_client, wrong_client])
+    service = CheckinService(
+        token_provider=Mock(return_value="wrong-token"),
+        client_factory=lambda *_args: next(clients),
+        token_store=store,
+    )
+
+    with pytest.raises(AuthError) as caught:
+        service._authenticated_client("20260000000", "password")
+
+    assert caught.value.reason is AuthFailureReason.TOKEN_EXCHANGE_FAILED
+    store.delete.assert_called_once_with("20260000000")
+    store.save.assert_not_called()
+
+
+def test_doctor_forces_fresh_auth_even_when_valid_cache_exists():
+    store = Mock()
+    store.get.return_value = CachedToken("cached-token", "20260000000")
+    login = Mock(side_effect=AuthError(AuthFailureReason.CREDENTIAL_REJECTED))
+    service = CheckinService(token_provider=login, token_store=store)
+
+    report = service.diagnose("20260000000", "wrong-password")
+
+    assert report.authentication is False
+    login.assert_called_once_with("20260000000", "wrong-password", 10)
+    store.get.assert_not_called()
+
+
+@pytest.mark.parametrize("method_name", ["check_in_once", "probe_once"])
+def test_normal_run_and_probe_still_use_valid_cache(method_name: str):
+    store = Mock()
+    store.get.return_value = CachedToken("cached-token", "20260000000")
+    client = Mock()
+    client.get_student_id.return_value = "20260000000"
+    client.get_leave_record_set.return_value = LeaveRecords.from_items([])
+    client.get_transition.return_value = None
+    login = Mock(side_effect=AssertionError("runtime must use the valid cache"))
+    service = CheckinService(
+        token_provider=login,
+        client_factory=lambda *_args: client,
+        token_store=store,
+    )
+
+    status = getattr(service, method_name)("20260000000", "password")
+
+    assert status is CheckinStatus.NO_TASK
+    login.assert_not_called()

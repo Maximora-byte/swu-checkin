@@ -24,7 +24,7 @@ from .api_models import (
 from .auth import AuthError, AuthFailureReason, auth_failure_status
 from .cache import CheckinContext
 from .client import SwuClient
-from .get_info import get_token
+from .get_info import authenticate_token
 from .models import CheckinResult
 from .status import RETRYABLE_STATUSES, CheckinStatus, VacationStatus, status_message
 from .time_utils import epoch_milliseconds, today_shanghai
@@ -41,6 +41,10 @@ EXPECTED_DATA_ERRORS = (
     TypeError,
     ApiSchemaError,
 )
+
+
+class _TokenInvalid(Exception):
+    """The validation endpoint explicitly rejected a bearer token."""
 
 
 @dataclass(frozen=True)
@@ -195,7 +199,7 @@ class CheckinService:
         token_store: TokenStoreProtocol | None = None,
     ):
         self.timeout = timeout
-        self._token_provider = token_provider or get_token
+        self._token_provider = token_provider or authenticate_token
         self._client_factory = client_factory or (lambda token, timeout: SwuClient(token, timeout))
         self._sleep = sleep
         self._clock = clock
@@ -212,33 +216,43 @@ class CheckinService:
         client = self._client_factory(token, self.timeout)
         try:
             student_id = client.get_student_id()
+        except requests.exceptions.HTTPError as error:
+            status_code = error.response.status_code if error.response is not None else None
+            if status_code in {401, 403}:
+                raise _TokenInvalid from None
+            raise AuthError(AuthFailureReason.NETWORK_ERROR) from None
         except requests.exceptions.RequestException:
             raise AuthError(AuthFailureReason.NETWORK_ERROR) from None
         except EXPECTED_DATA_ERRORS:
             raise AuthError(AuthFailureReason.TOKEN_EXCHANGE_FAILED) from None
         return client, student_id
 
-    def _authenticated_client(self, username: str, password: str) -> SwuClient:
-        try:
-            cached = self._token_store.get(username)
-        except (OSError, TokenStoreError):
-            cached = None
+    def _authenticated_client(self, username: str, password: str, *, use_token_cache: bool = True) -> SwuClient:
+        cached = None
+        if use_token_cache:
+            try:
+                cached = self._token_store.get(username)
+            except (OSError, TokenStoreError):
+                cached = None
         if cached is not None:
             try:
                 client, student_id = self._validate_token(cached.token)
-            except AuthError as error:
-                if error.reason is AuthFailureReason.NETWORK_ERROR:
-                    raise
+            except _TokenInvalid:
                 self._delete_cached_token(username)
             else:
-                if student_id == cached.student_id:
+                if student_id == cached.student_id == username:
                     return client
                 self._delete_cached_token(username)
 
         token = self._token_provider(username, password, self.timeout)
         if not token:
             raise AuthError(AuthFailureReason.UNKNOWN)
-        client, student_id = self._validate_token(token)
+        try:
+            client, student_id = self._validate_token(token)
+        except _TokenInvalid:
+            raise AuthError(AuthFailureReason.TOKEN_EXCHANGE_FAILED) from None
+        if student_id != username:
+            raise AuthError(AuthFailureReason.TOKEN_EXCHANGE_FAILED)
         try:
             self._token_store.save(username, token, student_id)
         except (OSError, TokenStoreError):
@@ -254,11 +268,11 @@ class CheckinService:
             transition=pending,
         )
 
-    def diagnose(self, username: str, password: str) -> DoctorReport:
+    def diagnose(self, username: str, password: str, *, use_token_cache: bool = False) -> DoctorReport:
         """Run staged read-only diagnostics without reaching the submit endpoint."""
 
         try:
-            client = self._authenticated_client(username, password)
+            client = self._authenticated_client(username, password, use_token_cache=use_token_cache)
         except (AuthError, *EXPECTED_DATA_ERRORS):
             client = None
         if client is None:

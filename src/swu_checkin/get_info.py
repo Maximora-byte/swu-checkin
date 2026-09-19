@@ -179,11 +179,17 @@ def get_token(username: str, password: str, timeout: int = 10) -> str:
         8. 用 ticket 换取 token
 
     返回:
-        成功返回 token
-
-    Raises:
-        AuthError: 带有不含敏感值的内部失败分类
+        成功返回 token；失败保持历史兼容并返回空字符串
     """
+    try:
+        return authenticate_token(username, password, timeout)
+    except AuthError:
+        return ""
+
+
+def authenticate_token(username: str, password: str, timeout: int = 10) -> str:
+    """Authenticate with classified failures for internal service orchestration."""
+
     return _get_token(username, password, timeout)
 
 

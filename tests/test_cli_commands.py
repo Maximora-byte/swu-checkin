@@ -29,7 +29,8 @@ def test_setup_uses_complete_read_only_diagnostics_and_never_prints_password(mon
         def __init__(self, *, timeout):
             assert timeout == 10
 
-        def diagnose(self, username, supplied_password):
+        def diagnose(self, username, supplied_password, *, use_token_cache):
+            assert use_token_cache is False
             calls.append((username, supplied_password))
             return DoctorReport(True, True, True, True, True)
 
@@ -56,7 +57,7 @@ def test_setup_unexpected_error_does_not_leak_password(monkeypatch, capsys):
         def __init__(self, *, timeout):
             assert timeout == 10
 
-        def diagnose(self, *_args):
+        def diagnose(self, *_args, **_kwargs):
             raise RuntimeError(password)
 
     monkeypatch.setattr(cli, "CheckinService", FailingService)
@@ -77,7 +78,7 @@ def test_setup_requires_every_read_only_diagnostic(monkeypatch, failed_index, ca
         def __init__(self, *, timeout):
             assert timeout == 10
 
-        def diagnose(self, *_args):
+        def diagnose(self, *_args, **_kwargs):
             return DoctorReport(*checks)
 
     monkeypatch.setattr("builtins.input", lambda _prompt: "student")
@@ -93,7 +94,8 @@ def test_doctor_uses_read_only_service_and_prints_seven_checks(monkeypatch, caps
         def __init__(self, *, timeout):
             assert timeout == 10
 
-        def diagnose(self, username, password):
+        def diagnose(self, username, password, *, use_token_cache):
+            assert use_token_cache is False
             assert (username, password) == ("student", "password")
             return DoctorReport(True, True, True, True, True)
 
