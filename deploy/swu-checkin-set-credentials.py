@@ -5,6 +5,8 @@ from __future__ import annotations
 
 import getpass
 import os
+import re
+import shlex
 import subprocess
 import sys
 import tempfile
@@ -13,6 +15,7 @@ from pathlib import Path
 CREDENTIAL_DIR = Path("/etc/swu-checkin")
 CREDENTIAL_FILE = CREDENTIAL_DIR / "credentials.env"
 NOTIFY_FILE = CREDENTIAL_DIR / "notify.env"
+_ENVIRONMENT_NAME = re.compile(r"[A-Za-z_][A-Za-z0-9_]*\Z")
 
 
 def _quote_environment_value(value: str) -> str:
@@ -45,6 +48,36 @@ def _write_credentials(username: str, password: str) -> None:
         raise
 
 
+def _validate_notify_config(path: Path) -> bool:
+    try:
+        content = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeError):
+        return False
+
+    values: dict[str, str] = {}
+    for raw_line in content.splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            continue
+        if "=" not in line:
+            return False
+
+        name, raw_value = line.split("=", 1)
+        name = name.strip()
+        if not _ENVIRONMENT_NAME.fullmatch(name):
+            return False
+
+        try:
+            parsed_values = shlex.split(raw_value, comments=True, posix=True)
+        except ValueError:
+            return False
+        if len(parsed_values) > 1:
+            return False
+        values[name] = parsed_values[0] if parsed_values else ""
+
+    return bool(values.get("SWUDK_NOTIFY_TARGET", "").strip())
+
+
 def main() -> int:
     if os.geteuid() != 0:
         print("请使用 sudo 运行此命令。", file=sys.stderr)
@@ -70,11 +103,13 @@ def main() -> int:
 
     subprocess.run(["systemctl", "enable", "--now", "swu-checkin.timer"], check=True)
     print("只读探测通过，swu-checkin.timer 已启用。")
-    if NOTIFY_FILE.exists():
+    if not NOTIFY_FILE.exists():
+        print("未检测到 /etc/swu-checkin/notify.env；Telegram 通知 timer 保持未启用。")
+    elif _validate_notify_config(NOTIFY_FILE):
         subprocess.run(["systemctl", "enable", "--now", "swu-checkin-notify.timer"], check=True)
         print("检测到 Telegram 通知配置，swu-checkin-notify.timer 已启用。")
     else:
-        print("未检测到 /etc/swu-checkin/notify.env；Telegram 通知 timer 保持未启用。")
+        print("检测到 Telegram 通知配置文件，但缺少有效的 SWUDK_NOTIFY_TARGET；通知 timer 未启用。")
     subprocess.run(["systemctl", "list-timers", "swu-checkin.timer", "--no-pager"], check=False)
     return 0
 
