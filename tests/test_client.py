@@ -76,26 +76,24 @@ def test_client_business_api_request_shapes_are_preserved():
     assert json.loads(submit_call.kwargs["data"]) == {"id": "record"}
 
 
-def test_leave_pagination_stops_when_first_page_is_not_full():
+def test_server_smaller_page_limit_continues_until_empty_page():
     session = Mock()
-    records = _inactive_records(2)
-    session.get.return_value = _leave_response(records)
+    first_page = _inactive_records(20)
+    second_page = _inactive_records(20, start=20)
+    session.get.side_effect = [_leave_response(first_page), _leave_response(second_page), _leave_response([])]
     client = SwuClient("token", session=session)
 
-    assert client.get_leave_records() == records
-    session.get.assert_called_once_with(
-        LEAVE_RECORDS_URL,
-        params={"pageNum": 1, "pageSize": LEAVE_PAGE_SIZE},
-        headers={"fighter-auth-token": "token"},
-        timeout=10,
-    )
+    assert client.get_leave_records() == first_page + second_page
+    assert {call.args[0] for call in session.get.call_args_list} == {LEAVE_RECORDS_URL}
+    assert [call.kwargs["params"]["pageNum"] for call in session.get.call_args_list] == [1, 2, 3]
+    assert {call.kwargs["params"]["pageSize"] for call in session.get.call_args_list} == {LEAVE_PAGE_SIZE}
 
 
-def test_leave_pagination_merges_full_page_and_partial_page():
+def test_partial_second_page_requires_empty_third_page_without_metadata():
     first_page = _inactive_records(LEAVE_PAGE_SIZE)
     second_page = _inactive_records(2, start=LEAVE_PAGE_SIZE)
     session = Mock()
-    session.get.side_effect = [_leave_response(first_page), _leave_response(second_page)]
+    session.get.side_effect = [_leave_response(first_page), _leave_response(second_page), _leave_response([])]
 
     records = SwuClient("token", session=session).get_leave_records()
 
@@ -103,14 +101,15 @@ def test_leave_pagination_merges_full_page_and_partial_page():
     assert [call.kwargs["params"] for call in session.get.call_args_list] == [
         {"pageNum": 1, "pageSize": LEAVE_PAGE_SIZE},
         {"pageNum": 2, "pageSize": LEAVE_PAGE_SIZE},
+        {"pageNum": 3, "pageSize": LEAVE_PAGE_SIZE},
     ]
 
 
-def test_later_full_page_active_leave_safely_stops_pagination():
+def test_later_short_page_active_leave_safely_stops_pagination():
     session = Mock()
     session.get.side_effect = [
-        _leave_response(_inactive_records(LEAVE_PAGE_SIZE)),
-        _leave_response([_active_leave(), *_inactive_records(LEAVE_PAGE_SIZE - 1, start=LEAVE_PAGE_SIZE)]),
+        _leave_response(_inactive_records(20)),
+        _leave_response([_active_leave(), *_inactive_records(19, start=20)]),
     ]
 
     records = SwuClient("token", session=session).get_leave_record_set()
@@ -122,8 +121,9 @@ def test_later_full_page_active_leave_safely_stops_pagination():
 def test_malformed_earlier_page_without_active_leave_is_unknown():
     session = Mock()
     session.get.side_effect = [
-        _leave_response([None, *_inactive_records(LEAVE_PAGE_SIZE - 1)]),
-        _leave_response(_inactive_records(1, start=LEAVE_PAGE_SIZE)),
+        _leave_response([None, *_inactive_records(19)]),
+        _leave_response(_inactive_records(1, start=20)),
+        _leave_response([]),
     ]
 
     records = SwuClient("token", session=session).get_leave_record_set()
@@ -134,8 +134,8 @@ def test_malformed_earlier_page_without_active_leave_is_unknown():
 def test_later_active_leave_wins_over_malformed_earlier_page():
     session = Mock()
     session.get.side_effect = [
-        _leave_response([None, *_inactive_records(LEAVE_PAGE_SIZE - 1)]),
-        _leave_response([_active_leave(), *_inactive_records(LEAVE_PAGE_SIZE - 1, start=LEAVE_PAGE_SIZE)]),
+        _leave_response([None, *_inactive_records(19)]),
+        _leave_response([_active_leave(), *_inactive_records(19, start=20)]),
     ]
 
     records = SwuClient("token", session=session).get_leave_record_set()
@@ -173,10 +173,8 @@ def test_leave_page_larger_than_requested_size_fails_closed():
 
 def test_full_maximum_leave_pages_fail_closed_without_extra_request():
     session = Mock()
-    session.get.side_effect = [
-        _leave_response(_inactive_records(LEAVE_PAGE_SIZE, start=page_num * LEAVE_PAGE_SIZE))
-        for page_num in range(MAX_LEAVE_PAGES)
-    ]
+    repeated_page = _leave_response(_inactive_records(20))
+    session.get.side_effect = [repeated_page] * MAX_LEAVE_PAGES
 
     with pytest.raises(ApiSchemaError, match="completeness"):
         SwuClient("token", session=session).get_leave_record_set()
@@ -207,6 +205,7 @@ def test_client_typed_methods_validate_before_returning_models():
     session.get.side_effect = [
         _response({"data": {"subject": {"username": "20260000000"}}}),
         _response({"data": {"records": [{"lcztmc": "审核中"}]}}),
+        _response({"data": {"records": []}}),
     ]
     session.post.side_effect = [
         _response(

@@ -137,7 +137,7 @@ class SwuClient:
             )
             if stop_on_active_leave and parsed_records.evaluate() is VacationStatus.ACTIVE_LEAVE:
                 return raw_records, parsed_records
-            if len(page_items) < LEAVE_PAGE_SIZE:
+            if not page_items:
                 return raw_records, parsed_records
         raise ApiSchemaError("leave pagination completeness cannot be confirmed")
 
