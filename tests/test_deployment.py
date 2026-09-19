@@ -83,3 +83,10 @@ def test_console_script_uses_the_single_cli_entrypoint():
     project = _read("pyproject.toml")
 
     assert 'swu-checkin = "swu_checkin.cli:main"' in project
+
+
+def test_telegram_deployment_uses_notify_preflight_instead_of_direct_enable():
+    deployment = _read("DEPLOYMENT.md")
+
+    assert "sudo swu-checkin-set-credentials --sync-notify" in deployment
+    assert "sudo systemctl enable --now swu-checkin-notify.timer" not in deployment
