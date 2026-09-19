@@ -106,12 +106,15 @@ class _FakeClient:
 
 
 def _service(client: _FakeClient, *, diagnostic=print) -> CheckinService:
+    token_store = Mock()
+    token_store.get.return_value = None
     return CheckinService(
         token_provider=lambda *_args: "test-token",
         client_factory=lambda *_args: client,
         sleep=lambda _seconds: None,
         clock=lambda: 0.0,
         diagnostic=diagnostic,
+        token_store=token_store,
     )
 
 

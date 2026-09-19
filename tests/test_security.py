@@ -4,6 +4,7 @@ import pytest
 import requests
 
 from swu_checkin import oauth_flow
+from swu_checkin.auth import AuthError, AuthFailureReason
 from swu_checkin.get_info import (
     _get_token,
     debug_print,
@@ -164,12 +165,15 @@ def test_login_exception_and_debug_output_never_leak_sensitive_values(
     error = oauth_flow.OAuthDiscoveryError(" ".join(secrets))
     monkeypatch.setattr("swu_checkin.get_info.discover_login_flow", Mock(side_effect=error))
 
-    assert _get_token(secrets[0], secrets[1], timeout=1, max_login_attempts=1) == ""
+    with pytest.raises(AuthError) as caught:
+        _get_token(secrets[0], secrets[1], timeout=1, max_login_attempts=1)
 
     output = capsys.readouterr().out
     for secret in secrets:
         assert secret not in output
     assert "OAuthDiscoveryError" in output
+    assert caught.value.reason is AuthFailureReason.OAUTH_FLOW_CHANGED
+    assert all(secret not in str(caught.value) for secret in secrets)
 
 
 def test_auth_response_stage_masks_ticket_and_query_values(

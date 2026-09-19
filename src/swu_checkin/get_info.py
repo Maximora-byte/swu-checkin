@@ -1,4 +1,3 @@
-import json
 import os
 import re
 import time
@@ -8,6 +7,7 @@ import ddddocr
 import requests
 from PIL import Image
 
+from .auth import AuthError, AuthFailureReason
 from .client import SwuClient
 from .des import des
 from .identity import submit_identity_selection_if_needed
@@ -25,6 +25,14 @@ from .oauth_flow import (
 
 # ===== 常量定义 =====
 TOKEN_EXCHANGE_URL = "https://of.swu.edu.cn/gateway/fighter-middle/api/integrate/uaap/cas/exchange-token"
+
+_CREDENTIAL_REJECTION_MARKERS = (
+    "用户名或密码",
+    "账号或密码",
+    "用户名密码错误",
+    "密码错误",
+)
+_CAPTCHA_REJECTION_MARKERS = ("验证码错误", "验证码不正确", "validateCode")
 
 
 # ===== 辅助函数 =====
@@ -94,6 +102,15 @@ def transform_ticket(ticket: str) -> str:
     return result
 
 
+def validate_login_result_text(html: str) -> None:
+    """Classify explicit server-side login rejection without exposing its body."""
+
+    if any(marker in html for marker in _CREDENTIAL_REJECTION_MARKERS):
+        raise AuthError(AuthFailureReason.CREDENTIAL_REJECTED)
+    if any(marker in html for marker in _CAPTCHA_REJECTION_MARKERS):
+        raise AuthError(AuthFailureReason.CAPTCHA_FAILED)
+
+
 def recognize_captcha(
     session: requests.Session,
     captcha_url: str,
@@ -112,7 +129,7 @@ def recognize_captcha(
         识别出的验证码字符串
 
     Raises:
-        ValueError: 多次尝试后仍无法识别
+        AuthError: 网络失败或多次尝试后仍无法识别
     """
     ocr = ddddocr.DdddOcr(show_ad=False, use_gpu=False)
 
@@ -131,13 +148,19 @@ def recognize_captcha(
                 return result
             else:
                 safe_print(f"验证码识别结果异常 (尝试 {attempt}/{max_attempts})，重新获取")
-        except (requests.exceptions.RequestException, OSError, RuntimeError, TypeError, ValueError) as error:
+        except requests.exceptions.RequestException as error:
+            safe_print(f"验证码识别失败 (尝试 {attempt}/{max_attempts}): {type(error).__name__}")
+            if attempt >= max_attempts:
+                raise AuthError(AuthFailureReason.NETWORK_ERROR) from None
+        except OAuthDiscoveryError:
+            raise
+        except (OSError, RuntimeError, TypeError, ValueError) as error:
             safe_print(f"验证码识别失败 (尝试 {attempt}/{max_attempts}): {type(error).__name__}")
 
         if attempt < max_attempts:
             time.sleep(0.5)  # 短暂延迟后重试
 
-    raise ValueError("验证码识别失败，已达到最大重试次数")
+    raise AuthError(AuthFailureReason.CAPTCHA_FAILED)
 
 
 # ===== 主要登录流程 =====
@@ -156,12 +179,12 @@ def get_token(username: str, password: str, timeout: int = 10) -> str:
         8. 用 ticket 换取 token
 
     返回:
-        成功返回 token，失败返回空字符串
+        成功返回 token
+
+    Raises:
+        AuthError: 带有不含敏感值的内部失败分类
     """
-    try:
-        return _get_token(username, password, timeout)
-    except (requests.exceptions.RequestException, json.JSONDecodeError, KeyError, ValueError, TypeError):
-        return ""
+    return _get_token(username, password, timeout)
 
 
 def _get_token(username: str, password: str, timeout: int, max_login_attempts: int = 3) -> str:
@@ -175,8 +198,12 @@ def _get_token(username: str, password: str, timeout: int, max_login_attempts: i
         max_login_attempts: 最大登录尝试次数（验证码错误时重试）
 
     Returns:
-        成功返回 token，失败返回空字符串
+        成功返回 token
+
+    Raises:
+        AuthError: 所有尝试均失败后的分类结果
     """
+    last_error = AuthError(AuthFailureReason.UNKNOWN)
     for login_attempt in range(1, max_login_attempts + 1):
         try:
             session = requests.Session()
@@ -189,12 +216,8 @@ def _get_token(username: str, password: str, timeout: int, max_login_attempts: i
             encrypted_username, encrypted_password = des(username, password, flow.code_random)
 
             # 步骤 3: OCR 识别验证码（带重试）
-            try:
-                captcha = recognize_captcha(session, flow.captcha_url, timeout, max_attempts=3)
-                debug_print("验证码已识别")
-            except ValueError:
-                safe_print(f"验证码识别失败 (尝试 {login_attempt}/{max_login_attempts})")
-                continue
+            captcha = recognize_captcha(session, flow.captcha_url, timeout, max_attempts=3)
+            debug_print("验证码已识别")
 
             # 步骤 4: 提交服务端提供的登录表单，并逐跳验证 Redirect
             form_data = build_login_form_data(flow, encrypted_username, encrypted_password, captcha)
@@ -208,11 +231,7 @@ def _get_token(username: str, password: str, timeout: int, max_login_attempts: i
             debug_print(f"登录提交响应: {describe_auth_response(response)}")
             validate_idm_login_response(response)
 
-            # 检查是否因验证码错误导致登录失败
-            if "验证码" in response.text or "validateCode" in response.text:
-                safe_print(f"验证码可能错误，重新尝试登录 (尝试 {login_attempt}/{max_login_attempts})")
-                time.sleep(1)  # 短暂延迟
-                continue
+            validate_login_result_text(response.text)
 
             # 步骤 5: 处理身份选择
             response = submit_identity_selection_if_needed(
@@ -232,8 +251,7 @@ def _get_token(username: str, password: str, timeout: int, max_login_attempts: i
             # 步骤 6: 提取并转换 ticket
             ticket_st = extract_ticket_from_url(response.url)
             if not ticket_st:
-                safe_print(f"未能从回调 URL 提取 ticket (尝试 {login_attempt}/{max_login_attempts})")
-                continue
+                raise AuthError(AuthFailureReason.TICKET_FAILED)
 
             ticket_cd = transform_ticket(ticket_st)
 
@@ -247,8 +265,7 @@ def _get_token(username: str, password: str, timeout: int, max_login_attempts: i
             # 步骤 7b: 从最终回调 URL 获取 token ticket
             token_st = extract_ticket_from_url(response.url)
             if not token_st:
-                safe_print(f"未能获取 token ticket (尝试 {login_attempt}/{max_login_attempts})")
-                continue
+                raise AuthError(AuthFailureReason.TICKET_FAILED)
 
             # 步骤 7c: 用 token ticket 换取最终 token
             response = session.get(
@@ -257,36 +274,46 @@ def _get_token(username: str, password: str, timeout: int, max_login_attempts: i
                 timeout=timeout,
             )
             response.raise_for_status()
-            token_response = response.json()
+            try:
+                token_response = response.json()
+            except (ValueError, TypeError):
+                raise AuthError(AuthFailureReason.TOKEN_EXCHANGE_FAILED) from None
 
-            if "data" not in token_response:
-                safe_print(f"token 交换失败 (尝试 {login_attempt}/{max_login_attempts})")
-                continue
+            if not isinstance(token_response, dict) or "data" not in token_response:
+                raise AuthError(AuthFailureReason.TOKEN_EXCHANGE_FAILED)
 
             token = token_response["data"]
             if not isinstance(token, str) or not token:
-                safe_print(f"token 交换失败 (尝试 {login_attempt}/{max_login_attempts})")
-                continue
+                raise AuthError(AuthFailureReason.TOKEN_EXCHANGE_FAILED)
             debug_print("登录成功，认证结果已确认")
 
             return token
 
-        except (
-            requests.exceptions.RequestException,
-            OAuthDiscoveryError,
-            json.JSONDecodeError,
-            KeyError,
-            ValueError,
-            TypeError,
-        ) as error:
+        except requests.exceptions.RequestException as error:
+            last_error = AuthError(AuthFailureReason.NETWORK_ERROR)
             safe_print(f"登录过程异常 (尝试 {login_attempt}/{max_login_attempts}): {type(error).__name__}")
-            if login_attempt < max_login_attempts:
-                time.sleep(1)
-            continue
+        except OAuthDiscoveryError as error:
+            last_error = AuthError(error.reason)
+            safe_print(f"登录过程异常 (尝试 {login_attempt}/{max_login_attempts}): {type(error).__name__}")
+        except AuthError as error:
+            last_error = error
+            safe_print(f"登录过程异常 (尝试 {login_attempt}/{max_login_attempts}): {type(error).__name__}")
+        except (KeyError, ValueError, TypeError) as error:
+            last_error = AuthError(AuthFailureReason.UNKNOWN)
+            safe_print(f"登录过程异常 (尝试 {login_attempt}/{max_login_attempts}): {type(error).__name__}")
+
+        if last_error.reason in {
+            AuthFailureReason.CREDENTIAL_REJECTED,
+            AuthFailureReason.LOGIN_PAGE_CHANGED,
+            AuthFailureReason.OAUTH_FLOW_CHANGED,
+        }:
+            raise last_error from None
+        if login_attempt < max_login_attempts:
+            time.sleep(1)
 
     # 所有尝试都失败
     safe_print(f"登录失败，已用尽 {max_login_attempts} 次尝试")
-    return ""
+    raise last_error from None
 
 
 def get_student_id(token: str, timeout: int = 10) -> str:

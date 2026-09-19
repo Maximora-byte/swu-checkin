@@ -226,7 +226,7 @@ def test_missing_required_hidden_input_fails_closed():
     cas_login_url = _cas_login_url(_authorize_url())
     idm_authorize_url = oauth_flow._build_idm_authorize_url(cas_login_url)
 
-    with pytest.raises(oauth_flow.OAuthDiscoveryError, match="hidden input"):
+    with pytest.raises(oauth_flow.OAuthDiscoveryError, match="hidden input") as caught:
         oauth_flow.parse_login_form(
             _login_html(idm_authorize_url, omit="goto"),
             page_url="https://idm.swu.edu.cn/am/UI/Login",
@@ -234,6 +234,8 @@ def test_missing_required_hidden_input_fails_closed():
             cas_callback_url=CALLBACK_URL,
             expected_authorize_url=idm_authorize_url,
         )
+
+    assert caught.value.reason is oauth_flow.AuthFailureReason.LOGIN_PAGE_CHANGED
 
 
 @pytest.mark.parametrize("missing_id", ["codeRandom", "kaptchaImage"])

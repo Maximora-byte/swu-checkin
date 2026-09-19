@@ -8,6 +8,12 @@ from swu_checkin.service import CheckinService, build_checkin_payload
 from swu_checkin.status import CheckinStatus
 
 
+def _empty_token_store() -> Mock:
+    store = Mock()
+    store.get.return_value = None
+    return store
+
+
 @pytest.mark.parametrize(
     ("statuses", "expected", "attempts"),
     [
@@ -94,6 +100,7 @@ def test_doctor_diagnostics_are_read_only_and_never_submit():
     service = CheckinService(
         token_provider=lambda *_args: "token",
         client_factory=lambda *_args: client,
+        token_store=_empty_token_store(),
     )
 
     report = service.diagnose("student", "password")
@@ -114,7 +121,11 @@ def test_doctor_accepts_active_valid_leave_without_submit():
     client.get_student_profile.return_value = StudentProfile("20260000000")
     client.get_dormitory_info.return_value = DormitoryInfo(29.0, 106.0, "building", "room")
     client.get_transition.return_value = None
-    service = CheckinService(token_provider=lambda *_args: "token", client_factory=lambda *_args: client)
+    service = CheckinService(
+        token_provider=lambda *_args: "token",
+        client_factory=lambda *_args: client,
+        token_store=_empty_token_store(),
+    )
 
     report = service.diagnose("student", "password")
 
@@ -128,7 +139,11 @@ def test_doctor_rejects_unknown_leave_policy_without_submit():
     client.get_student_profile.return_value = StudentProfile("20260000000")
     client.get_dormitory_info.return_value = DormitoryInfo(29.0, 106.0, "building", "room")
     client.get_transition.return_value = None
-    service = CheckinService(token_provider=lambda *_args: "token", client_factory=lambda *_args: client)
+    service = CheckinService(
+        token_provider=lambda *_args: "token",
+        client_factory=lambda *_args: client,
+        token_store=_empty_token_store(),
+    )
 
     report = service.diagnose("student", "password")
 

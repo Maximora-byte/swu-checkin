@@ -69,8 +69,10 @@ warn_unused_ignores = true
 [[tool.mypy.overrides]]
 module = [
     "swu_checkin.api_models",
+    "swu_checkin.auth",
     "swu_checkin.client",
     "swu_checkin.service",
+    "swu_checkin.token_store",
 ]
 disallow_any_generics = true
 disallow_untyped_defs = true

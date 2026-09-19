@@ -263,7 +263,7 @@ OAuth / get_token
 CLI / JSON / systemd / Actions
 ```
 
-`SwuClient` 只处理带 token 的 HTTP transport 与基础响应结构；`CheckinService` 负责请假、任务、payload、提交后回读和重试；CLI 负责展示与状态文件。旧 `check_in()`、`probe_check_in()`、`check_in_with_retry()` 继续返回 `CheckinStatus`。
+`SwuClient` 只处理带 token 的 HTTP transport 与基础响应结构；`CheckinService` 负责认证失败映射、已验证 token cache、请假、任务、payload、提交后回读和重试；CLI 负责展示与状态文件。旧 `check_in()`、`probe_check_in()`、`check_in_with_retry()` 继续返回 `CheckinStatus`。
 
 ## 环境变量配置
 
@@ -286,6 +286,7 @@ CLI / JSON / systemd / Actions
 - ⚠️ **自动化部署从环境变量、GitHub Secrets 或 root-only 环境文件读取凭据；本地运行在环境变量缺失时使用 `input()` / `getpass()` 交互输入。任何方式都不得硬编码或提交凭据**
 - ⚠️ **GitHub Actions 使用 Secrets 存储敏感信息，代码不会主动打印账号或凭据值**
 - ⚠️ **正常与诊断模式都不会输出密码、token、ticket、验证码、OAuth state/code 或完整回调 URL**
+- ⚠️ **token 只有通过现有学生信息接口验证后才会缓存；Windows 使用当前用户 DPAPI，Linux 使用用户 cache/state 目录中的原子 `0600` 文件。cache 不保存密码，失效 token 会先删除再重新认证**
 - ⚠️ **所有实际认证请求只发送到 allowlist 中的 SWU 官方 HTTPS 主机；精确匹配的 legacy IDM HTTP Location 仅作为服务端数据接受校验并原地升级为 HTTPS，客户端绝不向 HTTP 地址发请求；发现失败时不会回退到猜测 URL**
 - ⚠️ **项目只验证并使用学校接口返回的位置数据，不提供 GPS 欺骗、反检测或绕过安全机制的功能**
 
@@ -295,7 +296,7 @@ CLI / JSON / systemd / Actions
 - ✅ 验证码识别失败自动重试（每次登录尝试最多识别 3 次验证码）
 - ✅ 登录失败自动重试（验证码错误时自动重新登录，最多 3 次）
 - ✅ 网络异常、今日任务暂未生成时自动重试 3 次，打满才算失败
-- ✅ 一次签到流程中复用 token、学号、宿舍信息等，避免重复请求
+- ✅ 跨运行复用已经验证且身份一致的 token；每次命中仍先调用学生信息接口校验，失效时回退到完整登录
 - ✅ 提交成功后回读学校接口，确认状态确实变为“已签到”
 - ✅ 建议在正式使用前先手动测试一次
 

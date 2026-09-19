@@ -9,6 +9,8 @@ from typing import Any
 import requests
 from bs4 import BeautifulSoup
 
+from .auth import AuthFailureReason
+
 TRUSTED_SWU_HOSTS = frozenset({"of.swu.edu.cn", "uaaap.swu.edu.cn", "idm.swu.edu.cn"})
 
 CAS_LOGIN_URL = "https://of.swu.edu.cn/cas/oauth/login/SWU_CAS2_FEDERAL"
@@ -57,6 +59,15 @@ _ALLOWED_AUTH_PATHS = {
 
 class OAuthDiscoveryError(ValueError):
     """The server response cannot be proven to be the expected SWU flow."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        reason: AuthFailureReason = AuthFailureReason.OAUTH_FLOW_CHANGED,
+    ) -> None:
+        self.reason = reason
+        super().__init__(message)
 
 
 @dataclass(frozen=True, repr=False)
@@ -321,10 +332,13 @@ def parse_login_form(
     soup = BeautifulSoup(html, "html.parser")
     forms = soup.find_all("form", attrs={"name": "Login"})
     if len(forms) != 1:
-        raise OAuthDiscoveryError("登录页缺少唯一 Login form")
+        raise OAuthDiscoveryError(
+            "登录页缺少唯一 Login form",
+            reason=AuthFailureReason.LOGIN_PAGE_CHANGED,
+        )
     form = forms[0]
     if str(form.get("method") or "get").lower() != "post":
-        raise OAuthDiscoveryError("登录 form method 无效")
+        raise OAuthDiscoveryError("登录 form method 无效", reason=AuthFailureReason.LOGIN_PAGE_CHANGED)
     action = urllib.parse.urljoin(page_url, str(form.get("action") or ""))
     parsed_action = validate_trusted_swu_url(
         action,
@@ -332,7 +346,7 @@ def parse_login_form(
         expected_path="/am/UI/Login",
     )
     if parsed_action.query:
-        raise OAuthDiscoveryError("登录 form action 包含意外参数")
+        raise OAuthDiscoveryError("登录 form action 包含意外参数", reason=AuthFailureReason.LOGIN_PAGE_CHANGED)
 
     hidden_fields: dict[str, str] = {}
     for input_field in form.find_all("input"):
@@ -341,24 +355,24 @@ def parse_login_form(
             continue
         name = str(name)
         if not _INPUT_NAME_RE.fullmatch(name) or name in hidden_fields:
-            raise OAuthDiscoveryError("登录 form 字段无效或重复")
+            raise OAuthDiscoveryError("登录 form 字段无效或重复", reason=AuthFailureReason.LOGIN_PAGE_CHANGED)
         if str(input_field.get("type") or "text").lower() != "hidden":
-            raise OAuthDiscoveryError("登录 form 出现意外的可见字段")
+            raise OAuthDiscoveryError("登录 form 出现意外的可见字段", reason=AuthFailureReason.LOGIN_PAGE_CHANGED)
         hidden_fields[name] = str(input_field.get("value") or "")
     if not _REQUIRED_LOGIN_FIELDS.issubset(hidden_fields):
-        raise OAuthDiscoveryError("登录 form 缺少必要 hidden input")
+        raise OAuthDiscoveryError("登录 form 缺少必要 hidden input", reason=AuthFailureReason.LOGIN_PAGE_CHANGED)
     if hidden_fields["encoded"] != "true" or not hidden_fields["SunQueryParamsString"]:
-        raise OAuthDiscoveryError("登录 form hidden input 无效")
+        raise OAuthDiscoveryError("登录 form hidden input 无效", reason=AuthFailureReason.LOGIN_PAGE_CHANGED)
     _validate_hidden_goto(hidden_fields["goto"], expected_authorize_url)
 
     code_random_fields = soup.find_all("input", attrs={"id": "codeRandom"})
     if len(code_random_fields) != 1 or not code_random_fields[0].get("value"):
-        raise OAuthDiscoveryError("登录页缺少唯一随机参数")
+        raise OAuthDiscoveryError("登录页缺少唯一随机参数", reason=AuthFailureReason.LOGIN_PAGE_CHANGED)
     code_random = str(code_random_fields[0].get("value"))
 
     captcha_images = soup.find_all("img", attrs={"id": "kaptchaImage"})
     if len(captcha_images) != 1 or not captcha_images[0].get("src"):
-        raise OAuthDiscoveryError("登录页缺少唯一验证码地址")
+        raise OAuthDiscoveryError("登录页缺少唯一验证码地址", reason=AuthFailureReason.LOGIN_PAGE_CHANGED)
     captcha_url = urllib.parse.urljoin(page_url, str(captcha_images[0].get("src")))
     parsed_captcha = validate_trusted_swu_url(
         captcha_url,
@@ -366,7 +380,7 @@ def parse_login_form(
         expected_path="/am/validate.code",
     )
     if parsed_captcha.query:
-        raise OAuthDiscoveryError("验证码地址包含意外参数")
+        raise OAuthDiscoveryError("验证码地址包含意外参数", reason=AuthFailureReason.LOGIN_PAGE_CHANGED)
 
     return OAuthFlow(
         login_page_url=page_url,
