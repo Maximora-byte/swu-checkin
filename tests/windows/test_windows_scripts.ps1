@@ -154,6 +154,7 @@ if ($WindowsIntegration) {
     $smokeTaskName = "SWUCheckin-CI-" + [Guid]::NewGuid().ToString("N")
     $secretValue = "dpapi-smoke-" + [Guid]::NewGuid().ToString("N")
     $restoredValue = $null
+    $restoredCiphertext = $null
     $secureValue = $null
     $restoredSecureValue = $null
     $passwordPointer = [IntPtr]::Zero
@@ -161,7 +162,8 @@ if ($WindowsIntegration) {
     try {
         $secureValue = ConvertTo-SecureString $secretValue -AsPlainText -Force
         ConvertFrom-SecureString -SecureString $secureValue | Set-Content -LiteralPath $dpapiPath -Encoding ASCII
-        $restoredSecureValue = Get-Content -LiteralPath $dpapiPath -Raw | ConvertTo-SecureString
+        $restoredCiphertext = (Get-Content -LiteralPath $dpapiPath -Raw).Trim()
+        $restoredSecureValue = ConvertTo-SecureString $restoredCiphertext
         $passwordPointer = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($restoredSecureValue)
         $restoredValue = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($passwordPointer)
         Assert-True ($secretValue -ceq $restoredValue) "DPAPI must round-trip for the current Windows user."
@@ -191,6 +193,7 @@ if ($WindowsIntegration) {
             [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($passwordPointer)
         }
         $restoredValue = $null
+        $restoredCiphertext = $null
         $secretValue = $null
         if ($null -ne $restoredSecureValue) { $restoredSecureValue.Dispose() }
         if ($null -ne $secureValue) { $secureValue.Dispose() }

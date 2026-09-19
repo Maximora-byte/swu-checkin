@@ -22,9 +22,12 @@ $config = Get-Content -LiteralPath $configPath -Raw | ConvertFrom-Json
 if ($config.schema_version -ne 1 -or [string]::IsNullOrWhiteSpace([string]$config.username)) {
     throw "The local configuration file is invalid."
 }
-$password = Get-Content -LiteralPath $passwordPath -Raw | ConvertTo-SecureString
+$passwordCiphertext = $null
+$password = $null
 $exitCode = 1
 try {
+    $passwordCiphertext = (Get-Content -LiteralPath $passwordPath -Raw).Trim()
+    $password = ConvertTo-SecureString $passwordCiphertext
     $exitCode = Invoke-SWUCheckinProcess `
         -ExecutablePath $executablePath `
         -Arguments @("run", "--json") `
@@ -36,6 +39,7 @@ finally {
     if ($null -ne $password) {
         $password.Dispose()
     }
+    $passwordCiphertext = $null
     $password = $null
 }
 exit $exitCode
