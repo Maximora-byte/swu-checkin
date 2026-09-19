@@ -227,9 +227,16 @@ class CheckinService:
             raise AuthError(AuthFailureReason.TOKEN_EXCHANGE_FAILED) from None
         return client, student_id
 
-    def _authenticated_client(self, username: str, password: str, *, use_token_cache: bool = True) -> SwuClient:
+    def _authenticated_client(
+        self,
+        username: str,
+        password: str,
+        *,
+        read_token_cache: bool = True,
+        write_token_cache: bool = True,
+    ) -> SwuClient:
         cached = None
-        if use_token_cache:
+        if read_token_cache:
             try:
                 cached = self._token_store.get(username)
             except (OSError, TokenStoreError):
@@ -253,10 +260,11 @@ class CheckinService:
             raise AuthError(AuthFailureReason.TOKEN_EXCHANGE_FAILED) from None
         if student_id != username:
             raise AuthError(AuthFailureReason.TOKEN_EXCHANGE_FAILED)
-        try:
-            self._token_store.save(username, token, student_id)
-        except (OSError, TokenStoreError):
-            pass
+        if write_token_cache:
+            try:
+                self._token_store.save(username, token, student_id)
+            except (OSError, TokenStoreError):
+                pass
         return client
 
     @staticmethod
@@ -268,11 +276,23 @@ class CheckinService:
             transition=pending,
         )
 
-    def diagnose(self, username: str, password: str, *, use_token_cache: bool = False) -> DoctorReport:
+    def diagnose(
+        self,
+        username: str,
+        password: str,
+        *,
+        read_token_cache: bool = False,
+        write_token_cache: bool = False,
+    ) -> DoctorReport:
         """Run staged read-only diagnostics without reaching the submit endpoint."""
 
         try:
-            client = self._authenticated_client(username, password, use_token_cache=use_token_cache)
+            client = self._authenticated_client(
+                username,
+                password,
+                read_token_cache=read_token_cache,
+                write_token_cache=write_token_cache,
+            )
         except (AuthError, *EXPECTED_DATA_ERRORS):
             client = None
         if client is None:

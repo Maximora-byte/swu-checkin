@@ -29,8 +29,9 @@ def test_setup_uses_complete_read_only_diagnostics_and_never_prints_password(mon
         def __init__(self, *, timeout):
             assert timeout == 10
 
-        def diagnose(self, username, supplied_password, *, use_token_cache):
-            assert use_token_cache is False
+        def diagnose(self, username, supplied_password, *, read_token_cache, write_token_cache):
+            assert read_token_cache is False
+            assert write_token_cache is False
             calls.append((username, supplied_password))
             return DoctorReport(True, True, True, True, True)
 
@@ -94,8 +95,9 @@ def test_doctor_uses_read_only_service_and_prints_seven_checks(monkeypatch, caps
         def __init__(self, *, timeout):
             assert timeout == 10
 
-        def diagnose(self, username, password, *, use_token_cache):
-            assert use_token_cache is False
+        def diagnose(self, username, password, *, read_token_cache, write_token_cache):
+            assert read_token_cache is False
+            assert write_token_cache is False
             assert (username, password) == ("student", "password")
             return DoctorReport(True, True, True, True, True)
 

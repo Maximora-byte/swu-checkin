@@ -6,7 +6,7 @@ import pytest
 import requests
 
 from swu_checkin import token_store
-from swu_checkin.api_models import LeaveRecords
+from swu_checkin.api_models import DormitoryInfo, LeaveRecords, StudentProfile
 from swu_checkin.auth import AuthError, AuthFailureReason
 from swu_checkin.service import CheckinService
 from swu_checkin.status import CheckinStatus
@@ -27,6 +27,16 @@ def _http_error(status_code: int) -> requests.HTTPError:
     response = requests.Response()
     response.status_code = status_code
     return requests.HTTPError("sensitive response text", response=response)
+
+
+def _diagnostic_client() -> Mock:
+    client = Mock()
+    client.get_student_id.return_value = "20260000000"
+    client.get_leave_record_set.return_value = LeaveRecords.from_items([])
+    client.get_student_profile.return_value = StudentProfile("20260000000")
+    client.get_dormitory_info.return_value = DormitoryInfo(29.0, 106.0, "building", "room")
+    client.get_transition.return_value = None
+    return client
 
 
 def test_posix_token_cache_is_atomic_and_owner_only(tmp_path: Path):
@@ -249,6 +259,70 @@ def test_doctor_forces_fresh_auth_even_when_valid_cache_exists():
     assert report.authentication is False
     login.assert_called_once_with("20260000000", "wrong-password", 10)
     store.get.assert_not_called()
+    store.save.assert_not_called()
+    store.delete.assert_not_called()
+
+
+def test_doctor_fresh_auth_success_never_reads_or_mutates_cache():
+    store = Mock()
+    client = _diagnostic_client()
+    login = Mock(return_value="fresh-token")
+    service = CheckinService(
+        token_provider=login,
+        client_factory=lambda *_args: client,
+        token_store=store,
+    )
+
+    report = service.diagnose("20260000000", "password")
+
+    assert report.authentication is True
+    login.assert_called_once_with("20260000000", "password", 10)
+    store.get.assert_not_called()
+    store.save.assert_not_called()
+    store.delete.assert_not_called()
+    client.submit_checkin_form.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "failing_method",
+    ["get_leave_record_set", "get_dormitory_info", "get_transition"],
+)
+def test_doctor_api_failure_after_fresh_auth_never_saves_cache(failing_method: str):
+    store = Mock()
+    client = _diagnostic_client()
+    getattr(client, failing_method).side_effect = ValueError("malformed read-only response")
+    service = CheckinService(
+        token_provider=Mock(return_value="fresh-token"),
+        client_factory=lambda *_args: client,
+        token_store=store,
+    )
+
+    report = service.diagnose("20260000000", "password")
+
+    assert report.authentication is True
+    store.get.assert_not_called()
+    store.save.assert_not_called()
+    store.delete.assert_not_called()
+    client.submit_checkin_form.assert_not_called()
+
+
+def test_normal_fresh_login_validates_identity_then_saves_cache():
+    store = Mock()
+    store.get.return_value = None
+    client = _diagnostic_client()
+    login = Mock(return_value="fresh-token")
+    service = CheckinService(
+        token_provider=login,
+        client_factory=lambda *_args: client,
+        token_store=store,
+    )
+
+    assert service.check_in_once("20260000000", "password") is CheckinStatus.NO_TASK
+
+    store.get.assert_called_once_with("20260000000")
+    login.assert_called_once_with("20260000000", "password", 10)
+    client.get_student_id.assert_called_once_with()
+    store.save.assert_called_once_with("20260000000", "fresh-token", "20260000000")
 
 
 @pytest.mark.parametrize("method_name", ["check_in_once", "probe_once"])
@@ -269,4 +343,5 @@ def test_normal_run_and_probe_still_use_valid_cache(method_name: str):
     status = getattr(service, method_name)("20260000000", "password")
 
     assert status is CheckinStatus.NO_TASK
+    store.get.assert_called_once_with("20260000000")
     login.assert_not_called()
