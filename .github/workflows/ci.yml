@@ -111,6 +111,14 @@ jobs:
             Rename-Item -LiteralPath $hiddenSourcePath -NewName "src"
           }
 
+      - name: Python ctypes DPAPI TokenStore 检查
+        shell: powershell
+        run: |
+          $venv = Join-Path $env:RUNNER_TEMP "swu-checkin-locked-venv"
+          $python = Join-Path $venv "Scripts\python.exe"
+          & $python .\tests\windows\python_dpapi_smoke.py
+          if ($LASTEXITCODE -ne 0) { throw "Python DPAPI TokenStore smoke failed." }
+
   quality:
     name: quality
     if: ${{ always() }}

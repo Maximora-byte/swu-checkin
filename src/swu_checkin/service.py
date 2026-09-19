@@ -21,12 +21,14 @@ from .api_models import (
     Transition,
     parse_coordinate,
 )
+from .auth import AuthError, AuthFailureReason, auth_failure_status
 from .cache import CheckinContext
 from .client import SwuClient
-from .get_info import get_token
+from .get_info import authenticate_token
 from .models import CheckinResult
 from .status import RETRYABLE_STATUSES, CheckinStatus, VacationStatus, status_message
 from .time_utils import epoch_milliseconds, today_shanghai
+from .token_store import TokenStore, TokenStoreError, TokenStoreProtocol
 
 DEFAULT_MAX_ATTEMPTS = 3
 DEFAULT_RETRY_DELAY = 8
@@ -39,6 +41,10 @@ EXPECTED_DATA_ERRORS = (
     TypeError,
     ApiSchemaError,
 )
+
+
+class _TokenInvalid(Exception):
+    """The validation endpoint explicitly rejected a bearer token."""
 
 
 @dataclass(frozen=True)
@@ -175,6 +181,7 @@ class ServiceOptions(TypedDict, total=False):
     sleep: Callable[[float], None]
     clock: Callable[[], float]
     diagnostic: Callable[[str], None]
+    token_store: TokenStoreProtocol
 
 
 class CheckinService:
@@ -189,17 +196,76 @@ class CheckinService:
         sleep: Callable[[float], None] = time.sleep,
         clock: Callable[[], float] = time.perf_counter,
         diagnostic: Callable[[str], None] = print,
+        token_store: TokenStoreProtocol | None = None,
     ):
         self.timeout = timeout
-        self._token_provider = token_provider or get_token
+        self._token_provider = token_provider or authenticate_token
         self._client_factory = client_factory or (lambda token, timeout: SwuClient(token, timeout))
         self._sleep = sleep
         self._clock = clock
         self._diagnostic = diagnostic
+        self._token_store = token_store or TokenStore()
 
-    def _authenticated_client(self, username: str, password: str) -> SwuClient | None:
+    def _delete_cached_token(self, username: str) -> None:
+        try:
+            self._token_store.delete(username)
+        except (OSError, TokenStoreError):
+            pass
+
+    def _validate_token(self, token: str) -> tuple[SwuClient, str]:
+        client = self._client_factory(token, self.timeout)
+        try:
+            student_id = client.get_student_id()
+        except requests.exceptions.HTTPError as error:
+            status_code = error.response.status_code if error.response is not None else None
+            if status_code in {401, 403}:
+                raise _TokenInvalid from None
+            raise AuthError(AuthFailureReason.NETWORK_ERROR) from None
+        except requests.exceptions.RequestException:
+            raise AuthError(AuthFailureReason.NETWORK_ERROR) from None
+        except EXPECTED_DATA_ERRORS:
+            raise AuthError(AuthFailureReason.TOKEN_EXCHANGE_FAILED) from None
+        return client, student_id
+
+    def _authenticated_client(
+        self,
+        username: str,
+        password: str,
+        *,
+        read_token_cache: bool = True,
+        write_token_cache: bool = True,
+    ) -> SwuClient:
+        cached = None
+        if read_token_cache:
+            try:
+                cached = self._token_store.get(username)
+            except (OSError, TokenStoreError):
+                cached = None
+        if cached is not None:
+            try:
+                client, student_id = self._validate_token(cached.token)
+            except _TokenInvalid:
+                self._delete_cached_token(username)
+            else:
+                if student_id == cached.student_id == username:
+                    return client
+                self._delete_cached_token(username)
+
         token = self._token_provider(username, password, self.timeout)
-        return self._client_factory(token, self.timeout) if token else None
+        if not token:
+            raise AuthError(AuthFailureReason.UNKNOWN)
+        try:
+            client, student_id = self._validate_token(token)
+        except _TokenInvalid:
+            raise AuthError(AuthFailureReason.TOKEN_EXCHANGE_FAILED) from None
+        if student_id != username:
+            raise AuthError(AuthFailureReason.TOKEN_EXCHANGE_FAILED)
+        if write_token_cache:
+            try:
+                self._token_store.save(username, token, student_id)
+            except (OSError, TokenStoreError):
+                pass
+        return client
 
     @staticmethod
     def _prepare_context(client: SwuClient, transition: Transition) -> CheckinSubmission:
@@ -210,12 +276,24 @@ class CheckinService:
             transition=pending,
         )
 
-    def diagnose(self, username: str, password: str) -> DoctorReport:
+    def diagnose(
+        self,
+        username: str,
+        password: str,
+        *,
+        read_token_cache: bool = False,
+        write_token_cache: bool = False,
+    ) -> DoctorReport:
         """Run staged read-only diagnostics without reaching the submit endpoint."""
 
         try:
-            client = self._authenticated_client(username, password)
-        except EXPECTED_DATA_ERRORS:
+            client = self._authenticated_client(
+                username,
+                password,
+                read_token_cache=read_token_cache,
+                write_token_cache=write_token_cache,
+            )
+        except (AuthError, *EXPECTED_DATA_ERRORS):
             client = None
         if client is None:
             return DoctorReport(False, False, False, False, False)
@@ -274,8 +352,6 @@ class CheckinService:
         self, username: str, password: str
     ) -> tuple[CheckinStatus | None, SwuClient | None, Transition | None]:
         client = self._authenticated_client(username, password)
-        if client is None:
-            return CheckinStatus.LOGIN_FAILED, None, None
         vacation_status = client.get_leave_record_set().evaluate()
         if vacation_status is VacationStatus.UNKNOWN:
             return CheckinStatus.DATA_ERROR, client, None
@@ -299,6 +375,8 @@ class CheckinService:
             return self._submit_checkin(client, submission)
         except (KeyboardInterrupt, SystemExit):
             raise
+        except AuthError as error:
+            return auth_failure_status(error.reason)
         except DormitorySchemaError:
             self._diagnostic("宿舍数据结构异常")
             return CheckinStatus.DATA_ERROR
@@ -316,6 +394,8 @@ class CheckinService:
             return CheckinStatus.PROBE_PENDING
         except (KeyboardInterrupt, SystemExit):
             raise
+        except AuthError as error:
+            return auth_failure_status(error.reason)
         except DormitorySchemaError:
             self._diagnostic("宿舍数据结构异常")
             return CheckinStatus.DATA_ERROR
