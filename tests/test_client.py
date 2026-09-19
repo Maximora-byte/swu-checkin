@@ -4,15 +4,18 @@ from unittest.mock import Mock
 import pytest
 import requests
 
-from swu_checkin.api_models import DormitoryInfo, LeaveRecords, StudentProfile, Transition
+from swu_checkin.api_models import ApiSchemaError, DormitoryInfo, LeaveRecords, StudentProfile, Transition
 from swu_checkin.client import (
     CHECKIN_FORM_URL,
     DORMITORY_URL,
+    LEAVE_PAGE_SIZE,
     LEAVE_RECORDS_URL,
+    MAX_LEAVE_PAGES,
     TRANSITION_TODAY_URL,
     USER_INFO_URL,
     SwuClient,
 )
+from swu_checkin.status import VacationStatus
 
 
 def _response(payload: object) -> Mock:
@@ -20,6 +23,18 @@ def _response(payload: object) -> Mock:
     response.raise_for_status.return_value = None
     response.json.return_value = payload
     return response
+
+
+def _leave_response(records: object) -> Mock:
+    return _response({"data": {"records": records}})
+
+
+def _inactive_records(count: int, *, start: int = 0) -> list[dict[str, object]]:
+    return [{"id": index, "lcztmc": "审核中"} for index in range(start, start + count)]
+
+
+def _active_leave() -> dict[str, object]:
+    return {"lcztmc": "已同意", "kssj": "2000-01-01 00:00", "jssj": "2100-01-01 00:00"}
 
 
 def test_client_uses_token_headers_timeout_and_response_validation():
@@ -61,17 +76,114 @@ def test_client_business_api_request_shapes_are_preserved():
     assert json.loads(submit_call.kwargs["data"]) == {"id": "record"}
 
 
-def test_client_leave_records_and_malformed_json_fail_closed():
+def test_server_smaller_page_limit_continues_until_empty_page():
     session = Mock()
-    session.get.return_value = _response({"data": {"records": [{"lcztmc": "审核中"}]}})
+    first_page = _inactive_records(20)
+    second_page = _inactive_records(20, start=20)
+    session.get.side_effect = [_leave_response(first_page), _leave_response(second_page), _leave_response([])]
     client = SwuClient("token", session=session)
 
-    assert client.get_leave_records() == [{"lcztmc": "审核中"}]
-    assert session.get.call_args.args[0] == LEAVE_RECORDS_URL
+    assert client.get_leave_records() == first_page + second_page
+    assert {call.args[0] for call in session.get.call_args_list} == {LEAVE_RECORDS_URL}
+    assert [call.kwargs["params"]["pageNum"] for call in session.get.call_args_list] == [1, 2, 3]
+    assert {call.kwargs["params"]["pageSize"] for call in session.get.call_args_list} == {LEAVE_PAGE_SIZE}
 
-    session.get.return_value = _response({"data": {"records": None}})
-    with pytest.raises(ValueError, match="records"):
-        client.get_leave_records()
+
+def test_partial_second_page_requires_empty_third_page_without_metadata():
+    first_page = _inactive_records(LEAVE_PAGE_SIZE)
+    second_page = _inactive_records(2, start=LEAVE_PAGE_SIZE)
+    session = Mock()
+    session.get.side_effect = [_leave_response(first_page), _leave_response(second_page), _leave_response([])]
+
+    records = SwuClient("token", session=session).get_leave_records()
+
+    assert records == first_page + second_page
+    assert [call.kwargs["params"] for call in session.get.call_args_list] == [
+        {"pageNum": 1, "pageSize": LEAVE_PAGE_SIZE},
+        {"pageNum": 2, "pageSize": LEAVE_PAGE_SIZE},
+        {"pageNum": 3, "pageSize": LEAVE_PAGE_SIZE},
+    ]
+
+
+def test_later_short_page_active_leave_safely_stops_pagination():
+    session = Mock()
+    session.get.side_effect = [
+        _leave_response(_inactive_records(20)),
+        _leave_response([_active_leave(), *_inactive_records(19, start=20)]),
+    ]
+
+    records = SwuClient("token", session=session).get_leave_record_set()
+
+    assert records.evaluate() is VacationStatus.ACTIVE_LEAVE
+    assert session.get.call_count == 2
+
+
+def test_malformed_earlier_page_without_active_leave_is_unknown():
+    session = Mock()
+    session.get.side_effect = [
+        _leave_response([None, *_inactive_records(19)]),
+        _leave_response(_inactive_records(1, start=20)),
+        _leave_response([]),
+    ]
+
+    records = SwuClient("token", session=session).get_leave_record_set()
+
+    assert records.evaluate() is VacationStatus.UNKNOWN
+
+
+def test_later_active_leave_wins_over_malformed_earlier_page():
+    session = Mock()
+    session.get.side_effect = [
+        _leave_response([None, *_inactive_records(19)]),
+        _leave_response([_active_leave(), *_inactive_records(19, start=20)]),
+    ]
+
+    records = SwuClient("token", session=session).get_leave_record_set()
+
+    assert records.malformed is True
+    assert records.evaluate() is VacationStatus.ACTIVE_LEAVE
+    assert session.get.call_count == 2
+
+
+def test_empty_leave_records_are_no_active_leave():
+    session = Mock()
+    session.get.return_value = _leave_response([])
+
+    records = SwuClient("token", session=session).get_leave_record_set()
+
+    assert records.evaluate() is VacationStatus.NO_ACTIVE_LEAVE
+
+
+@pytest.mark.parametrize("payload", [{}, {"data": None}, {"data": {}}, {"data": {"records": None}}])
+def test_leave_pagination_rejects_invalid_envelope_or_records(payload: object):
+    session = Mock()
+    session.get.return_value = _response(payload)
+
+    with pytest.raises(ApiSchemaError):
+        SwuClient("token", session=session).get_leave_records()
+
+
+def test_leave_page_larger_than_requested_size_fails_closed():
+    session = Mock()
+    session.get.return_value = _leave_response(_inactive_records(LEAVE_PAGE_SIZE + 1))
+
+    with pytest.raises(ApiSchemaError, match="exceeds"):
+        SwuClient("token", session=session).get_leave_record_set()
+
+
+def test_full_maximum_leave_pages_fail_closed_without_extra_request():
+    session = Mock()
+    repeated_page = _leave_response(_inactive_records(20))
+    session.get.side_effect = [repeated_page] * MAX_LEAVE_PAGES
+
+    with pytest.raises(ApiSchemaError, match="completeness"):
+        SwuClient("token", session=session).get_leave_record_set()
+
+    assert session.get.call_count == MAX_LEAVE_PAGES
+    assert [call.kwargs["params"]["pageNum"] for call in session.get.call_args_list] == list(
+        range(1, MAX_LEAVE_PAGES + 1)
+    )
+    assert {call.kwargs["params"]["pageSize"] for call in session.get.call_args_list} == {LEAVE_PAGE_SIZE}
 
 
 def test_client_propagates_http_errors_without_logging_token(capsys):
@@ -93,6 +205,7 @@ def test_client_typed_methods_validate_before_returning_models():
     session.get.side_effect = [
         _response({"data": {"subject": {"username": "20260000000"}}}),
         _response({"data": {"records": [{"lcztmc": "审核中"}]}}),
+        _response({"data": {"records": []}}),
     ]
     session.post.side_effect = [
         _response(
