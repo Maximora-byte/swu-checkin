@@ -160,10 +160,10 @@ powershell -ExecutionPolicy Bypass -File .\scripts\windows\install.ps1
 
 安装器仅支持 Windows，并执行以下操作：
 
-- 安装到 `%LOCALAPPDATA%\SWUCheckin`，使用 uv 和 Python 3.13 从当前仓库创建独立虚拟环境。
+- 安装到 `%LOCALAPPDATA%\SWUCheckin`，使用 uv、Python 3.13 和仓库中的 `uv.lock` 创建独立虚拟环境；项目以非 editable 方式安装，不依赖后续保留原 Git checkout。
 - 如果系统没有 uv，从 Astral 官方 GitHub Release 下载固定版本的 ZIP，并在解压前校验官方 SHA256；不会执行未经验证的远程脚本。
 - 交互读取账号与密码；账号写入本地 JSON，密码通过 Windows DPAPI 加密保存，不写入 `.env`、JSON、任务参数或日志。
-- 先执行 `swu-checkin doctor`；只有诊断成功才创建 `SWUCheckin-2115` 和 `SWUCheckin-2145` 两个任务，每天北京时间 21:15、21:45 运行。重复安装会更新相同任务，不会追加重复项。
+- 先执行 `swu-checkin doctor`；只有诊断成功才创建一个 `SWUCheckin-Daily` 任务，任务内包含北京时间 21:15、21:45 两个 daily trigger。两个触发共用 `IgnoreNew` 并发策略，错过触发后补跑也不会相互重叠；重复安装会更新同一任务，不会追加重复任务或 trigger。
 - 任务使用当前 Windows 用户的交互登录令牌运行，因此执行时该用户需要处于登录状态。
 
 DPAPI 密文只保证同一 Windows 用户、同一台机器可以解密。卸载时运行：
@@ -172,7 +172,7 @@ DPAPI 密文只保证同一 Windows 用户、同一台机器可以解密。卸�
 powershell -ExecutionPolicy Bypass -File "$env:LOCALAPPDATA\SWUCheckin\uninstall.ps1"
 ```
 
-卸载器只删除本项目的两个计划任务和 `%LOCALAPPDATA%\SWUCheckin`；不会卸载或修改用户已有的 uv、Python 或其他任务。
+卸载器只删除本项目的 `SWUCheckin-Daily` 计划任务和 `%LOCALAPPDATA%\SWUCheckin`；不会卸载或修改用户已有的 uv、Python 或其他任务。
 
 也可以不安装任务，手动配置环境变量运行：
 

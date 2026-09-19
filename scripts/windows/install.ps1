@@ -79,8 +79,20 @@ function Get-UvExecutable {
 New-Item -ItemType Directory -Force -Path $installRoot | Out-Null
 $uvExecutable = Get-UvExecutable
 Invoke-CheckedCommand -Executable $uvExecutable -CommandArguments @("python", "install", "3.13") -FailureMessage "Python 3.13 installation failed"
-Invoke-CheckedCommand -Executable $uvExecutable -CommandArguments @("venv", "--python", "3.13", "--clear", $venvRoot) -FailureMessage "Virtual environment creation failed"
-Invoke-CheckedCommand -Executable $uvExecutable -CommandArguments @("pip", "install", "--python", (Join-Path $venvRoot "Scripts\python.exe"), "--force-reinstall", $repositoryRoot) -FailureMessage "swu-checkin installation failed"
+$previousProjectEnvironment = $env:UV_PROJECT_ENVIRONMENT
+try {
+    $env:UV_PROJECT_ENVIRONMENT = $venvRoot
+    $syncArguments = Get-SWUCheckinLockedSyncArguments -RepositoryRoot $repositoryRoot
+    Invoke-CheckedCommand -Executable $uvExecutable -CommandArguments $syncArguments -FailureMessage "Locked swu-checkin installation failed"
+}
+finally {
+    if ($null -eq $previousProjectEnvironment) {
+        Remove-Item Env:UV_PROJECT_ENVIRONMENT -ErrorAction SilentlyContinue
+    }
+    else {
+        $env:UV_PROJECT_ENVIRONMENT = $previousProjectEnvironment
+    }
+}
 
 Copy-Item -Force -LiteralPath (Join-Path $PSScriptRoot "SWUCheckin.Windows.psm1") -Destination $installRoot
 Copy-Item -Force -LiteralPath (Join-Path $PSScriptRoot "run.ps1") -Destination $installRoot

@@ -1,6 +1,6 @@
 Set-StrictMode -Version Latest
 
-$script:TaskNames = @("SWUCheckin-2115", "SWUCheckin-2145")
+$script:TaskName = "SWUCheckin-Daily"
 
 function Test-SWUCheckinWindows {
     return [System.Environment]::OSVersion.Platform -eq [System.PlatformID]::Win32NT
@@ -14,7 +14,7 @@ function Get-SWUCheckinInstallRoot {
 }
 
 function Get-SWUCheckinTaskNames {
-    return @($script:TaskNames)
+    return @($script:TaskName)
 }
 
 function Get-SWUCheckinTaskSpecs {
@@ -25,9 +25,29 @@ function Get-SWUCheckinTaskSpecs {
 
     $runScript = Join-Path $InstallRoot "run.ps1"
     $argument = '-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "{0}"' -f $runScript.Replace('"', '""')
+    return [pscustomobject]@{
+        Name = $script:TaskName
+        Command = $PowerShellPath
+        Arguments = $argument
+        Triggers = @(
+            [pscustomobject]@{ Hour = 21; Minute = 15 },
+            [pscustomobject]@{ Hour = 21; Minute = 45 }
+        )
+    }
+}
+
+function Get-SWUCheckinLockedSyncArguments {
+    param([Parameter(Mandatory = $true)][string]$RepositoryRoot)
+
     return @(
-        [pscustomobject]@{ Name = $script:TaskNames[0]; Hour = 21; Minute = 15; Command = $PowerShellPath; Arguments = $argument },
-        [pscustomobject]@{ Name = $script:TaskNames[1]; Hour = 21; Minute = 45; Command = $PowerShellPath; Arguments = $argument }
+        "sync",
+        "--locked",
+        "--no-dev",
+        "--no-editable",
+        "--project",
+        $RepositoryRoot,
+        "--python",
+        "3.13"
     )
 }
 
@@ -59,10 +79,23 @@ function ConvertTo-SWUCheckinTaskXml {
     param(
         [Parameter(Mandatory = $true)]$Spec,
         [Parameter(Mandatory = $true)][string]$UserSid,
-        [Parameter(Mandatory = $true)][string]$WorkingDirectory
+        [Parameter(Mandatory = $true)][string]$WorkingDirectory,
+        [DateTimeOffset]$Now = [DateTimeOffset]::UtcNow
     )
 
-    $startBoundary = Get-SWUCheckinBeijingStartBoundary -Hour $Spec.Hour -Minute $Spec.Minute
+    if (@($Spec.Triggers).Count -ne 2) {
+        throw "The scheduled task must contain exactly two triggers."
+    }
+    $triggerXml = foreach ($trigger in $Spec.Triggers) {
+        $startBoundary = Get-SWUCheckinBeijingStartBoundary -Hour $trigger.Hour -Minute $trigger.Minute -Now $Now
+        @"
+    <CalendarTrigger>
+      <StartBoundary>$startBoundary</StartBoundary>
+      <Enabled>true</Enabled>
+      <ScheduleByDay><DaysInterval>1</DaysInterval></ScheduleByDay>
+    </CalendarTrigger>
+"@
+    }
     $escapedCommand = [Security.SecurityElement]::Escape([string]$Spec.Command)
     $escapedArguments = [Security.SecurityElement]::Escape([string]$Spec.Arguments)
     $escapedDirectory = [Security.SecurityElement]::Escape($WorkingDirectory)
@@ -72,11 +105,7 @@ function ConvertTo-SWUCheckinTaskXml {
 <Task version="1.4" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
   <RegistrationInfo><Description>SWU Check-in scheduled run (Beijing time).</Description></RegistrationInfo>
   <Triggers>
-    <CalendarTrigger>
-      <StartBoundary>$startBoundary</StartBoundary>
-      <Enabled>true</Enabled>
-      <ScheduleByDay><DaysInterval>1</DaysInterval></ScheduleByDay>
-    </CalendarTrigger>
+$($triggerXml -join "`n")
   </Triggers>
   <Principals>
     <Principal id="Author">
@@ -133,9 +162,7 @@ function Remove-SWUCheckinScheduledTasks {
             }
         }
     }
-    foreach ($taskName in $script:TaskNames) {
-        & $RemoveAction $taskName
-    }
+    & $RemoveAction $script:TaskName
 }
 
 function Invoke-SWUCheckinDoctorGate {
@@ -221,6 +248,7 @@ Export-ModuleMember -Function @(
     "Get-SWUCheckinInstallRoot",
     "Get-SWUCheckinTaskNames",
     "Get-SWUCheckinTaskSpecs",
+    "Get-SWUCheckinLockedSyncArguments",
     "Get-SWUCheckinBeijingStartBoundary",
     "ConvertTo-SWUCheckinTaskXml",
     "Sync-SWUCheckinScheduledTasks",
