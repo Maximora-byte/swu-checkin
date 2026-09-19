@@ -206,7 +206,7 @@ def _get_token(username: str, password: str, timeout: int, max_login_attempts: i
         username: 用户名
         password: 密码
         timeout: 超时时间
-        max_login_attempts: 为调用兼容保留；验证码识别仍在 recognize_captcha 内有限重试
+        max_login_attempts: 服务端明确拒绝验证码后的最大提交次数
 
     Returns:
         成功返回 token
@@ -224,23 +224,34 @@ def _get_token(username: str, password: str, timeout: int, max_login_attempts: i
         # 步骤 2: DES 加密凭证
         encrypted_username, encrypted_password = des(username, password, flow.code_random)
 
-        # 步骤 3: OCR 识别验证码（带重试）
-        captcha = recognize_captcha(session, flow.captcha_url, timeout, max_attempts=3)
-        debug_print("验证码已识别")
+        if max_login_attempts < 1:
+            raise AuthError(AuthFailureReason.CAPTCHA_FAILED)
+        for captcha_submit_attempt in range(1, max_login_attempts + 1):
+            # 步骤 3: OCR 识别验证码（图片获取与 OCR 自身带有限重试）
+            captcha = recognize_captcha(session, flow.captcha_url, timeout, max_attempts=3)
+            debug_print("验证码已识别")
 
-        # 步骤 4: 提交服务端提供的登录表单，并逐跳验证 Redirect
-        form_data = build_login_form_data(flow, encrypted_username, encrypted_password, captcha)
-        response = session.post(
-            flow.form_action,
-            data=form_data,
-            timeout=timeout,
-            allow_redirects=False,
-        )
-        response = follow_trusted_auth_redirects(session, response, timeout=timeout)
-        debug_print(f"登录提交响应: {describe_auth_response(response)}")
-        validate_idm_login_response(response)
+            # 步骤 4: 提交服务端提供的登录表单，并逐跳验证 Redirect
+            form_data = build_login_form_data(flow, encrypted_username, encrypted_password, captcha)
+            response = session.post(
+                flow.form_action,
+                data=form_data,
+                timeout=timeout,
+                allow_redirects=False,
+            )
+            response = follow_trusted_auth_redirects(session, response, timeout=timeout)
+            debug_print(f"登录提交响应: {describe_auth_response(response)}")
+            validate_idm_login_response(response)
 
-        validate_login_result_text(response.text)
+            try:
+                validate_login_result_text(response.text)
+            except AuthError as error:
+                if error.reason is not AuthFailureReason.CAPTCHA_FAILED or captcha_submit_attempt >= max_login_attempts:
+                    raise
+                safe_print(f"验证码被服务器拒绝 (尝试 {captcha_submit_attempt}/{max_login_attempts})，重新获取")
+                time.sleep(1)
+                continue
+            break
 
         # 步骤 5: 处理身份选择
         response = submit_identity_selection_if_needed(
