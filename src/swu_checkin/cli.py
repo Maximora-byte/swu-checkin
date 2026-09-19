@@ -37,7 +37,14 @@ def _parser() -> argparse.ArgumentParser:
     commands = parser.add_subparsers(dest="command")
     commands.add_parser("setup", help="交互验证账号和接口（不保存密码）")
     commands.add_parser("doctor", help="运行只读环境与接口诊断")
-    status_parser = commands.add_parser("status", help="读取最近一次本地运行状态")
+    status_parser = commands.add_parser(
+        "status",
+        help="读取已有的本地运行状态（不发网络请求）",
+        description=(
+            "读取已有的非敏感 status 文件。systemd 默认路径为 /var/lib/swu-checkin/status.json；"
+            "普通本地 run 仅在设置 SWUDK_STATUS_FILE 时记录。"
+        ),
+    )
     status_parser.add_argument("--file", dest="status_file", help="状态文件路径")
     run_parser = commands.add_parser("run", help="立即执行正式签到")
     run_parser.add_argument("--json", action="store_true", dest="command_json", help="输出 schema v1 JSON")
@@ -121,14 +128,13 @@ def _setup() -> int:
         print("配置验证失败：账号和密码不能为空")
         return 1
     try:
-        result = run_probe(username, password, 10)
+        report = CheckinService(timeout=10).diagnose(username, password)
     except (KeyboardInterrupt, SystemExit):
         raise
     except Exception as error:
         print(f"配置验证失败：{type(error).__name__}", file=sys.stderr)
         return 1
-    _print_result(result, json_output=False)
-    if not _successful(result):
+    if not _doctor_report_passed(report):
         print("配置验证失败；未保存任何凭据。")
         return 1
     print("配置验证成功；本版本不会保存密码或创建明文凭据文件。")
@@ -141,10 +147,23 @@ def _doctor_lines(*, runtime: bool, credentials: bool, report: DoctorReport | No
         ("Runtime", runtime),
         ("Credentials", credentials),
         ("SWU Authentication", bool(report and report.authentication)),
+        ("Leave API", bool(report and report.leave_policy)),
         ("Student Profile", bool(report and report.student_profile)),
         ("Dormitory Schema", bool(report and report.dormitory_schema)),
         ("Check-in API", bool(report and report.checkin_api)),
     ]
+
+
+def _doctor_report_passed(report: DoctorReport) -> bool:
+    return all(
+        (
+            report.authentication,
+            report.leave_policy,
+            report.student_profile,
+            report.dormitory_schema,
+            report.checkin_api,
+        )
+    )
 
 
 def _doctor() -> int:
@@ -199,11 +218,14 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "run" and args.probe:
         parser.error("run 不能与旧式 --probe 同时使用")
 
+    probe_environment = os.getenv("SWUDK_PROBE_ONLY") == "1"
+    if args.command == "run" and probe_environment:
+        print("安全开关 SWUDK_PROBE_ONLY=1 已启用，拒绝执行正式签到。", file=sys.stderr)
+        return 2
+
     command_json = getattr(args, "command_json", False)
     json_output = args.json_output or command_json
-    probe_only = args.command == "probe" or (
-        args.command is None and (args.probe or os.getenv("SWUDK_PROBE_ONLY") == "1")
-    )
+    probe_only = args.command == "probe" or (args.command is None and (args.probe or probe_environment))
     return _execute(probe_only=probe_only, json_output=json_output)
 
 

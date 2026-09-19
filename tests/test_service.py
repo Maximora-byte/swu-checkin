@@ -86,6 +86,7 @@ def test_payload_fields_and_values_remain_unchanged(monkeypatch):
 
 def test_doctor_diagnostics_are_read_only_and_never_submit():
     client = Mock()
+    client.get_leave_records.return_value = []
     client.get_student_id.return_value = "20260000000"
     client.get_dormitory.return_value = {
         "data": {
@@ -105,7 +106,54 @@ def test_doctor_diagnostics_are_read_only_and_never_submit():
     report = service.diagnose("student", "password")
 
     assert report.authentication is True
+    assert report.leave_policy is True
     assert report.student_profile is True
     assert report.dormitory_schema is True
     assert report.checkin_api is True
+    client.submit_checkin_form.assert_not_called()
+
+
+def test_doctor_accepts_active_valid_leave_without_submit():
+    client = Mock()
+    client.get_leave_records.return_value = [
+        {"lcztmc": "已同意", "kssj": "2000-01-01 00:00", "jssj": "2100-01-01 00:00"}
+    ]
+    client.get_student_id.return_value = "20260000000"
+    client.get_dormitory.return_value = {
+        "data": {
+            "columnList": [
+                {"prop": "qddz", "latitude": 29.0, "longitude": 106.0},
+                {"prop": "qsqddd", "value": "building"},
+                {"prop": "qdbj", "value": "room"},
+            ]
+        }
+    }
+    client.get_transition_today.return_value = None
+    service = CheckinService(token_provider=lambda *_args: "token", client_factory=lambda *_args: client)
+
+    report = service.diagnose("student", "password")
+
+    assert report.leave_policy is True
+    client.submit_checkin_form.assert_not_called()
+
+
+def test_doctor_rejects_unknown_leave_policy_without_submit():
+    client = Mock()
+    client.get_leave_records.return_value = [None]
+    client.get_student_id.return_value = "20260000000"
+    client.get_dormitory.return_value = {
+        "data": {
+            "columnList": [
+                {"prop": "qddz", "latitude": 29.0, "longitude": 106.0},
+                {"prop": "qsqddd", "value": "building"},
+                {"prop": "qdbj", "value": "room"},
+            ]
+        }
+    }
+    client.get_transition_today.return_value = None
+    service = CheckinService(token_provider=lambda *_args: "token", client_factory=lambda *_args: client)
+
+    report = service.diagnose("student", "password")
+
+    assert report.leave_policy is False
     client.submit_checkin_form.assert_not_called()

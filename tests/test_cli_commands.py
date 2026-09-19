@@ -21,24 +21,28 @@ def clean_environment(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.delenv("SWUDK_STATUS_FILE", raising=False)
 
 
-def test_setup_uses_probe_only_and_never_prints_password(monkeypatch, capsys):
+def test_setup_uses_complete_read_only_diagnostics_and_never_prints_password(monkeypatch, capsys):
     password = "never-print-this-password"
     calls = []
+
+    class FakeService:
+        def __init__(self, *, timeout):
+            assert timeout == 10
+
+        def diagnose(self, username, supplied_password):
+            calls.append((username, supplied_password))
+            return DoctorReport(True, True, True, True, True)
+
     monkeypatch.setattr("builtins.input", lambda _prompt: "student")
     monkeypatch.setattr(cli, "getpass", lambda _prompt: password)
-    monkeypatch.setattr(
-        cli,
-        "run_probe",
-        lambda username, supplied_password, timeout: (
-            calls.append((username, supplied_password, timeout)) or _result(CheckinStatus.PROBE_PENDING, mode="probe")
-        ),
-    )
+    monkeypatch.setattr(cli, "CheckinService", FakeService)
+    monkeypatch.setattr(cli, "run_probe", lambda *_args, **_kwargs: pytest.fail("setup must use complete diagnostics"))
     monkeypatch.setattr(cli, "run_checkin", lambda *_args, **_kwargs: pytest.fail("setup must not check in"))
 
     assert cli.main(["setup"]) == 0
 
     captured = capsys.readouterr()
-    assert calls == [("student", password, 10)]
+    assert calls == [("student", password)]
     assert "配置验证成功" in captured.out
     assert password not in captured.out + captured.err
 
@@ -47,7 +51,15 @@ def test_setup_unexpected_error_does_not_leak_password(monkeypatch, capsys):
     password = "never-print-this-password"
     monkeypatch.setattr("builtins.input", lambda _prompt: "student")
     monkeypatch.setattr(cli, "getpass", lambda _prompt: password)
-    monkeypatch.setattr(cli, "run_probe", lambda *_args: (_ for _ in ()).throw(RuntimeError(password)))
+
+    class FailingService:
+        def __init__(self, *, timeout):
+            assert timeout == 10
+
+        def diagnose(self, *_args):
+            raise RuntimeError(password)
+
+    monkeypatch.setattr(cli, "CheckinService", FailingService)
 
     assert cli.main(["setup"]) == 1
 
@@ -56,14 +68,34 @@ def test_setup_unexpected_error_does_not_leak_password(monkeypatch, capsys):
     assert "RuntimeError" in captured.err
 
 
-def test_doctor_uses_read_only_service_and_prints_six_checks(monkeypatch, capsys):
+@pytest.mark.parametrize("failed_index", range(5))
+def test_setup_requires_every_read_only_diagnostic(monkeypatch, failed_index, capsys):
+    checks = [True, True, True, True, True]
+    checks[failed_index] = False
+
+    class FakeService:
+        def __init__(self, *, timeout):
+            assert timeout == 10
+
+        def diagnose(self, *_args):
+            return DoctorReport(*checks)
+
+    monkeypatch.setattr("builtins.input", lambda _prompt: "student")
+    monkeypatch.setattr(cli, "getpass", lambda _prompt: "password")
+    monkeypatch.setattr(cli, "CheckinService", FakeService)
+
+    assert cli.main(["setup"]) == 1
+    assert "配置验证失败" in capsys.readouterr().out
+
+
+def test_doctor_uses_read_only_service_and_prints_seven_checks(monkeypatch, capsys):
     class FakeService:
         def __init__(self, *, timeout):
             assert timeout == 10
 
         def diagnose(self, username, password):
             assert (username, password) == ("student", "password")
-            return DoctorReport(True, True, True, True)
+            return DoctorReport(True, True, True, True, True)
 
     monkeypatch.setenv("SWUDK_USERNAME", "student")
     monkeypatch.setenv("SWUDK_PASSWORD", "password")
@@ -77,12 +109,13 @@ def test_doctor_uses_read_only_service_and_prints_six_checks(monkeypatch, capsys
         "Runtime",
         "Credentials",
         "SWU Authentication",
+        "Leave API",
         "Student Profile",
         "Dormitory Schema",
         "Check-in API",
     ):
         assert label in output
-    assert output.count("✓") == 6
+    assert output.count("✓") == 7
 
 
 def test_status_reads_local_file_without_network(monkeypatch, tmp_path, capsys):
@@ -111,6 +144,17 @@ def test_run_subcommand_reuses_formal_checkin_path(monkeypatch):
 
     assert cli.main(["run"]) == 0
     assert calls and calls[0][0] == ("student", "password", 10)
+
+
+def test_probe_only_environment_rejects_explicit_run_without_execution(monkeypatch, capsys):
+    monkeypatch.setenv("SWUDK_PROBE_ONLY", "1")
+    monkeypatch.setattr(cli, "run_checkin", lambda *_args, **_kwargs: pytest.fail("run must be blocked"))
+    monkeypatch.setattr(cli, "run_probe", lambda *_args, **_kwargs: pytest.fail("run must not be downgraded"))
+
+    assert cli.main(["run"]) != 0
+
+    captured = capsys.readouterr()
+    assert "拒绝执行正式签到" in captured.err
 
 
 def test_probe_subcommand_reuses_read_only_path(monkeypatch):

@@ -41,6 +41,7 @@ class DoctorReport:
     """Non-sensitive results from read-only SWU diagnostics."""
 
     authentication: bool
+    leave_policy: bool
     student_profile: bool
     dormitory_schema: bool
     checkin_api: bool
@@ -249,7 +250,13 @@ class CheckinService:
         except EXPECTED_DATA_ERRORS:
             client = None
         if client is None:
-            return DoctorReport(False, False, False, False)
+            return DoctorReport(False, False, False, False, False)
+
+        try:
+            leave_status = evaluate_vacation_records(client.get_leave_records())
+            leave_policy = leave_status in {VacationStatus.NO_ACTIVE_LEAVE, VacationStatus.ACTIVE_LEAVE}
+        except EXPECTED_DATA_ERRORS:
+            leave_policy = False
 
         try:
             client.get_student_id()
@@ -269,7 +276,7 @@ class CheckinService:
         except EXPECTED_DATA_ERRORS:
             checkin_api = False
 
-        return DoctorReport(True, student_profile, dormitory_schema, checkin_api)
+        return DoctorReport(True, leave_policy, student_profile, dormitory_schema, checkin_api)
 
     def _confirm_checkin(self, client: SwuClient) -> bool:
         for delay in (0, 0.3, 0.6, 1.0):
