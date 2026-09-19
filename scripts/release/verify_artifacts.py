@@ -1,4 +1,4 @@
-"""Validate release artifacts through a clean wheel installation."""
+"""Validate release artifacts through clean wheel and sdist installations."""
 
 from __future__ import annotations
 
@@ -45,22 +45,29 @@ def _verify_archives(wheel: Path, sdist: Path) -> None:
         _verify_archive_members(sdist, archive.getnames())
 
 
-def verify_artifacts(dist: Path, expected_version: str, uv: str) -> None:
-    wheel = _single_artifact(dist, "*.whl", "wheel")
-    sdist = _single_artifact(dist, "*.tar.gz", "sdist")
-    _verify_archives(wheel, sdist)
-    with tempfile.TemporaryDirectory(prefix="swu-checkin-wheel-smoke-") as temp:
+def _smoke_install(artifact: Path, expected_version: str, uv: str, label: str) -> None:
+    with tempfile.TemporaryDirectory(prefix=f"swu-checkin-{label}-smoke-") as temp:
         root = Path(temp)
         venv = root / "venv"
-        subprocess.run([uv, "venv", str(venv), "--python", "3.13"], check=True)
-        scripts = venv / ("Scripts" if os.name == "nt" else "bin")
-        python = scripts / ("python.exe" if os.name == "nt" else "python")
-        cli = scripts / ("swu-checkin.exe" if os.name == "nt" else "swu-checkin")
-        subprocess.run([uv, "pip", "install", "--python", str(python), str(wheel)], check=True)
         environment = os.environ.copy()
         environment.pop("PYTHONPATH", None)
         environment["PYTHONNOUSERSITE"] = "1"
         environment["EXPECTED_VERSION"] = expected_version
+        subprocess.run(
+            [uv, "venv", str(venv), "--python", "3.13"],
+            cwd=root,
+            env=environment,
+            check=True,
+        )
+        scripts = venv / ("Scripts" if os.name == "nt" else "bin")
+        python = scripts / ("python.exe" if os.name == "nt" else "python")
+        cli = scripts / ("swu-checkin.exe" if os.name == "nt" else "swu-checkin")
+        subprocess.run(
+            [uv, "pip", "install", "--python", str(python), str(artifact)],
+            cwd=root,
+            env=environment,
+            check=True,
+        )
         subprocess.run([str(cli), "--help"], cwd=root, env=environment, check=True)
         subprocess.run([str(cli), "status", "--help"], cwd=root, env=environment, check=True)
         subprocess.run(
@@ -78,6 +85,14 @@ def verify_artifacts(dist: Path, expected_version: str, uv: str) -> None:
             env=environment,
             check=True,
         )
+
+
+def verify_artifacts(dist: Path, expected_version: str, uv: str) -> None:
+    wheel = _single_artifact(dist, "*.whl", "wheel")
+    sdist = _single_artifact(dist, "*.tar.gz", "sdist")
+    _verify_archives(wheel, sdist)
+    _smoke_install(wheel, expected_version, uv, "wheel")
+    _smoke_install(sdist, expected_version, uv, "sdist")
 
 
 def main() -> int:
