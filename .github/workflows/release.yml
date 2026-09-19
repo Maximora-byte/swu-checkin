@@ -86,6 +86,7 @@ jobs:
       - name: 验证下载内容并创建 GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
         run: |
           mapfile -t wheels < <(find dist -maxdepth 1 -type f -name '*.whl' -print)
           mapfile -t sdists < <(find dist -maxdepth 1 -type f -name '*.tar.gz' -print)

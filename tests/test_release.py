@@ -89,6 +89,8 @@ def test_release_workflow_separates_build_and_publish_permissions():
     assert "persist-credentials: false" in build
     assert "permissions:\n      contents: write" in publish
     assert "contents: read" not in publish
+    assert "GH_REPO: ${{ github.repository }}" in publish
+    assert "--repo" not in publish
     assert "actions/checkout@" not in publish
     assert "setup-uv@" not in publish
     assert "uv sync" not in publish
