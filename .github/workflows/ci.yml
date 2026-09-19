@@ -119,17 +119,46 @@ jobs:
           & $python .\tests\windows\python_dpapi_smoke.py
           if ($LASTEXITCODE -ne 0) { throw "Python DPAPI TokenStore smoke failed." }
 
+  package-quality:
+    name: package-quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: 安装固定版本 uv 与 Python
+        uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6
+        with:
+          version: "0.12.15"
+          enable-cache: true
+
+      - name: 按锁文件安装依赖
+        run: |
+          uv python install 3.13
+          uv sync --locked --all-groups --python 3.13
+
+      - name: 构建 wheel 与 sdist
+        run: uv build
+
+      - name: 干净环境安装 wheel 并运行 CLI smoke
+        run: |
+          project_version="$(uv run --locked python scripts/release/verify_release_tag.py)"
+          uv run --locked python scripts/release/verify_artifacts.py --expected-version "$project_version"
+
   quality:
     name: quality
     if: ${{ always() }}
-    needs: [linux-quality, windows-quality]
+    needs: [linux-quality, windows-quality, package-quality]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: 汇总 Linux 与 Windows 门禁
+      - name: 汇总 Linux、Windows 与 package 门禁
         env:
           LINUX_RESULT: ${{ needs.linux-quality.result }}
           WINDOWS_RESULT: ${{ needs.windows-quality.result }}
+          PACKAGE_RESULT: ${{ needs.package-quality.result }}
         run: |
           test "$LINUX_RESULT" = "success"
           test "$WINDOWS_RESULT" = "success"
+          test "$PACKAGE_RESULT" = "success"

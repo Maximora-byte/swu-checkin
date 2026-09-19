@@ -1,0 +1,104 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  build-verify:
+    name: release-build-verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: 验证 tag commit 已进入 main
+        run: |
+          git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "Tagged commit is not contained in origin/main; refusing release." >&2
+            exit 1
+          fi
+
+      - name: 安装固定版本 uv 与 Python
+        uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6
+        with:
+          version: "0.12.15"
+          enable-cache: true
+
+      - name: 按锁文件安装依赖
+        run: |
+          uv python install 3.13
+          uv sync --locked --all-groups --python 3.13
+
+      - name: 验证 tag 与项目版本
+        run: |
+          project_version="$(uv run --locked python scripts/release/verify_release_tag.py --tag "$GITHUB_REF_NAME")"
+          echo "PROJECT_VERSION=$project_version" >> "$GITHUB_ENV"
+
+      - name: 运行完整质量门禁
+        run: |
+          uv run --locked pytest -q
+          uv run --locked ruff check .
+          uv run --locked ruff format --check .
+          uv run --locked mypy src/swu_checkin
+          uv lock --check
+
+      - name: 构建并验证发布 artifacts
+        run: |
+          uv build
+          uv run --locked python scripts/release/verify_artifacts.py --expected-version "$PROJECT_VERSION"
+
+      - name: 上传已验证的发布 artifacts
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: release-distributions-${{ github.sha }}
+          path: |
+            dist/*.whl
+            dist/*.tar.gz
+          if-no-files-found: error
+          retention-days: 1
+
+  publish:
+    name: release-publish
+    needs: [build-verify]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - name: 下载已验证的发布 artifacts
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: release-distributions-${{ github.sha }}
+          path: dist
+
+      - name: 验证下载内容并创建 GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          mapfile -t wheels < <(find dist -maxdepth 1 -type f -name '*.whl' -print)
+          mapfile -t sdists < <(find dist -maxdepth 1 -type f -name '*.tar.gz' -print)
+          if [[ "${#wheels[@]}" -ne 1 || "${#sdists[@]}" -ne 1 ]]; then
+            echo "Expected exactly one verified wheel and one verified sdist." >&2
+            exit 1
+          fi
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            echo "Release $GITHUB_REF_NAME already exists; refusing to overwrite immutable artifacts." >&2
+            exit 1
+          fi
+          gh release create "$GITHUB_REF_NAME" "${wheels[0]}" "${sdists[0]}" \
+            --verify-tag \
+            --title "$GITHUB_REF_NAME" \
+            --generate-notes
