@@ -107,6 +107,7 @@ $runOutput = @(
 Assert-Equal 37 $runOutput[-1] "The runner must preserve the child exit code."
 Assert-Equal "student-test-user" $observed["SWUDK_USERNAME"] "The child must receive the username through its private environment."
 Assert-Equal "sensitive-test-value" $observed["SWUDK_PASSWORD"] "The child must receive the decrypted DPAPI value only through its private environment."
+Assert-Equal "1" $observed["PYTHONUTF8"] "Windows child processes must use UTF-8 output."
 Assert-Equal $parentUsername $env:SWUDK_USERNAME "The parent username environment must not be changed."
 Assert-Equal $parentPassword $env:SWUDK_PASSWORD "The parent password environment must not be changed."
 $renderedOutput = $runOutput -join "`n"

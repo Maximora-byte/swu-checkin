@@ -200,6 +200,7 @@ function Invoke-SWUCheckinProcess {
         $plainPassword = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($passwordPointer)
         $childEnvironment["SWUDK_USERNAME"] = $Username
         $childEnvironment["SWUDK_PASSWORD"] = $plainPassword
+        $childEnvironment["PYTHONUTF8"] = "1"
         if (-not [string]::IsNullOrWhiteSpace($StatusFile)) {
             $childEnvironment["SWUDK_STATUS_FILE"] = $StatusFile
         }
@@ -228,10 +229,12 @@ function Invoke-SWUCheckinProcess {
             $startInfo.EnvironmentVariables.Remove("SWUDK_PASSWORD")
             $startInfo.EnvironmentVariables.Remove("SWUDK_USERNAME")
             $startInfo.EnvironmentVariables.Remove("SWUDK_STATUS_FILE")
+            $startInfo.EnvironmentVariables.Remove("PYTHONUTF8")
         }
         $childEnvironment.Remove("SWUDK_PASSWORD")
         $childEnvironment.Remove("SWUDK_USERNAME")
         $childEnvironment.Remove("SWUDK_STATUS_FILE")
+        $childEnvironment.Remove("PYTHONUTF8")
         $plainPassword = $null
         if ($passwordPointer -ne [IntPtr]::Zero) {
             [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($passwordPointer)

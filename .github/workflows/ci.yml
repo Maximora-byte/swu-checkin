@@ -99,6 +99,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "Python 3.13 installation failed." }
           uv sync --locked --no-dev --no-editable --project $env:GITHUB_WORKSPACE --python 3.13
           if ($LASTEXITCODE -ne 0) { throw "Locked installation failed." }
+          $env:PYTHONUTF8 = "1"
           $sourcePath = Join-Path $env:GITHUB_WORKSPACE "src"
           $hiddenSourcePath = Join-Path $env:GITHUB_WORKSPACE "src.checkout-hidden"
           Rename-Item -LiteralPath $sourcePath -NewName "src.checkout-hidden"
