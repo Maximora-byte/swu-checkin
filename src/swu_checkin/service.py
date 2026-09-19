@@ -376,7 +376,13 @@ class CheckinService:
 
     def _submit_checkin(self, client: SwuClient, submission: CheckinSubmission) -> CheckinStatus:
         payload = _build_typed_checkin_payload(submission)
-        response_payload = client.submit_checkin_form(form_id=submission.transition.form_id, payload=payload)
+        try:
+            response_payload = client.submit_checkin_form(form_id=submission.transition.form_id, payload=payload)
+        except requests.exceptions.RequestException:
+            if self._confirm_checkin(client):
+                return CheckinStatus.SUCCESS
+            self._diagnostic("签到请求结果不明确，且未能确认服务端签到状态")
+            return CheckinStatus.DATA_ERROR
         business_success = business_response_succeeded(response_payload)
         if self._confirm_checkin(client):
             return CheckinStatus.SUCCESS

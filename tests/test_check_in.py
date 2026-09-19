@@ -1,7 +1,7 @@
 import json
 import stat
 from datetime import UTC, datetime
-from unittest.mock import Mock
+from unittest.mock import Mock, call
 
 import pytest
 import requests
@@ -105,13 +105,13 @@ class _FakeClient:
         return self.submit_response
 
 
-def _service(client: _FakeClient, *, diagnostic=print) -> CheckinService:
+def _service(client: _FakeClient, *, diagnostic=print, sleep=lambda _seconds: None) -> CheckinService:
     token_store = Mock()
     token_store.get.return_value = None
     return CheckinService(
         token_provider=lambda *_args: "test-token",
         client_factory=lambda *_args: client,
-        sleep=lambda _seconds: None,
+        sleep=sleep,
         clock=lambda: 0.0,
         diagnostic=diagnostic,
         token_store=token_store,
@@ -157,6 +157,44 @@ def test_submit_succeeds_only_after_readback():
 
     assert _service(client).check_in_once("student", "password") == CheckinStatus.SUCCESS
     assert client.submit_calls == 1
+
+
+def _http_error(status_code: int) -> requests.HTTPError:
+    response = requests.Response()
+    response.status_code = status_code
+    return requests.HTTPError(response=response)
+
+
+@pytest.mark.parametrize(
+    "error",
+    [
+        requests.Timeout("timeout"),
+        requests.ConnectionError("connection reset"),
+        _http_error(503),
+    ],
+)
+@pytest.mark.parametrize(("confirmed", "expected"), [(True, "success"), (False, "data_error")])
+def test_ambiguous_submit_is_read_back_without_outer_retry(
+    error: requests.RequestException,
+    confirmed: bool,
+    expected: str,
+):
+    pending = {"id": "record-1", "formId": "form-1", "qdzt": "未签到"}
+    readback = {"qdzt": "已签到"} if confirmed else pending
+    client = _FakeClient([pending, *([readback] * 4)])
+    client.submit_checkin_form = Mock(side_effect=error)
+    sleep = Mock()
+    service = _service(client, sleep=sleep)
+
+    result = service.run_checkin("student", "password", max_attempts=3, retry_delay=8)
+
+    assert result.status == expected
+    assert result.attempts == 1
+    assert client.submit_checkin_form.call_count == 1
+    if confirmed:
+        sleep.assert_not_called()
+    else:
+        assert sleep.call_args_list == [call(0.3), call(0.6), call(1.0)]
 
 
 def test_already_checked_in_transition_needs_only_status():
