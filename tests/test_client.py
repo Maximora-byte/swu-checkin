@@ -4,6 +4,7 @@ from unittest.mock import Mock
 import pytest
 import requests
 
+from swu_checkin.api_models import DormitoryInfo, LeaveRecords, StudentProfile, Transition
 from swu_checkin.client import (
     CHECKIN_FORM_URL,
     DORMITORY_URL,
@@ -85,3 +86,41 @@ def test_client_propagates_http_errors_without_logging_token(capsys):
 
     captured = capsys.readouterr()
     assert "never-print-this-token" not in captured.out + captured.err
+
+
+def test_client_typed_methods_validate_before_returning_models():
+    session = Mock()
+    session.get.side_effect = [
+        _response({"data": {"subject": {"username": "20260000000"}}}),
+        _response({"data": {"records": [{"lcztmc": "审核中"}]}}),
+    ]
+    session.post.side_effect = [
+        _response(
+            {
+                "data": {
+                    "columnList": [
+                        {"prop": "qddz", "latitude": 29.0, "longitude": 106.0},
+                        {"prop": "qsqddd", "value": "橘园"},
+                        {"prop": "qdbj", "value": "001"},
+                    ]
+                }
+            }
+        ),
+        _response({"data": {"records": [{"id": "record-1", "formId": "form-1", "qdzt": "未签到"}]}}),
+    ]
+    client = SwuClient("token", session=session)
+
+    assert client.get_student_profile() == StudentProfile("20260000000")
+    assert client.get_dormitory_info() == DormitoryInfo(29.0, 106.0, "橘园", "001")
+    assert client.get_transition() == Transition("record-1", "form-1", "未签到")
+    assert client.get_leave_record_set() == LeaveRecords.from_items([{"lcztmc": "审核中"}])
+
+
+def test_client_transition_accepts_status_only_terminal_record():
+    session = Mock()
+    session.post.return_value = _response({"data": {"records": [{"qdzt": "已签到"}]}})
+
+    transition = SwuClient("token", session=session).get_transition()
+
+    assert transition == Transition(record_id=None, form_id=None, checkin_status="已签到")
+    assert transition.is_checked_in is True

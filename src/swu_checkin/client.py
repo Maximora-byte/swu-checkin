@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import json
-from typing import Any
+from typing import cast
 
 import requests
+
+from .api_models import DormitoryInfo, LeaveRecords, StudentProfile, Transition
 
 USER_INFO_URL = "https://of.swu.edu.cn/gateway/fighter-middle/api/auth/user"
 DORMITORY_URL = "https://of.swu.edu.cn/gateway/fighter-baida/api/cqlc/getDormitory"
@@ -17,7 +19,7 @@ CHECKIN_FORM_URL = "https://of.swu.edu.cn/gateway/fighter-baida/api/form-instanc
 class SwuClient:
     """Small authenticated HTTP client with no check-in policy decisions."""
 
-    def __init__(self, token: str, timeout: int = 10, *, session: Any | None = None):
+    def __init__(self, token: str, timeout: int = 10, *, session: requests.Session | None = None) -> None:
         if not isinstance(token, str) or not token:
             raise ValueError("token is required")
         self._token = token
@@ -31,27 +33,31 @@ class SwuClient:
         return headers
 
     @staticmethod
-    def _json_object(response: Any, *, label: str) -> dict[str, Any]:
+    def _json_object(response: requests.Response, *, label: str) -> dict[str, object]:
         response.raise_for_status()
-        payload = response.json()
-        if not isinstance(payload, dict):
+        payload: object = response.json()
+        if not isinstance(payload, dict) or not all(isinstance(key, str) for key in payload):
             raise ValueError(f"{label} response is not an object")
-        return payload
+        return cast("dict[str, object]", payload)
 
-    def get_student_id(self) -> str:
+    def _student_payload(self) -> dict[str, object]:
         response = self._session.get(
             USER_INFO_URL,
             params={"appType": "fighter-portal"},
             headers=self._headers(),
             timeout=self.timeout,
         )
-        payload = self._json_object(response, label="student")
-        student_id = payload["data"]["subject"]["username"]
-        if not isinstance(student_id, str) or not student_id:
-            raise ValueError("student id is missing")
-        return student_id
+        return self._json_object(response, label="student")
 
-    def get_dormitory(self) -> dict[str, Any]:
+    def get_student_profile(self) -> StudentProfile:
+        return StudentProfile.from_response(self._student_payload())
+
+    def get_student_id(self) -> str:
+        """Compatibility wrapper returning the historical string value."""
+
+        return self.get_student_profile().student_id
+
+    def _dormitory_payload(self) -> dict[str, object]:
         response = self._session.post(
             DORMITORY_URL,
             headers=self._headers(json_content=True),
@@ -60,14 +66,30 @@ class SwuClient:
         )
         return self._json_object(response, label="dormitory")
 
-    def get_transition_today(self) -> dict[str, Any] | None:
+    def get_dormitory_info(self) -> DormitoryInfo:
+        return DormitoryInfo.from_response(self._dormitory_payload())
+
+    def get_dormitory(self) -> dict[str, object]:
+        """Compatibility wrapper returning the historical response object."""
+
+        return self._dormitory_payload()
+
+    def _transition_payload(self) -> dict[str, object]:
         response = self._session.post(
             TRANSITION_TODAY_URL,
             headers=self._headers(),
             data={"pageNum": 1, "pageSize": 1},
             timeout=self.timeout,
         )
-        payload = self._json_object(response, label="transition")
+        return self._json_object(response, label="transition")
+
+    def get_transition(self) -> Transition | None:
+        return Transition.from_response(self._transition_payload())
+
+    def get_transition_today(self) -> dict[str, object] | None:
+        """Compatibility wrapper returning the historical transition mapping."""
+
+        payload = self._transition_payload()
         data = payload.get("data")
         if not isinstance(data, dict):
             raise ValueError("transition response is missing data")
@@ -77,17 +99,25 @@ class SwuClient:
         if not records:
             return None
         record = records[0]
-        if not isinstance(record, dict):
+        if not isinstance(record, dict) or not all(isinstance(key, str) for key in record):
             raise ValueError("transition record is invalid")
-        return record
+        return cast("dict[str, object]", record)
 
-    def get_leave_records(self) -> list[dict[str, Any] | object]:
+    def _leave_payload(self) -> dict[str, object]:
         response = self._session.get(
             LEAVE_RECORDS_URL,
             headers=self._headers(),
             timeout=self.timeout,
         )
-        payload = self._json_object(response, label="leave")
+        return self._json_object(response, label="leave")
+
+    def get_leave_record_set(self) -> LeaveRecords:
+        return LeaveRecords.from_response(self._leave_payload())
+
+    def get_leave_records(self) -> list[object]:
+        """Compatibility wrapper returning the historical records list."""
+
+        payload = self._leave_payload()
         data = payload.get("data")
         if not isinstance(data, dict):
             raise ValueError("leave response is missing data")
@@ -96,7 +126,7 @@ class SwuClient:
             raise ValueError("leave records are invalid")
         return records
 
-    def submit_checkin_form(self, *, form_id: object, payload: dict[str, Any]) -> object:
+    def submit_checkin_form(self, *, form_id: str | int, payload: dict[str, object]) -> object:
         response = self._session.post(
             CHECKIN_FORM_URL,
             headers=self._headers(json_content=True),

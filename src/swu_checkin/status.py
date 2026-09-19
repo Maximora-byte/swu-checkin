@@ -52,6 +52,8 @@ def status_message(status: CheckinStatus | int) -> str:
 
 
 def is_successful_checkin_status(status: object) -> bool:
+    if not isinstance(status, int):
+        return False
     try:
         return CheckinStatus(status) in SUCCESSFUL_CHECKIN_STATUSES
     except (TypeError, ValueError):

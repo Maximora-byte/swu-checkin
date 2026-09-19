@@ -38,6 +38,9 @@ jobs:
       - name: Ruff 格式检查
         run: uv run --locked ruff format --check .
 
+      - name: mypy 类型检查
+        run: uv run --locked mypy src/swu_checkin
+
       - name: GitHub Actions 语法检查
         run: go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.7 .github/workflows/*.yml
 

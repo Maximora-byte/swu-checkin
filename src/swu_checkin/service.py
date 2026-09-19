@@ -3,37 +3,42 @@
 from __future__ import annotations
 
 import json
-import math
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any
+from typing import TypedDict, Unpack, cast
 
 import requests
 
+from .api_models import (
+    ApiSchemaError,
+    CheckinSubmission,
+    DormitoryInfo,
+    DormitorySchemaError,
+    LeaveRecords,
+    StudentProfile,
+    Transition,
+    parse_coordinate,
+)
 from .cache import CheckinContext
 from .client import SwuClient
 from .get_info import get_token
 from .models import CheckinResult
 from .status import RETRYABLE_STATUSES, CheckinStatus, VacationStatus, status_message
-from .time_utils import epoch_milliseconds, now_shanghai, parse_swu_datetime, today_shanghai
+from .time_utils import epoch_milliseconds, today_shanghai
 
 DEFAULT_MAX_ATTEMPTS = 3
 DEFAULT_RETRY_DELAY = 8
 SUCCESS_CODES = {"0", "200", "20000", "00000", "success", "ok", "true"}
-CURRENT_LOCATION_FIELDS = frozenset({"address", "latitude", "longitude", "qdbj"})
 EXPECTED_DATA_ERRORS = (
     requests.exceptions.RequestException,
     json.JSONDecodeError,
     KeyError,
     ValueError,
     TypeError,
+    ApiSchemaError,
 )
-
-
-class DormitorySchemaError(ValueError):
-    """The dormitory response cannot be interpreted without ambiguity."""
 
 
 @dataclass(frozen=True)
@@ -48,116 +53,39 @@ class DoctorReport:
 
 
 def evaluate_vacation_records(
-    records: list[dict[str, Any] | object],
+    records: Sequence[object],
     *,
     now: datetime | None = None,
 ) -> VacationStatus:
     """Evaluate approved leave records and fail closed on malformed data."""
 
-    if not records:
-        return VacationStatus.NO_ACTIVE_LEAVE
-    current = now or now_shanghai()
-    if current.tzinfo is None:
-        raise ValueError("now must be timezone-aware")
-    malformed_record = False
-    for record in records:
-        if not isinstance(record, dict):
-            malformed_record = True
-            continue
-        approval_status = record.get("lcztmc")
-        if not isinstance(approval_status, str):
-            malformed_record = True
-            continue
-        if approval_status != "已同意":
-            continue
-        try:
-            start_raw = record["kssj"]
-            end_raw = record["jssj"]
-            if not isinstance(start_raw, str) or not isinstance(end_raw, str):
-                raise ValueError("leave time is not a string")
-            start = parse_swu_datetime(start_raw)
-            end = parse_swu_datetime(end_raw)
-            if end < start:
-                raise ValueError("leave end precedes start")
-        except (KeyError, TypeError, ValueError):
-            malformed_record = True
-            continue
-        if start <= current.astimezone(start.tzinfo) <= end:
-            return VacationStatus.ACTIVE_LEAVE
-    return VacationStatus.UNKNOWN if malformed_record else VacationStatus.NO_ACTIVE_LEAVE
-
-
-def parse_coordinate(value: object, *, name: str, minimum: float, maximum: float) -> float:
-    if isinstance(value, bool):
-        raise ValueError(f"{name} is not a valid coordinate")
-    try:
-        coordinate = float(value)
-    except (TypeError, ValueError) as error:
-        raise ValueError(f"{name} is not a valid coordinate") from error
-    if not math.isfinite(coordinate) or not minimum <= coordinate <= maximum:
-        raise ValueError(f"{name} is outside the valid range")
-    return coordinate
+    return LeaveRecords.from_items(records).evaluate(now=now)
 
 
 def parse_dormitory_data(dormitory_list: list[dict[str, object]]) -> tuple[dict[str, float], str, str]:
-    location_candidates: list[dict[str, object]] = []
-    building = None
-    room = None
-    for item in dormitory_list:
-        if not isinstance(item, dict):
-            continue
-        prop = item.get("prop", "")
-        if prop == "qddz":
-            location_candidates.append(item)
-        elif "prop" not in item and CURRENT_LOCATION_FIELDS.issubset(item):
-            location_candidates.append(item)
-        elif prop == "qsqddd":
-            building = item.get("value")
-        elif prop == "qdbj":
-            room = item.get("value")
-    if (
-        len(location_candidates) != 1
-        or not isinstance(building, str)
-        or not building.strip()
-        or not isinstance(room, str)
-        or not room.strip()
-    ):
-        raise DormitorySchemaError("dormitory response has an invalid or ambiguous schema")
-    location = location_candidates[0]
-    try:
-        coordinates = {
-            "latitude": parse_coordinate(location.get("latitude"), name="latitude", minimum=-90, maximum=90),
-            "longitude": parse_coordinate(location.get("longitude"), name="longitude", minimum=-180, maximum=180),
-        }
-    except ValueError as error:
-        raise DormitorySchemaError(str(error)) from error
-    return coordinates, building.strip(), room.strip()
+    info = DormitoryInfo.from_columns(dormitory_list)
+    return {"latitude": info.latitude, "longitude": info.longitude}, info.building, info.room
 
 
 def parse_dormitory_response(dormitory: object) -> tuple[dict[str, float], str, str]:
     """Validate the response envelope before parsing its non-sensitive schema."""
 
-    if not isinstance(dormitory, dict):
-        raise DormitorySchemaError("dormitory response is not an object")
-    data = dormitory.get("data")
-    if not isinstance(data, dict):
-        raise DormitorySchemaError("dormitory response is missing data")
-    column_list = data.get("columnList")
-    if not isinstance(column_list, list):
-        raise DormitorySchemaError("dormitory columns are invalid")
-    return parse_dormitory_data(column_list)
+    info = DormitoryInfo.from_response(dormitory)
+    return {"latitude": info.latitude, "longitude": info.longitude}, info.building, info.room
 
 
 def business_response_succeeded(payload: object) -> bool:
     """Return true only when the response contains an explicit success signal."""
 
-    if not isinstance(payload, dict):
+    if not isinstance(payload, dict) or not all(isinstance(key, str) for key in payload):
         return False
-    nested = payload.get("data") if isinstance(payload.get("data"), dict) else {}
-    code_value = payload.get("code", payload.get("status", nested.get("code", nested.get("status"))))
-    result_value = payload.get(
+    root = cast("Mapping[str, object]", payload)
+    nested_value = root.get("data")
+    nested = cast("Mapping[str, object]", nested_value) if isinstance(nested_value, dict) else {}
+    code_value = root.get("code", root.get("status", nested.get("code", nested.get("status"))))
+    result_value = root.get(
         "success",
-        payload.get("result", payload.get("ok", nested.get("success", nested.get("result", nested.get("ok"))))),
+        root.get("result", root.get("ok", nested.get("success", nested.get("result", nested.get("ok"))))),
     )
     if code_value is not None and str(code_value).strip().lower() not in SUCCESS_CODES:
         return False
@@ -173,21 +101,21 @@ def business_response_succeeded(payload: object) -> bool:
     )
 
 
-def build_checkin_payload(ctx: CheckinContext) -> dict[str, Any]:
-    """Build the existing check-in payload without changing any field semantics."""
+def _build_typed_checkin_payload(submission: CheckinSubmission) -> dict[str, object]:
+    """Build the existing check-in payload from validated API models."""
 
     return {
-        "id": ctx.transition["id"],
-        "formId": ctx.transition["formId"],
+        "id": submission.transition.record_id,
+        "formId": submission.transition.form_id,
         "tsrq": today_shanghai(),
-        "xh": ctx.student_id,
+        "xh": submission.student.student_id,
         "qdsj": ["21:00", "23:30"],
-        "qsqddd": ctx.building,
-        "qdbj": ctx.room,
+        "qsqddd": submission.dormitory.building,
+        "qdbj": submission.dormitory.room,
         "qddz": {
-            "latitude": ctx.latitude,
-            "longitude": ctx.longitude,
-            "address": ctx.building,
+            "latitude": submission.dormitory.latitude,
+            "longitude": submission.dormitory.longitude,
+            "address": submission.dormitory.building,
             "netType": "wifi",
             "operatorType": "unknown",
             "imei": "imei",
@@ -204,6 +132,49 @@ def build_checkin_payload(ctx: CheckinContext) -> dict[str, Any]:
             "tip": "当前在签到范围内",
         },
     }
+
+
+def submission_from_legacy_context(ctx: CheckinContext) -> CheckinSubmission:
+    """Validate the historical mutable context before entering the typed core."""
+
+    if ctx.transition is None:
+        raise ValueError("transition is missing")
+    transition_payload = dict(ctx.transition)
+    transition_payload.setdefault("qdzt", "未签到")
+    transition = Transition.from_record(transition_payload)
+    student = StudentProfile(student_id=ctx.student_id) if isinstance(ctx.student_id, str) else None
+    if student is None or not student.student_id:
+        raise ValueError("student id is missing")
+    if (
+        not isinstance(ctx.building, str)
+        or not ctx.building.strip()
+        or not isinstance(ctx.room, str)
+        or not ctx.room.strip()
+        or ctx.latitude is None
+        or ctx.longitude is None
+    ):
+        raise ValueError("dormitory data is incomplete")
+    dormitory = DormitoryInfo(
+        latitude=parse_coordinate(ctx.latitude, name="latitude", minimum=-90, maximum=90),
+        longitude=parse_coordinate(ctx.longitude, name="longitude", minimum=-180, maximum=180),
+        building=ctx.building.strip(),
+        room=ctx.room.strip(),
+    )
+    return CheckinSubmission(student=student, dormitory=dormitory, transition=transition.require_pending())
+
+
+def build_checkin_payload(ctx: CheckinContext) -> dict[str, object]:
+    """Backward-compatible payload builder over the typed validation layer."""
+
+    return _build_typed_checkin_payload(submission_from_legacy_context(ctx))
+
+
+class ServiceOptions(TypedDict, total=False):
+    token_provider: Callable[[str, str, int], str]
+    client_factory: Callable[[str, int], SwuClient]
+    sleep: Callable[[float], None]
+    clock: Callable[[], float]
+    diagnostic: Callable[[str], None]
 
 
 class CheckinService:
@@ -230,17 +201,14 @@ class CheckinService:
         token = self._token_provider(username, password, self.timeout)
         return self._client_factory(token, self.timeout) if token else None
 
-    def _prepare_context(self, client: SwuClient, ctx: CheckinContext) -> None:
-        if not ctx.has_dormitory_info():
-            dormitory = client.get_dormitory()
-            location, building, room = parse_dormitory_response(dormitory)
-            ctx.dormitory_data = dormitory
-            ctx.building = building
-            ctx.room = room
-            ctx.latitude = location["latitude"]
-            ctx.longitude = location["longitude"]
-        if not ctx.has_student_id():
-            ctx.student_id = client.get_student_id()
+    @staticmethod
+    def _prepare_context(client: SwuClient, transition: Transition) -> CheckinSubmission:
+        pending = transition.require_pending()
+        return CheckinSubmission(
+            student=client.get_student_profile(),
+            dormitory=client.get_dormitory_info(),
+            transition=pending,
+        )
 
     def diagnose(self, username: str, password: str) -> DoctorReport:
         """Run staged read-only diagnostics without reaching the submit endpoint."""
@@ -253,25 +221,25 @@ class CheckinService:
             return DoctorReport(False, False, False, False, False)
 
         try:
-            leave_status = evaluate_vacation_records(client.get_leave_records())
+            leave_status = client.get_leave_record_set().evaluate()
             leave_policy = leave_status in {VacationStatus.NO_ACTIVE_LEAVE, VacationStatus.ACTIVE_LEAVE}
         except EXPECTED_DATA_ERRORS:
             leave_policy = False
 
         try:
-            client.get_student_id()
+            client.get_student_profile()
             student_profile = True
         except EXPECTED_DATA_ERRORS:
             student_profile = False
 
         try:
-            parse_dormitory_response(client.get_dormitory())
+            client.get_dormitory_info()
             dormitory_schema = True
         except EXPECTED_DATA_ERRORS:
             dormitory_schema = False
 
         try:
-            client.get_transition_today()
+            client.get_transition()
             checkin_api = True
         except EXPECTED_DATA_ERRORS:
             checkin_api = False
@@ -283,17 +251,16 @@ class CheckinService:
             if delay:
                 self._sleep(delay)
             try:
-                transition = client.get_transition_today()
+                transition = client.get_transition()
             except EXPECTED_DATA_ERRORS:
                 continue
-            if transition and transition.get("qdzt") == "已签到":
+            if transition and transition.is_checked_in:
                 return True
         return False
 
-    def _submit_checkin(self, client: SwuClient, ctx: CheckinContext) -> CheckinStatus:
-        self._prepare_context(client, ctx)
-        payload = build_checkin_payload(ctx)
-        response_payload = client.submit_checkin_form(form_id=ctx.transition["formId"], payload=payload)
+    def _submit_checkin(self, client: SwuClient, submission: CheckinSubmission) -> CheckinStatus:
+        payload = _build_typed_checkin_payload(submission)
+        response_payload = client.submit_checkin_form(form_id=submission.transition.form_id, payload=payload)
         business_success = business_response_succeeded(response_payload)
         if self._confirm_checkin(client):
             return CheckinStatus.SUCCESS
@@ -305,19 +272,19 @@ class CheckinService:
 
     def _common_status(
         self, username: str, password: str
-    ) -> tuple[CheckinStatus | None, SwuClient | None, dict | None]:
+    ) -> tuple[CheckinStatus | None, SwuClient | None, Transition | None]:
         client = self._authenticated_client(username, password)
         if client is None:
             return CheckinStatus.LOGIN_FAILED, None, None
-        vacation_status = evaluate_vacation_records(client.get_leave_records())
+        vacation_status = client.get_leave_record_set().evaluate()
         if vacation_status is VacationStatus.UNKNOWN:
             return CheckinStatus.DATA_ERROR, client, None
         if vacation_status is VacationStatus.ACTIVE_LEAVE:
             return CheckinStatus.ON_LEAVE, client, None
-        transition = client.get_transition_today()
+        transition = client.get_transition()
         if not transition:
             return CheckinStatus.NO_TASK, client, None
-        if transition.get("qdzt") == "已签到":
+        if transition.is_checked_in:
             return CheckinStatus.ALREADY_CHECKED_IN, client, transition
         return None, client, transition
 
@@ -326,8 +293,10 @@ class CheckinService:
             status, client, transition = self._common_status(username, password)
             if status is not None:
                 return status
-            ctx = CheckinContext(transition=transition)
-            return self._submit_checkin(client, ctx)
+            if client is None or transition is None:
+                return CheckinStatus.DATA_ERROR
+            submission = self._prepare_context(client, transition)
+            return self._submit_checkin(client, submission)
         except (KeyboardInterrupt, SystemExit):
             raise
         except DormitorySchemaError:
@@ -341,7 +310,9 @@ class CheckinService:
             status, client, transition = self._common_status(username, password)
             if status is not None:
                 return status
-            self._prepare_context(client, CheckinContext(transition=transition))
+            if client is None or transition is None:
+                return CheckinStatus.DATA_ERROR
+            self._prepare_context(client, transition)
             return CheckinStatus.PROBE_PENDING
         except (KeyboardInterrupt, SystemExit):
             raise
@@ -392,7 +363,7 @@ def run_checkin(
     *,
     max_attempts: int = DEFAULT_MAX_ATTEMPTS,
     retry_delay: int = DEFAULT_RETRY_DELAY,
-    **service_options: Any,
+    **service_options: Unpack[ServiceOptions],
 ) -> CheckinResult:
     return CheckinService(timeout=timeout, **service_options).run_checkin(
         username,
@@ -402,5 +373,10 @@ def run_checkin(
     )
 
 
-def run_probe(username: str, password: str, timeout: int = 10, **service_options: Any) -> CheckinResult:
+def run_probe(
+    username: str,
+    password: str,
+    timeout: int = 10,
+    **service_options: Unpack[ServiceOptions],
+) -> CheckinResult:
     return CheckinService(timeout=timeout, **service_options).run_probe(username, password)

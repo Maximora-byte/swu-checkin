@@ -13,9 +13,9 @@ from .service import (
     EXPECTED_DATA_ERRORS,
     CheckinService,
     business_response_succeeded,
-    evaluate_vacation_records,
     parse_coordinate,
     parse_dormitory_data,
+    submission_from_legacy_context,
 )
 from .service import (
     run_checkin as run_checkin_result,
@@ -50,8 +50,9 @@ def _check_vacation_status(
     """Compatibility wrapper around the client and leave-policy evaluator."""
 
     try:
-        records = SwuClient(ctx.token, timeout).get_leave_records()
-        return evaluate_vacation_records(records, now=now)
+        if ctx.token is None:
+            return VacationStatus.UNKNOWN
+        return SwuClient(ctx.token, timeout).get_leave_record_set().evaluate(now=now)
     except EXPECTED_DATA_ERRORS:
         return VacationStatus.UNKNOWN
 
@@ -67,7 +68,10 @@ def _submit_checkin(ctx: CheckinContext, timeout: int) -> CheckinStatus:
     """Compatibility wrapper for a single prepared-context submission."""
 
     try:
-        return CheckinService(timeout=timeout)._submit_checkin(SwuClient(ctx.token, timeout), ctx)
+        if ctx.token is None:
+            return CheckinStatus.DATA_ERROR
+        submission = submission_from_legacy_context(ctx)
+        return CheckinService(timeout=timeout)._submit_checkin(SwuClient(ctx.token, timeout), submission)
     except EXPECTED_DATA_ERRORS:
         return CheckinStatus.DATA_ERROR
 
