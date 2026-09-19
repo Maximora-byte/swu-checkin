@@ -8,6 +8,7 @@ from swu_checkin.api_models import (
     DormitorySchemaError,
     LeaveRecord,
     LeaveRecords,
+    PendingTransition,
     StudentProfile,
     Transition,
 )
@@ -35,6 +36,7 @@ def test_normal_api_payloads_create_typed_models():
     assert profile.student_id == "20260000000"
     assert dormitory == DormitoryInfo(latitude=29.123, longitude=106.456, building="橘园", room="001")
     assert transition == Transition(record_id="record-1", form_id=42, checkin_status="未签到")
+    assert transition.require_pending() == PendingTransition(record_id="record-1", form_id=42)
     assert leave.approval_status == "已同意"
     assert leave.start is not None
     assert leave.end is not None
@@ -55,13 +57,25 @@ def test_student_profile_rejects_missing_or_wrong_fields(payload: object):
         StudentProfile.from_response(payload)
 
 
-@pytest.mark.parametrize("field", ["id", "formId", "qdzt"])
-def test_transition_rejects_missing_fields(field: str):
-    record: dict[str, object] = {"id": "record-1", "formId": "form-1", "qdzt": "未签到"}
-    del record[field]
-
+def test_transition_rejects_missing_status():
     with pytest.raises(ApiSchemaError):
-        Transition.from_record(record)
+        Transition.from_record({"id": "record-1", "formId": "form-1"})
+
+
+def test_terminal_transition_allows_status_only():
+    transition = Transition.from_record({"qdzt": "已签到"})
+
+    assert transition.is_checked_in is True
+    assert transition.record_id is None
+    assert transition.form_id is None
+
+
+@pytest.mark.parametrize("record", [{"qdzt": "未签到"}, {"id": "record-1", "qdzt": "未签到"}])
+def test_pending_transition_requires_both_submission_identifiers(record: object):
+    transition = Transition.from_record(record)
+
+    with pytest.raises(ApiSchemaError, match="missing id or form id"):
+        transition.require_pending()
 
 
 @pytest.mark.parametrize(
@@ -76,6 +90,12 @@ def test_transition_rejects_missing_fields(field: str):
 def test_transition_rejects_wrong_types_and_bool_identifiers(record: object):
     with pytest.raises(ApiSchemaError):
         Transition.from_record(record)
+
+
+@pytest.mark.parametrize("status", [" 已签到", "已签到 ", " 未签到 "])
+def test_transition_protocol_status_does_not_trim_whitespace(status: str):
+    with pytest.raises(ApiSchemaError, match="status is invalid"):
+        Transition.from_record({"qdzt": status})
 
 
 @pytest.mark.parametrize(
@@ -126,3 +146,13 @@ def test_valid_active_leave_still_wins_when_another_record_is_malformed():
     )
 
     assert records.evaluate(now=datetime(2026, 9, 19, 0, 30, tzinfo=UTC)) is VacationStatus.ACTIVE_LEAVE
+
+
+@pytest.mark.parametrize("approval_status", [" 已同意", "已同意 ", " 已同意 "])
+def test_leave_protocol_status_does_not_trim_whitespace(approval_status: str):
+    records = LeaveRecords.from_items(
+        [{"lcztmc": approval_status, "kssj": "2026-09-19 08:00", "jssj": "2026-09-19 10:00"}]
+    )
+
+    assert records.malformed is True
+    assert records.evaluate(now=datetime(2026, 9, 19, 0, 30, tzinfo=UTC)) is VacationStatus.UNKNOWN

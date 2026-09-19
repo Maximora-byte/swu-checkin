@@ -160,7 +160,7 @@ def submission_from_legacy_context(ctx: CheckinContext) -> CheckinSubmission:
         building=ctx.building.strip(),
         room=ctx.room.strip(),
     )
-    return CheckinSubmission(student=student, dormitory=dormitory, transition=transition)
+    return CheckinSubmission(student=student, dormitory=dormitory, transition=transition.require_pending())
 
 
 def build_checkin_payload(ctx: CheckinContext) -> dict[str, object]:
@@ -203,10 +203,11 @@ class CheckinService:
 
     @staticmethod
     def _prepare_context(client: SwuClient, transition: Transition) -> CheckinSubmission:
+        pending = transition.require_pending()
         return CheckinSubmission(
             student=client.get_student_profile(),
             dormitory=client.get_dormitory_info(),
-            transition=transition,
+            transition=pending,
         )
 
     def diagnose(self, username: str, password: str) -> DoctorReport:

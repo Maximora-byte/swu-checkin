@@ -40,6 +40,12 @@ def _required_text(value: object, *, label: str) -> str:
     return value.strip()
 
 
+def _required_protocol_token(value: object, *, label: str) -> str:
+    if not isinstance(value, str) or not value or value != value.strip():
+        raise ApiSchemaError(f"{label} is invalid")
+    return value
+
+
 def _identifier(value: object, *, label: str) -> str | int:
     if isinstance(value, bool) or not isinstance(value, (str, int)):
         raise ApiSchemaError(f"{label} has an invalid type")
@@ -125,8 +131,8 @@ class DormitoryInfo:
 
 @dataclass(frozen=True)
 class Transition:
-    record_id: str | int
-    form_id: str | int
+    record_id: str | int | None
+    form_id: str | int | None
     checkin_status: str
 
     @property
@@ -137,10 +143,15 @@ class Transition:
     def from_record(cls, payload: object) -> Transition:
         record = _mapping(payload, label="transition record")
         return cls(
-            record_id=_identifier(record.get("id"), label="transition id"),
-            form_id=_identifier(record.get("formId"), label="transition form id"),
-            checkin_status=_required_text(record.get("qdzt"), label="transition status"),
+            record_id=_identifier(record["id"], label="transition id") if "id" in record else None,
+            form_id=_identifier(record["formId"], label="transition form id") if "formId" in record else None,
+            checkin_status=_required_protocol_token(record.get("qdzt"), label="transition status"),
         )
+
+    def require_pending(self) -> PendingTransition:
+        if self.record_id is None or self.form_id is None:
+            raise ApiSchemaError("pending transition is missing id or form id")
+        return PendingTransition(record_id=self.record_id, form_id=self.form_id)
 
     @classmethod
     def from_response(cls, payload: object) -> Transition | None:
@@ -161,7 +172,7 @@ class LeaveRecord:
     @classmethod
     def from_payload(cls, payload: object) -> LeaveRecord:
         record = _mapping(payload, label="leave record")
-        approval_status = _required_text(record.get("lcztmc"), label="leave approval status")
+        approval_status = _required_protocol_token(record.get("lcztmc"), label="leave approval status")
         if approval_status != "已同意":
             return cls(approval_status=approval_status)
         start_raw = _required_text(record.get("kssj"), label="leave start")
@@ -213,7 +224,13 @@ class LeaveRecords:
 
 
 @dataclass(frozen=True)
+class PendingTransition:
+    record_id: str | int
+    form_id: str | int
+
+
+@dataclass(frozen=True)
 class CheckinSubmission:
     student: StudentProfile
     dormitory: DormitoryInfo
-    transition: Transition
+    transition: PendingTransition

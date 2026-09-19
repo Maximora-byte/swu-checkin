@@ -114,3 +114,13 @@ def test_client_typed_methods_validate_before_returning_models():
     assert client.get_dormitory_info() == DormitoryInfo(29.0, 106.0, "橘园", "001")
     assert client.get_transition() == Transition("record-1", "form-1", "未签到")
     assert client.get_leave_record_set() == LeaveRecords.from_items([{"lcztmc": "审核中"}])
+
+
+def test_client_transition_accepts_status_only_terminal_record():
+    session = Mock()
+    session.post.return_value = _response({"data": {"records": [{"qdzt": "已签到"}]}})
+
+    transition = SwuClient("token", session=session).get_transition()
+
+    assert transition == Transition(record_id=None, form_id=None, checkin_status="已签到")
+    assert transition.is_checked_in is True

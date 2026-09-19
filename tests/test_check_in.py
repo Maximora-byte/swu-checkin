@@ -86,13 +86,7 @@ class _FakeClient:
         value = self.get_transition_today()
         if value is None:
             return None
-        return Transition.from_record(
-            {
-                "id": value.get("id", "record-1"),
-                "formId": value.get("formId", "form-1"),
-                "qdzt": value.get("qdzt", "未签到"),
-            }
-        )
+        return Transition.from_record(value)
 
     def get_dormitory(self):
         return {"data": {"columnList": _dormitory(29, 106)}}
@@ -160,6 +154,28 @@ def test_submit_succeeds_only_after_readback():
 
     assert _service(client).check_in_once("student", "password") == CheckinStatus.SUCCESS
     assert client.submit_calls == 1
+
+
+def test_already_checked_in_transition_needs_only_status():
+    client = _FakeClient([{"qdzt": "已签到"}])
+
+    assert _service(client).check_in_once("student", "password") == CheckinStatus.ALREADY_CHECKED_IN
+    assert client.submit_calls == 0
+
+
+@pytest.mark.parametrize(
+    "pending",
+    [
+        {"qdzt": "未签到"},
+        {"id": "record-1", "qdzt": "未签到"},
+        {"formId": "form-1", "qdzt": "未签到"},
+    ],
+)
+def test_pending_transition_without_submission_ids_fails_closed(pending: dict[str, object]):
+    client = _FakeClient([pending])
+
+    assert _service(client).check_in_once("student", "password") == CheckinStatus.DATA_ERROR
+    assert client.submit_calls == 0
 
 
 @pytest.mark.parametrize(
