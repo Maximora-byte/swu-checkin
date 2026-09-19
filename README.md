@@ -89,13 +89,35 @@ uv sync --locked --no-dev --python 3.13
 安装后可直接使用命令行工具：
 
 ```bash
-# 设置环境变量后运行
-export SWUDK_USERNAME="你的学号"
-export SWUDK_PASSWORD="你的密码"
-swu-checkin
+# 首次使用：交互验证账号和只读接口，不保存密码
+swu-checkin setup
+
+# 只读诊断运行环境、认证和接口
+swu-checkin doctor
+
+# 查看最近一次本地运行状态（不发网络请求）
+swu-checkin status
+
+# 明确执行正式签到
+swu-checkin run
+
+# 只读检测，不提交签到
+swu-checkin probe
 ```
 
-本地交互运行时也可以直接执行 `swu-checkin`；如果未设置上述环境变量，程序会分别通过 `input()` 和 `getpass()` 安全询问账号与密码。GitHub Actions、systemd 等无人值守部署必须通过 Secrets 或受限环境文件提供凭据。
+`setup` 只通过现有 probe 验证凭据和接口。本版本尚未实现跨平台安全 credential store，因此不会把密码写入 JSON、TOML、YAML 或其他配置文件。自动化部署仍应使用 GitHub Secrets 或权限受限的 systemd 环境文件。
+
+也可以先设置环境变量，避免 `run`、`probe` 和 `doctor` 重复询问凭据：
+
+```bash
+export SWUDK_USERNAME="你的学号"
+export SWUDK_PASSWORD="你的密码"
+swu-checkin run
+```
+
+如果未设置上述环境变量，程序会分别通过 `input()` 和 `getpass()` 安全询问账号与密码。GitHub Actions、systemd 等无人值守部署必须通过 Secrets 或受限环境文件提供凭据。
+
+原有命令全部保持兼容：不带子命令的 `swu-checkin` 等价于正式签到，旧 `--probe` 和 JSON 参数仍可使用。
 
 只验证登录与任务读取、不执行签到：
 
@@ -110,6 +132,8 @@ swu-checkin --probe
 ```bash
 swu-checkin --json
 swu-checkin --probe --json
+swu-checkin run --json
+swu-checkin probe --json
 ```
 
 JSON 模式的 stdout 只包含一个 `schema_version=1` JSON document；重试和诊断信息写入 stderr。退出码与人类可读模式完全一致。

@@ -6,6 +6,7 @@ import json
 import math
 import time
 from collections.abc import Callable
+from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
@@ -33,6 +34,16 @@ EXPECTED_DATA_ERRORS = (
 
 class DormitorySchemaError(ValueError):
     """The dormitory response cannot be interpreted without ambiguity."""
+
+
+@dataclass(frozen=True)
+class DoctorReport:
+    """Non-sensitive results from read-only SWU diagnostics."""
+
+    authentication: bool
+    student_profile: bool
+    dormitory_schema: bool
+    checkin_api: bool
 
 
 def evaluate_vacation_records(
@@ -122,6 +133,20 @@ def parse_dormitory_data(dormitory_list: list[dict[str, object]]) -> tuple[dict[
     return coordinates, building.strip(), room.strip()
 
 
+def parse_dormitory_response(dormitory: object) -> tuple[dict[str, float], str, str]:
+    """Validate the response envelope before parsing its non-sensitive schema."""
+
+    if not isinstance(dormitory, dict):
+        raise DormitorySchemaError("dormitory response is not an object")
+    data = dormitory.get("data")
+    if not isinstance(data, dict):
+        raise DormitorySchemaError("dormitory response is missing data")
+    column_list = data.get("columnList")
+    if not isinstance(column_list, list):
+        raise DormitorySchemaError("dormitory columns are invalid")
+    return parse_dormitory_data(column_list)
+
+
 def business_response_succeeded(payload: object) -> bool:
     """Return true only when the response contains an explicit success signal."""
 
@@ -207,13 +232,7 @@ class CheckinService:
     def _prepare_context(self, client: SwuClient, ctx: CheckinContext) -> None:
         if not ctx.has_dormitory_info():
             dormitory = client.get_dormitory()
-            data = dormitory.get("data")
-            if not isinstance(data, dict):
-                raise DormitorySchemaError("dormitory response is missing data")
-            column_list = data.get("columnList")
-            if not isinstance(column_list, list):
-                raise DormitorySchemaError("dormitory columns are invalid")
-            location, building, room = parse_dormitory_data(column_list)
+            location, building, room = parse_dormitory_response(dormitory)
             ctx.dormitory_data = dormitory
             ctx.building = building
             ctx.room = room
@@ -221,6 +240,36 @@ class CheckinService:
             ctx.longitude = location["longitude"]
         if not ctx.has_student_id():
             ctx.student_id = client.get_student_id()
+
+    def diagnose(self, username: str, password: str) -> DoctorReport:
+        """Run staged read-only diagnostics without reaching the submit endpoint."""
+
+        try:
+            client = self._authenticated_client(username, password)
+        except EXPECTED_DATA_ERRORS:
+            client = None
+        if client is None:
+            return DoctorReport(False, False, False, False)
+
+        try:
+            client.get_student_id()
+            student_profile = True
+        except EXPECTED_DATA_ERRORS:
+            student_profile = False
+
+        try:
+            parse_dormitory_response(client.get_dormitory())
+            dormitory_schema = True
+        except EXPECTED_DATA_ERRORS:
+            dormitory_schema = False
+
+        try:
+            client.get_transition_today()
+            checkin_api = True
+        except EXPECTED_DATA_ERRORS:
+            checkin_api = False
+
+        return DoctorReport(True, student_profile, dormitory_schema, checkin_api)
 
     def _confirm_checkin(self, client: SwuClient) -> bool:
         for delay in (0, 0.3, 0.6, 1.0):
