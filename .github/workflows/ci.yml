@@ -114,7 +114,8 @@ jobs:
       - name: Python ctypes DPAPI TokenStore 检查
         shell: powershell
         run: |
-          $python = Join-Path $env:UV_PROJECT_ENVIRONMENT "Scripts\python.exe"
+          $venv = Join-Path $env:RUNNER_TEMP "swu-checkin-locked-venv"
+          $python = Join-Path $venv "Scripts\python.exe"
           & $python .\tests\windows\python_dpapi_smoke.py
           if ($LASTEXITCODE -ne 0) { throw "Python DPAPI TokenStore smoke failed." }
 
