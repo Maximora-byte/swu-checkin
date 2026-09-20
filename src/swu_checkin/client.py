@@ -19,6 +19,10 @@ LEAVE_PAGE_SIZE = 100
 MAX_LEAVE_PAGES = 20
 
 
+class SessionExpiredError(requests.RequestException):
+    """An authenticated endpoint explicitly rejected the current session."""
+
+
 class SwuClient:
     """Small authenticated HTTP client with no check-in policy decisions."""
 
@@ -37,11 +41,20 @@ class SwuClient:
 
     @staticmethod
     def _json_object(response: requests.Response, *, label: str) -> dict[str, object]:
-        response.raise_for_status()
+        try:
+            response.raise_for_status()
+        except requests.HTTPError as error:
+            if response.status_code in {401, 403}:
+                raise SessionExpiredError(response=response) from error
+            raise
         payload: object = response.json()
         if not isinstance(payload, dict) or not all(isinstance(key, str) for key in payload):
             raise ValueError(f"{label} response is not an object")
-        return cast("dict[str, object]", payload)
+        parsed = cast("dict[str, object]", payload)
+        code = parsed.get("code")
+        if isinstance(code, (str, int)) and str(code).strip() in {"401", "403"}:
+            raise SessionExpiredError(response=response)
+        return parsed
 
     def _student_payload(self) -> dict[str, object]:
         response = self._session.get(
