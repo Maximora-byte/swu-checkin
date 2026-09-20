@@ -13,6 +13,7 @@ from swu_checkin.client import (
     MAX_LEAVE_PAGES,
     TRANSITION_TODAY_URL,
     USER_INFO_URL,
+    SessionExpiredError,
     SwuClient,
 )
 from swu_checkin.status import VacationStatus
@@ -198,6 +199,35 @@ def test_client_propagates_http_errors_without_logging_token(capsys):
 
     captured = capsys.readouterr()
     assert "never-print-this-token" not in captured.out + captured.err
+
+
+@pytest.mark.parametrize("code", [401, 403, "401", "403"])
+def test_client_recognizes_business_session_expiry_before_schema_parsing(code: int | str):
+    session = Mock()
+    session.get.return_value = _response({"code": code, "data": None, "msg": "session rejected"})
+
+    with pytest.raises(SessionExpiredError):
+        SwuClient("stale-token", session=session).get_student_id()
+
+
+@pytest.mark.parametrize("status_code", [401, 403])
+def test_client_recognizes_http_session_expiry(status_code: int):
+    session = Mock()
+    response = _response({})
+    response.status_code = status_code
+    response.raise_for_status.side_effect = requests.HTTPError(response=response)
+    session.get.return_value = response
+
+    with pytest.raises(SessionExpiredError):
+        SwuClient("stale-token", session=session).get_student_id()
+
+
+def test_non_auth_business_code_remains_a_schema_error():
+    session = Mock()
+    session.get.return_value = _response({"code": 500, "data": None, "msg": "unexpected response"})
+
+    with pytest.raises(ApiSchemaError):
+        SwuClient("token", session=session).get_student_id()
 
 
 def test_client_typed_methods_validate_before_returning_models():

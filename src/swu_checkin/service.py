@@ -23,7 +23,7 @@ from .api_models import (
 )
 from .auth import AuthError, AuthFailureReason, auth_failure_status
 from .cache import CheckinContext
-from .client import SwuClient
+from .client import SessionExpiredError, SwuClient
 from .get_info import authenticate_token
 from .models import CheckinResult
 from .status import CheckinStatus, VacationStatus, status_message
@@ -53,6 +53,14 @@ class _AttemptOutcome:
 
     status: CheckinStatus
     retryable: bool
+
+
+@dataclass(frozen=True)
+class _AuthenticatedSession:
+    """An authenticated client and whether it came from the token cache."""
+
+    client: SwuClient
+    from_cache: bool
 
 
 @dataclass(frozen=True)
@@ -244,6 +252,8 @@ class CheckinService:
         client = self._client_factory(token, self.timeout)
         try:
             student_id = client.get_student_id()
+        except SessionExpiredError:
+            raise _TokenInvalid from None
         except requests.exceptions.HTTPError as error:
             status_code = error.response.status_code if error.response is not None else None
             if status_code in {401, 403}:
@@ -265,14 +275,14 @@ class CheckinService:
             raise AuthError(AuthFailureReason.TOKEN_EXCHANGE_FAILED) from None
         return client, student_id
 
-    def _authenticated_client(
+    def _authenticated_session(
         self,
         username: str,
         password: str,
         *,
         read_token_cache: bool = True,
         write_token_cache: bool = True,
-    ) -> SwuClient:
+    ) -> _AuthenticatedSession:
         cached = None
         if read_token_cache:
             try:
@@ -286,7 +296,7 @@ class CheckinService:
                 self._delete_cached_token(username)
             else:
                 if student_id == cached.student_id == username:
-                    return client
+                    return _AuthenticatedSession(client=client, from_cache=True)
                 self._delete_cached_token(username)
 
         token = self._token_provider(username, password, self.timeout)
@@ -303,7 +313,22 @@ class CheckinService:
                 self._token_store.save(username, token, student_id)
             except (OSError, TokenStoreError):
                 pass
-        return client
+        return _AuthenticatedSession(client=client, from_cache=False)
+
+    def _authenticated_client(
+        self,
+        username: str,
+        password: str,
+        *,
+        read_token_cache: bool = True,
+        write_token_cache: bool = True,
+    ) -> SwuClient:
+        return self._authenticated_session(
+            username,
+            password,
+            read_token_cache=read_token_cache,
+            write_token_cache=write_token_cache,
+        ).client
 
     @staticmethod
     def _prepare_context(client: SwuClient, transition: Transition) -> CheckinSubmission:
@@ -392,10 +417,9 @@ class CheckinService:
             self._diagnostic("签到接口未返回明确成功状态，且服务端状态未变更")
         return CheckinStatus.DATA_ERROR
 
-    def _common_status(
-        self, username: str, password: str
-    ) -> tuple[CheckinStatus | None, SwuClient | None, Transition | None]:
-        client = self._authenticated_client(username, password)
+    def _prepare_pre_submit_with_client(
+        self, client: SwuClient
+    ) -> tuple[CheckinStatus | None, SwuClient, CheckinSubmission | None]:
         vacation_status = client.get_leave_record_set().evaluate()
         if vacation_status is VacationStatus.UNKNOWN:
             return CheckinStatus.DATA_ERROR, client, None
@@ -405,17 +429,42 @@ class CheckinService:
         if not transition:
             return CheckinStatus.NO_TASK, client, None
         if transition.is_checked_in:
-            return CheckinStatus.ALREADY_CHECKED_IN, client, transition
-        return None, client, transition
+            return CheckinStatus.ALREADY_CHECKED_IN, client, None
+        return None, client, self._prepare_context(client, transition)
+
+    def _prepare_pre_submit(
+        self,
+        username: str,
+        password: str,
+        *,
+        allow_cached_session_recovery: bool,
+    ) -> tuple[CheckinStatus | None, SwuClient, CheckinSubmission | None]:
+        session = self._authenticated_session(username, password)
+        try:
+            return self._prepare_pre_submit_with_client(session.client)
+        except SessionExpiredError:
+            if not session.from_cache or not allow_cached_session_recovery:
+                raise AuthError(AuthFailureReason.TOKEN_EXCHANGE_FAILED) from None
+
+        self._delete_cached_token(username)
+        fresh = self._authenticated_session(username, password, read_token_cache=False)
+        try:
+            return self._prepare_pre_submit_with_client(fresh.client)
+        except SessionExpiredError:
+            self._delete_cached_token(username)
+            raise AuthError(AuthFailureReason.TOKEN_EXCHANGE_FAILED) from None
 
     def _check_in_attempt(self, username: str, password: str) -> _AttemptOutcome:
         try:
-            status, client, transition = self._common_status(username, password)
+            status, client, submission = self._prepare_pre_submit(
+                username,
+                password,
+                allow_cached_session_recovery=True,
+            )
             if status is not None:
                 return self._status_outcome(status)
-            if client is None or transition is None:
+            if submission is None:
                 return _AttemptOutcome(CheckinStatus.DATA_ERROR, retryable=False)
-            submission = self._prepare_context(client, transition)
             return self._status_outcome(self._submit_checkin(client, submission))
         except (KeyboardInterrupt, SystemExit):
             raise
@@ -436,12 +485,15 @@ class CheckinService:
 
     def probe_once(self, username: str, password: str) -> CheckinStatus:
         try:
-            status, client, transition = self._common_status(username, password)
+            status, _client, submission = self._prepare_pre_submit(
+                username,
+                password,
+                allow_cached_session_recovery=False,
+            )
             if status is not None:
                 return status
-            if client is None or transition is None:
+            if submission is None:
                 return CheckinStatus.DATA_ERROR
-            self._prepare_context(client, transition)
             return CheckinStatus.PROBE_PENDING
         except (KeyboardInterrupt, SystemExit):
             raise

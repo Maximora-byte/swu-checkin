@@ -1,13 +1,15 @@
+import json
 import stat
 from pathlib import Path
-from unittest.mock import Mock
+from unittest.mock import ANY, Mock
 
 import pytest
 import requests
 
 from swu_checkin import token_store
-from swu_checkin.api_models import DormitoryInfo, LeaveRecords, StudentProfile
+from swu_checkin.api_models import ApiSchemaError, DormitoryInfo, LeaveRecords, StudentProfile, Transition
 from swu_checkin.auth import AuthError, AuthFailureReason
+from swu_checkin.client import SessionExpiredError
 from swu_checkin.service import CheckinService
 from swu_checkin.status import CheckinStatus
 from swu_checkin.token_store import CachedToken, TokenStore, TokenStoreError
@@ -36,6 +38,17 @@ def _diagnostic_client() -> Mock:
     client.get_student_profile.return_value = StudentProfile("20260000000")
     client.get_dormitory_info.return_value = DormitoryInfo(29.0, 106.0, "building", "room")
     client.get_transition.return_value = None
+    return client
+
+
+def _pending_client() -> Mock:
+    client = Mock()
+    client.get_student_id.return_value = "20260000000"
+    client.get_leave_record_set.return_value = LeaveRecords.from_items([])
+    client.get_student_profile.return_value = StudentProfile("20260000000")
+    client.get_dormitory_info.return_value = DormitoryInfo(29.0, 106.0, "building", "room")
+    client.get_transition.return_value = Transition("record", "form", "未签到")
+    client.submit_checkin_form.return_value = {"code": 200}
     return client
 
 
@@ -344,4 +357,145 @@ def test_normal_run_and_probe_still_use_valid_cache(method_name: str):
 
     assert status is CheckinStatus.NO_TASK
     store.get.assert_called_once_with("20260000000")
+    login.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "failing_method",
+    ["get_leave_record_set", "get_transition", "get_student_profile", "get_dormitory_info"],
+)
+def test_cached_session_expiry_during_pre_submit_fresh_authenticates_once(failing_method: str):
+    store = Mock()
+    store.get.return_value = CachedToken("cached-token", "20260000000")
+    cached_client = _pending_client()
+    getattr(cached_client, failing_method).side_effect = SessionExpiredError()
+    fresh_client = _pending_client()
+    fresh_client.get_transition.side_effect = [
+        Transition("record", "form", "未签到"),
+        Transition(None, None, "已签到"),
+    ]
+    clients = iter([cached_client, fresh_client])
+    login = Mock(return_value="fresh-token")
+    service = CheckinService(
+        token_provider=login,
+        client_factory=lambda *_args: next(clients),
+        token_store=store,
+    )
+
+    assert service.check_in_once("20260000000", "password") is CheckinStatus.SUCCESS
+    store.delete.assert_called_once_with("20260000000")
+    login.assert_called_once_with("20260000000", "password", 10)
+    store.save.assert_called_once_with("20260000000", "fresh-token", "20260000000")
+    cached_client.submit_checkin_form.assert_not_called()
+    fresh_client.submit_checkin_form.assert_called_once_with(
+        form_id="form",
+        payload=ANY,
+    )
+
+
+def test_fresh_auth_failure_after_cached_session_expiry_is_terminal():
+    store = Mock()
+    store.get.return_value = CachedToken("cached-token", "20260000000")
+    cached_client = _pending_client()
+    cached_client.get_leave_record_set.side_effect = SessionExpiredError()
+    login = Mock(side_effect=AuthError(AuthFailureReason.CREDENTIAL_REJECTED))
+    service = CheckinService(
+        token_provider=login,
+        client_factory=lambda *_args: cached_client,
+        token_store=store,
+    )
+
+    assert service.check_in_once("20260000000", "password") is CheckinStatus.LOGIN_FAILED
+    store.delete.assert_called_once_with("20260000000")
+    login.assert_called_once_with("20260000000", "password", 10)
+    cached_client.submit_checkin_form.assert_not_called()
+
+
+def test_fresh_session_expiry_after_cache_fallback_is_terminal_without_loop():
+    store = Mock()
+    store.get.return_value = CachedToken("cached-token", "20260000000")
+    cached_client = _pending_client()
+    cached_client.get_leave_record_set.side_effect = SessionExpiredError()
+    fresh_client = _pending_client()
+    fresh_client.get_leave_record_set.side_effect = SessionExpiredError()
+    clients = iter([cached_client, fresh_client])
+    login = Mock(return_value="fresh-token")
+    service = CheckinService(
+        token_provider=login,
+        client_factory=lambda *_args: next(clients),
+        token_store=store,
+    )
+
+    assert service.check_in_once("20260000000", "password") is CheckinStatus.DATA_ERROR
+    assert store.delete.call_count == 2
+    login.assert_called_once_with("20260000000", "password", 10)
+    fresh_client.submit_checkin_form.assert_not_called()
+
+
+def test_probe_does_not_evict_stale_cached_token():
+    store = Mock()
+    store.get.return_value = CachedToken("cached-token", "20260000000")
+    cached_client = _pending_client()
+    cached_client.get_leave_record_set.side_effect = SessionExpiredError()
+    login = Mock()
+    service = CheckinService(
+        token_provider=login,
+        client_factory=lambda *_args: cached_client,
+        token_store=store,
+    )
+
+    assert service.probe_once("20260000000", "password") is CheckinStatus.DATA_ERROR
+    store.delete.assert_not_called()
+    store.save.assert_not_called()
+    login.assert_not_called()
+    cached_client.submit_checkin_form.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "failure",
+    [
+        ApiSchemaError("malformed"),
+        json.JSONDecodeError("unexpected JSON", "", 0),
+        requests.Timeout("timeout"),
+    ],
+)
+def test_non_session_pre_submit_failures_do_not_evict_cache_or_fresh_auth(failure: Exception):
+    store = Mock()
+    store.get.return_value = CachedToken("cached-token", "20260000000")
+    cached_client = _pending_client()
+    cached_client.get_leave_record_set.side_effect = failure
+    login = Mock()
+    service = CheckinService(
+        token_provider=login,
+        client_factory=lambda *_args: cached_client,
+        token_store=store,
+    )
+
+    assert service.check_in_once("20260000000", "password") is CheckinStatus.DATA_ERROR
+    store.delete.assert_not_called()
+    login.assert_not_called()
+    cached_client.submit_checkin_form.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "submit_error",
+    [requests.Timeout("timeout"), requests.ConnectionError("reset"), _http_error(503)],
+)
+def test_ambiguous_submit_never_evicts_cache_or_fresh_authenticates(submit_error: Exception):
+    store = Mock()
+    store.get.return_value = CachedToken("cached-token", "20260000000")
+    cached_client = _pending_client()
+    cached_client.get_transition.side_effect = [Transition("record", "form", "未签到")] * 5
+    cached_client.submit_checkin_form.side_effect = submit_error
+    login = Mock()
+    service = CheckinService(
+        token_provider=login,
+        client_factory=lambda *_args: cached_client,
+        token_store=store,
+        sleep=Mock(),
+    )
+
+    assert service.check_in_once("20260000000", "password") is CheckinStatus.DATA_ERROR
+    cached_client.submit_checkin_form.assert_called_once()
+    store.delete.assert_not_called()
     login.assert_not_called()
