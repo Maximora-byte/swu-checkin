@@ -67,9 +67,9 @@ def test_lock_file_contains_no_sensitive_runtime_data(tmp_path):
     path = tmp_path / "checkin.lock"
 
     with RuntimeLock(path):
-        content = path.read_bytes()
+        pass
 
-    assert content in {b"", b"\0"}
+    assert path.read_bytes() in {b"", b"\0"}
 
 
 @pytest.mark.skipif(os.name != "nt", reason="Windows default lock domain")
