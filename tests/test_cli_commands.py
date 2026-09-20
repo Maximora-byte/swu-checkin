@@ -14,11 +14,12 @@ def _result(status: CheckinStatus, *, mode: str) -> CheckinResult:
 
 
 @pytest.fixture(autouse=True)
-def clean_environment(monkeypatch: pytest.MonkeyPatch):
+def clean_environment(monkeypatch: pytest.MonkeyPatch, tmp_path):
     monkeypatch.delenv("SWUDK_USERNAME", raising=False)
     monkeypatch.delenv("SWUDK_PASSWORD", raising=False)
     monkeypatch.delenv("SWUDK_PROBE_ONLY", raising=False)
     monkeypatch.delenv("SWUDK_STATUS_FILE", raising=False)
+    monkeypatch.setenv("SWUDK_LOCK_FILE", str(tmp_path / "checkin.lock"))
 
 
 def test_setup_uses_complete_read_only_diagnostics_and_never_prints_password(monkeypatch, capsys):
@@ -189,3 +190,35 @@ def test_subcommand_json_keeps_schema_v1(monkeypatch, capsys, command, mode):
     assert set(payload) == {"schema_version", "mode", "status", "code", "message", "attempts", "duration_ms"}
     assert payload["schema_version"] == 1
     assert payload["mode"] == mode
+
+
+@pytest.mark.parametrize("command", ["setup", "doctor", "status", "probe"])
+def test_non_formal_commands_never_construct_runtime_lock(monkeypatch, tmp_path, command):
+    monkeypatch.setattr(cli, "RuntimeLock", lambda: pytest.fail(f"{command} must remain unlocked"))
+    monkeypatch.setattr(cli, "_setup", lambda: 0)
+    monkeypatch.setattr(cli, "_doctor", lambda: 0)
+    monkeypatch.setattr(cli, "_status", lambda _path: 0)
+    monkeypatch.setenv("SWUDK_USERNAME", "student")
+    monkeypatch.setenv("SWUDK_PASSWORD", "password")
+    monkeypatch.setattr(
+        cli,
+        "run_probe",
+        lambda *_args, **_kwargs: _result(CheckinStatus.PROBE_PENDING, mode="probe"),
+    )
+
+    arguments = ["status", "--file", str(tmp_path / "status.json")] if command == "status" else [command]
+    assert cli.main(arguments) == 0
+
+
+def test_probe_only_environment_keeps_legacy_path_unlocked(monkeypatch):
+    monkeypatch.setenv("SWUDK_PROBE_ONLY", "1")
+    monkeypatch.setenv("SWUDK_USERNAME", "student")
+    monkeypatch.setenv("SWUDK_PASSWORD", "password")
+    monkeypatch.setattr(cli, "RuntimeLock", lambda: pytest.fail("SWUDK_PROBE_ONLY path must remain unlocked"))
+    monkeypatch.setattr(
+        cli,
+        "run_probe",
+        lambda *_args, **_kwargs: _result(CheckinStatus.PROBE_PENDING, mode="probe"),
+    )
+
+    assert cli.main([]) == 0

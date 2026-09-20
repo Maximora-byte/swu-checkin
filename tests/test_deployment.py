@@ -38,6 +38,8 @@ def test_checkin_service_uses_dedicated_account_and_private_state():
     assert "Group=swu-checkin" in unit
     assert "StateDirectory=swu-checkin" in unit
     assert "StateDirectoryMode=0770" in unit
+    assert "Environment=SWUDK_LOCK_FILE=/var/lib/swu-checkin/checkin.lock" in unit
+    assert "SWUDK_LOCK_FILE" not in probe
     assert "User=swu-checkin" in probe
     assert "Group=swu-checkin" in probe
 
