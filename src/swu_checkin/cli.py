@@ -12,11 +12,14 @@ from pathlib import Path
 from typing import TextIO
 
 from .models import CheckinResult
+from .runtime_lock import RuntimeLock, RuntimeLockError
 from .service import DEFAULT_MAX_ATTEMPTS, DEFAULT_RETRY_DELAY, CheckinService, DoctorReport, run_checkin, run_probe
 from .status import SUCCESSFUL_CHECKIN_STATUSES, SUCCESSFUL_PROBE_STATUSES, CheckinStatus
 from .storage import StatusStorageError, load_run_status, record_run_status
 
 DEFAULT_STATUS_FILE = "/var/lib/swu-checkin/status.json"
+LOCK_BUSY_MESSAGE = "已有签到任务正在运行，本次跳过。"
+LOCK_ERROR_MESSAGE = "无法安全获取签到运行锁，本次未执行。"
 
 
 def _env_int(name: str, default: int) -> int:
@@ -240,7 +243,21 @@ def main(argv: list[str] | None = None) -> int:
     command_json = getattr(args, "command_json", False)
     json_output = args.json_output or command_json
     probe_only = args.command == "probe" or (args.command is None and (args.probe or probe_environment))
-    return _execute(probe_only=probe_only, json_output=json_output)
+    if probe_only:
+        return _execute(probe_only=True, json_output=json_output)
+
+    lock = RuntimeLock()
+    try:
+        if not lock.acquire():
+            print(LOCK_BUSY_MESSAGE, file=sys.stderr)
+            return 0
+    except RuntimeLockError:
+        print(LOCK_ERROR_MESSAGE, file=sys.stderr)
+        return 1
+    try:
+        return _execute(probe_only=False, json_output=json_output)
+    finally:
+        lock.release()
 
 
 if __name__ == "__main__":

@@ -16,6 +16,7 @@ Environment=PYTHONDONTWRITEBYTECODE=1
 Environment=SWUDK_MAX_ATTEMPTS=3
 Environment=SWUDK_RETRY_DELAY=8
 Environment=SWUDK_STATUS_FILE=/var/lib/swu-checkin/status.json
+Environment=SWUDK_LOCK_FILE=/var/lib/swu-checkin/checkin.lock
 ExecStart=/opt/swu-checkin/.venv/bin/swu-checkin
 StateDirectory=swu-checkin
 StateDirectoryMode=0770

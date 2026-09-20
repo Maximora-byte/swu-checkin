@@ -16,6 +16,7 @@ from swu_checkin.check_in import (
 from swu_checkin.client import SwuClient
 from swu_checkin.models import CheckinResult
 from swu_checkin.notify import _build_message
+from swu_checkin.runtime_lock import RuntimeLock
 from swu_checkin.service import EXPECTED_DATA_ERRORS, CheckinService, DormitorySchemaError, evaluate_vacation_records
 from swu_checkin.status import CheckinStatus, VacationStatus, is_successful_checkin_status
 
@@ -406,11 +407,16 @@ def test_statuses_1_2_5_are_successful_terminal_states(status: CheckinStatus):
 
 
 @pytest.mark.parametrize("status", [CheckinStatus.SUCCESS, CheckinStatus.ALREADY_CHECKED_IN, CheckinStatus.ON_LEAVE])
-def test_cli_exits_zero_for_statuses_1_2_5(monkeypatch: pytest.MonkeyPatch, status: CheckinStatus):
+def test_cli_exits_zero_for_statuses_1_2_5(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path,
+    status: CheckinStatus,
+):
     monkeypatch.setenv("SWUDK_USERNAME", "student")
     monkeypatch.setenv("SWUDK_PASSWORD", "secret")
     monkeypatch.delenv("SWUDK_PROBE_ONLY", raising=False)
     monkeypatch.delenv("SWUDK_STATUS_FILE", raising=False)
+    monkeypatch.setenv("SWUDK_LOCK_FILE", str(tmp_path / "checkin.lock"))
     monkeypatch.setattr(
         "swu_checkin.cli.run_checkin",
         lambda *_args, **_kwargs: CheckinResult.from_status(status, attempts=1, duration_ms=0, mode="checkin"),
@@ -419,6 +425,24 @@ def test_cli_exits_zero_for_statuses_1_2_5(monkeypatch: pytest.MonkeyPatch, stat
     from swu_checkin.check_in import main
 
     assert main() == 0
+
+
+def test_legacy_formal_main_uses_the_same_runtime_lock(monkeypatch: pytest.MonkeyPatch, tmp_path, capsys):
+    lock_path = tmp_path / "checkin.lock"
+    monkeypatch.setenv("SWUDK_LOCK_FILE", str(lock_path))
+    monkeypatch.setattr(
+        "swu_checkin.cli.run_checkin",
+        lambda *_args, **_kwargs: pytest.fail("legacy busy path must not use SWU"),
+    )
+
+    from swu_checkin.check_in import main
+
+    with RuntimeLock(lock_path):
+        assert main() == 0
+
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert "已有签到任务正在运行，本次跳过" in captured.err
 
 
 def test_status_record_preserves_an_earlier_success(tmp_path):

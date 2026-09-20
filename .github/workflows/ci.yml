@@ -111,6 +111,15 @@ jobs:
             Rename-Item -LiteralPath $hiddenSourcePath -NewName "src"
           }
 
+      - name: Windows 跨进程运行锁检查
+        shell: powershell
+        run: |
+          $env:PYTHONUTF8 = "1"
+          uv sync --locked --all-groups --python 3.13
+          if ($LASTEXITCODE -ne 0) { throw "Windows runtime lock test environment installation failed." }
+          uv run --locked pytest -q .\tests\test_runtime_lock.py
+          if ($LASTEXITCODE -ne 0) { throw "Windows runtime lock subprocess test failed." }
+
       - name: Python ctypes DPAPI TokenStore 检查
         shell: powershell
         run: |
