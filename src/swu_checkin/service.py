@@ -433,13 +433,17 @@ class CheckinService:
         return None, client, self._prepare_context(client, transition)
 
     def _prepare_pre_submit(
-        self, username: str, password: str
+        self,
+        username: str,
+        password: str,
+        *,
+        allow_cached_session_recovery: bool,
     ) -> tuple[CheckinStatus | None, SwuClient, CheckinSubmission | None]:
         session = self._authenticated_session(username, password)
         try:
             return self._prepare_pre_submit_with_client(session.client)
         except SessionExpiredError:
-            if not session.from_cache:
+            if not session.from_cache or not allow_cached_session_recovery:
                 raise AuthError(AuthFailureReason.TOKEN_EXCHANGE_FAILED) from None
 
         self._delete_cached_token(username)
@@ -452,7 +456,11 @@ class CheckinService:
 
     def _check_in_attempt(self, username: str, password: str) -> _AttemptOutcome:
         try:
-            status, client, submission = self._prepare_pre_submit(username, password)
+            status, client, submission = self._prepare_pre_submit(
+                username,
+                password,
+                allow_cached_session_recovery=True,
+            )
             if status is not None:
                 return self._status_outcome(status)
             if submission is None:
@@ -477,7 +485,11 @@ class CheckinService:
 
     def probe_once(self, username: str, password: str) -> CheckinStatus:
         try:
-            status, _client, submission = self._prepare_pre_submit(username, password)
+            status, _client, submission = self._prepare_pre_submit(
+                username,
+                password,
+                allow_cached_session_recovery=False,
+            )
             if status is not None:
                 return status
             if submission is None:

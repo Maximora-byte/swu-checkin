@@ -432,6 +432,25 @@ def test_fresh_session_expiry_after_cache_fallback_is_terminal_without_loop():
     fresh_client.submit_checkin_form.assert_not_called()
 
 
+def test_probe_does_not_evict_stale_cached_token():
+    store = Mock()
+    store.get.return_value = CachedToken("cached-token", "20260000000")
+    cached_client = _pending_client()
+    cached_client.get_leave_record_set.side_effect = SessionExpiredError()
+    login = Mock()
+    service = CheckinService(
+        token_provider=login,
+        client_factory=lambda *_args: cached_client,
+        token_store=store,
+    )
+
+    assert service.probe_once("20260000000", "password") is CheckinStatus.DATA_ERROR
+    store.delete.assert_not_called()
+    store.save.assert_not_called()
+    login.assert_not_called()
+    cached_client.submit_checkin_form.assert_not_called()
+
+
 @pytest.mark.parametrize(
     "failure",
     [
