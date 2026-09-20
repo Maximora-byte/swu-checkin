@@ -2,6 +2,7 @@ import os
 import subprocess
 import sys
 import textwrap
+from pathlib import Path
 
 import pytest
 
@@ -78,6 +79,41 @@ def test_windows_default_lock_path_is_shared_under_local_appdata(monkeypatch, tm
     monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
 
     assert default_lock_path() == tmp_path / "SWUCheckin" / "checkin.lock"
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX default lock domain")
+def test_posix_default_ignores_existing_deployment_state_directory(monkeypatch, tmp_path):
+    monkeypatch.delenv("SWUDK_LOCK_FILE", raising=False)
+    monkeypatch.delenv("XDG_RUNTIME_DIR", raising=False)
+    monkeypatch.setattr("swu_checkin.runtime_lock.Path.is_dir", lambda _path: True)
+    monkeypatch.setattr("swu_checkin.runtime_lock.tempfile.gettempdir", lambda: str(tmp_path))
+
+    assert default_lock_path() == tmp_path / f"swu-checkin-{os.getuid()}.lock"
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX explicit systemd lock path")
+def test_posix_explicit_lock_override_keeps_systemd_path(monkeypatch):
+    systemd_path = "/var/lib/swu-checkin/checkin.lock"
+    monkeypatch.setenv("SWUDK_LOCK_FILE", systemd_path)
+
+    assert default_lock_path() == Path(systemd_path)
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX XDG runtime lock domain")
+def test_posix_default_uses_xdg_runtime_directory(monkeypatch):
+    monkeypatch.delenv("SWUDK_LOCK_FILE", raising=False)
+    monkeypatch.setenv("XDG_RUNTIME_DIR", "/run/user/123")
+
+    assert default_lock_path() == Path("/run/user/123/swu-checkin.lock")
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX uid fallback lock domain")
+def test_posix_default_falls_back_to_uid_scoped_tempfile(monkeypatch, tmp_path):
+    monkeypatch.delenv("SWUDK_LOCK_FILE", raising=False)
+    monkeypatch.delenv("XDG_RUNTIME_DIR", raising=False)
+    monkeypatch.setattr("swu_checkin.runtime_lock.tempfile.gettempdir", lambda: str(tmp_path))
+
+    assert default_lock_path() == tmp_path / f"swu-checkin-{os.getuid()}.lock"
 
 
 def test_real_subprocess_contention_is_non_blocking_and_release_is_reusable(tmp_path):

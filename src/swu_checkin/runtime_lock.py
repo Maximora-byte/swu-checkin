@@ -33,10 +33,6 @@ def default_lock_path() -> Path:
         root = Path(base) if base else Path(tempfile.gettempdir())
         return root / "SWUCheckin" / "checkin.lock"
 
-    deployed_state = Path("/var/lib/swu-checkin")
-    if deployed_state.is_dir():
-        return deployed_state / "checkin.lock"
-
     runtime_dir = os.getenv("XDG_RUNTIME_DIR", "").strip()
     if runtime_dir:
         return Path(runtime_dir) / "swu-checkin.lock"
