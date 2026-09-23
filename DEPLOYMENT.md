@@ -121,6 +121,8 @@ journalctl -u swu-checkin-notify.service -n 50 --no-pager
 
 不要把包含敏感数据的完整 journal 直接贴到公开 Issue。报告问题前按 [故障排查](docs/troubleshooting.md) 脱敏。
 
+日志中的 `业务码已返回` 是隐私保护后的固定分类，不会显示学校返回的原值。`请求超时`、`连接异常` 或 `HTTP <状态>` 也只表示传输结果；遇到这些分类时先读取状态并运行只读 probe，不要连续手动启动正式 service。
+
 ## 升级与回滚
 
 升级前保留当前 symlink 目标：
