@@ -98,6 +98,18 @@ uv run --locked --no-dev swu-checkin probe --json
 
 stdout 只包含一个 `schema_version=1` JSON document；重试与诊断信息进入 stderr。字段和退出语义见 [CLI 参考](cli-reference.md)。
 
+### 安全解读 stderr
+
+stderr 只提供排障分类，不是服务端原始响应：
+
+- `请求超时`：提交连接在结果可确认前超时；
+- `连接异常`：连接中断，无法判断服务端是否已经处理；
+- `HTTP 503`：只保留 HTTP 状态，不保留异常文本或响应正文；
+- `业务码已返回`：响应包含非成功的 `code/status`，但原值有意不记录；
+- `响应结构异常`：返回值不是可识别的对象结构。
+
+提交结果不明确时，程序只回读学校状态，不在同一进程发送第二次 POST。不要根据某个分类连续手动重跑；先运行 `status`、`doctor` 和 `probe`，再按 [故障排查](troubleshooting.md) 判断。
+
 ## 7. 升级
 
 先查看 [Releases](https://github.com/Maximora-byte/swu-checkin/releases) 的版本说明和 CI，再切换 tag：
@@ -111,6 +123,13 @@ uv run --locked --no-dev swu-checkin probe
 ```
 
 不要只复制单个 Python 文件，也不要把新代码与旧 `uv.lock`、Windows 脚本或 systemd unit 混用。
+
+升级后按部署方式继续检查：
+
+- 本地：确认 `doctor` 7 项通过，再运行一次只读 `probe`；
+- systemd：保留旧 release，原子切换 symlink 后启动 `swu-checkin-probe.service`；
+- Windows：从新 tag 根目录重新运行安装器，确认同一个计划任务被更新；
+- GitHub Actions：同步整个稳定 tag，并确认 workflow、源码和 `uv.lock` 来自同一版本。
 
 ## 下一步
 

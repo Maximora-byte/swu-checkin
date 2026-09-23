@@ -15,6 +15,7 @@
 - **安全认证**：动态发现并严格校验 SWU OAuth/CAS 登录链，异常主机、协议和参数均 fail closed。
 - **保守执行**：请假、宿舍、任务或响应结构无法安全确认时停止提交，不猜测数据。
 - **只读诊断**：`setup`、`doctor`、`status` 和 `probe` 不提交签到；`probe` 也不会刷新 TokenStore。
+- **脱敏日志**：提交异常只记录固定分类；学校返回的未知业务码、响应正文和 message 不写入日志。
 - **并发保护**：正式 CLI 使用跨进程非阻塞锁，定时任务与手动运行不会同时提交。
 - **跨平台部署**：支持 GitHub Actions、Windows Task Scheduler 与 systemd timer。
 - **可复现交付**：Python 3.13、`uv.lock`、Linux/Windows CI、wheel/sdist 安装验证和依赖审计。
@@ -84,6 +85,8 @@ swu-checkin probe --json   # 只读 probe 的 schema v1 JSON
 | 6 | probe 检测到待签到任务，未提交 | 仅 probe 正常 |
 
 状态 `4` 是 fail-closed 聚合状态：网络、JSON、schema 或学校服务异常无法安全区分时，都不会继续猜测或提交。排查步骤见 [故障排查](docs/troubleshooting.md)。
+
+常见 stderr 分类包括 `请求超时`、`连接异常`、`HTTP 503`、`业务码已返回` 和 `响应结构异常`。其中 `业务码已返回` 只表示响应含有非成功的 `code/status` 字段；项目有意不记录其原值，不能据此判断具体账号或学校端原因。
 
 ## 安全边界
 
