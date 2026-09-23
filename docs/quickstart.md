@@ -43,7 +43,7 @@ uv run --locked --no-dev swu-checkin probe
 - `[6] 检测到待签到任务（未提交）`：任务存在，但 probe 按设计没有提交；
 - `[3]` / `[4]`：按 [故障排查](troubleshooting.md) 处理，不要盲目重复正式运行。
 
-`probe` 是只读诊断：不会写状态文件、删除/刷新 cached token，也不会获取正式运行锁。
+`probe` 是业务只读诊断：不会提交签到、写状态文件或获取正式运行锁。它会复用有效 cached token；若 token 在最初身份校验阶段明确失效，认证层可能 fresh-auth 并替换本地 cache。若 cache 通过身份校验、但在后续业务读取阶段失效，probe 会 fail closed，不执行正式流程的 stale-session 自动恢复。
 
 ## 4. 正式运行一次
 
