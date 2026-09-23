@@ -19,7 +19,7 @@ journalctl -u swu-checkin.service -n 100 --no-pager
 swu-checkin status --file /var/lib/swu-checkin/status.json
 ```
 
-`doctor` 使用 fresh authentication，且不读写 token cache；`probe` 是只读业务检查，也不会刷新 stale cache。二者可帮助区分凭据/接口、cached session 与正式运行问题。
+`doctor` 使用 fresh authentication，且不读写 token cache；`probe` 不提交签到或写运行状态。probe 会复用有效 cache，身份校验明确失败时可能替换它，但不会对后续业务读取阶段失效的 cache 执行正式流程的自动恢复。二者可帮助区分凭据/接口、cached session 与正式运行问题。
 
 ## 状态码 3：登录失败
 
@@ -66,7 +66,7 @@ swu-checkin status --file /var/lib/swu-checkin/status.json
 
 这是可能且有意的：
 
-- `probe` 不提交，也不刷新 TokenStore；
+- `probe` 不提交或写运行状态；它可替换身份校验明确失败的 cache，但不恢复业务读取阶段才失效的 cached session；
 - `doctor` 总是 fresh-auth，且不读写 cache；
 - 正式运行可读取 cache，并只在明确 session expiry 时执行一次安全恢复；
 - 正式运行受跨进程锁保护，probe 不受锁影响。

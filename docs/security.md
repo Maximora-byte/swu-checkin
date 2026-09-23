@@ -27,7 +27,7 @@
 - cached token 每次使用前仍验证身份与请求学号；
 - 正式签到只在**提交前只读阶段**收到明确 HTTP/业务码 401/403 时清 cache 并 fresh-auth 一次；
 - schema、JSON、超时、网络错误和未知业务响应不会被误判为 session 失效；
-- `probe`、`doctor` 和 `setup` 不刷新认证状态。
+- `doctor` 和 `setup` 不读写 TokenStore；`probe` 会复用有效 cache，身份校验明确失效时可 fresh-auth 并替换它，但不会恢复业务读取阶段才失效的 cached session。
 
 ## 提交安全
 

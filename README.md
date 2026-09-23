@@ -14,7 +14,7 @@
 - **可靠判断**：提交后回读学校接口，HTTP 200 不会被直接当作签到成功。
 - **安全认证**：动态发现并严格校验 SWU OAuth/CAS 登录链，异常主机、协议和参数均 fail closed。
 - **保守执行**：请假、宿舍、任务或响应结构无法安全确认时停止提交，不猜测数据。
-- **只读诊断**：`setup`、`doctor`、`status` 和 `probe` 不提交签到；`probe` 也不会刷新 TokenStore。
+- **只读诊断**：`setup`、`doctor`、`status` 和 `probe` 不提交签到；`probe` 不写运行状态，也不对业务阶段失效的 cache 自动恢复。
 - **脱敏日志**：提交异常只记录固定分类；学校返回的未知业务码、响应正文和 message 不写入日志。
 - **并发保护**：正式 CLI 使用跨进程非阻塞锁，定时任务与手动运行不会同时提交。
 - **跨平台部署**：支持 GitHub Actions、Windows Task Scheduler 与 systemd timer。
@@ -93,7 +93,7 @@ swu-checkin probe --json   # 只读 probe 的 schema v1 JSON
 - 凭据只能进入环境变量、GitHub Secrets、Windows DPAPI 或 root-only 环境文件；不得写入仓库、Issue、截图或日志。
 - 日志不输出账号值、密码、验证码、token、ticket、OAuth state/code、完整回调 URL、宿舍地址或坐标。
 - 项目只使用学校接口返回并经过校验的数据，不提供定位伪造、反检测或认证绕过。
-- `probe`、`doctor`、`setup` 和 `status` 保持只读；只有显式 `run` 或无子命令兼容入口会进入正式流程。
+- `probe`、`doctor`、`setup` 和 `status` 不调用签到提交接口；只有显式 `run` 或无子命令兼容入口会进入正式流程。`probe` 会复用有效 cache，若 cache 在身份校验阶段明确失效，则可能 fresh-auth 并替换本地 cache。
 - POST 发生超时、连接中断或 5xx 等不明确结果时，不会通过重新登录再发第二次 POST。
 - cached session 只有在提交前只读阶段出现明确 401/403 时才会被清理并 fresh-auth 一次。
 
