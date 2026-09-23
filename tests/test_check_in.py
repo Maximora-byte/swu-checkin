@@ -146,12 +146,11 @@ def test_business_response_requires_explicit_success_signal():
 @pytest.mark.parametrize(
     ("payload", "expected"),
     [
-        ({"code": 500, "message": "保存失败"}, "业务码=500"),
-        ({"data": {"status": "DENIED"}}, "业务码=DENIED"),
+        ({"code": 500, "message": "保存失败"}, "业务码已返回"),
+        ({"data": {"status": "DENIED"}}, "业务码已返回"),
         ({"success": False}, "显式失败标志"),
         ({"message": "保存失败"}, "缺少明确业务码或成功标志"),
         ("保存失败", "响应结构异常"),
-        ({"code": "token=secret"}, "业务码已返回但不可安全记录"),
     ],
 )
 def test_business_response_diagnostic_is_non_sensitive(payload: object, expected: str):
@@ -161,6 +160,23 @@ def test_business_response_diagnostic_is_non_sensitive(payload: object, expected
     assert "secret" not in diagnostic
 
 
+@pytest.mark.parametrize(
+    ("payload", "sensitive_value"),
+    [
+        ({"code": "secretABC123"}, "secretABC123"),
+        ({"code": "20260000000"}, "20260000000"),
+        ({"code": "abcdef0123456789abcdef0123456789"}, "abcdef0123456789abcdef0123456789"),
+        ({"status": "sessionToken123"}, "sessionToken123"),
+        ({"data": {"code": "privateIdentifier"}}, "privateIdentifier"),
+    ],
+)
+def test_business_response_diagnostic_never_logs_unknown_code_values(payload: object, sensitive_value: str):
+    diagnostic = _business_response_diagnostic(payload)
+
+    assert diagnostic == "业务码已返回"
+    assert sensitive_value not in diagnostic
+
+
 def test_http_200_business_failure_is_not_success():
     pending = {"id": "record-1", "formId": "form-1", "qdzt": "未签到"}
     client = _FakeClient([pending] * 5, submit_response={"code": 500, "message": "保存失败"})
@@ -168,7 +184,7 @@ def test_http_200_business_failure_is_not_success():
 
     assert _service(client, diagnostic=diagnostic).check_in_once("student", "password") == CheckinStatus.DATA_ERROR
     assert client.submit_calls == 1
-    diagnostic.assert_called_once_with("签到接口未返回明确成功状态（业务码=500），且服务端状态未变更")
+    diagnostic.assert_called_once_with("签到接口未返回明确成功状态（业务码已返回），且服务端状态未变更")
 
 
 def test_submit_success_without_readback_confirmation_is_failure():

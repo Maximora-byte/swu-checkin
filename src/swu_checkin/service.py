@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import re
 import time
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
@@ -134,16 +133,7 @@ def _business_response_diagnostic(payload: object) -> str:
     nested = cast("Mapping[str, object]", nested_value) if isinstance(nested_value, dict) else {}
     code_value = root.get("code", root.get("status", nested.get("code", nested.get("status"))))
     if code_value is not None:
-        if isinstance(code_value, bool):
-            return "业务码类型异常"
-        if isinstance(code_value, int):
-            normalized = str(code_value)
-            return f"业务码={normalized}" if len(normalized) <= 16 else "业务码已返回但不可安全记录"
-        if isinstance(code_value, str):
-            normalized = code_value.strip()
-            if re.fullmatch(r"[A-Za-z0-9_.:-]{1,32}", normalized):
-                return f"业务码={normalized}"
-        return "业务码已返回但不可安全记录"
+        return "业务码已返回"
 
     result_value = root.get(
         "success",
