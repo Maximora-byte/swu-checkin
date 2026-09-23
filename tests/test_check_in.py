@@ -17,7 +17,13 @@ from swu_checkin.client import SwuClient
 from swu_checkin.models import CheckinResult
 from swu_checkin.notify import _build_message
 from swu_checkin.runtime_lock import RuntimeLock
-from swu_checkin.service import EXPECTED_DATA_ERRORS, CheckinService, DormitorySchemaError, evaluate_vacation_records
+from swu_checkin.service import (
+    EXPECTED_DATA_ERRORS,
+    CheckinService,
+    DormitorySchemaError,
+    _business_response_diagnostic,
+    evaluate_vacation_records,
+)
 from swu_checkin.status import CheckinStatus, VacationStatus, is_successful_checkin_status
 
 
@@ -137,12 +143,32 @@ def test_business_response_requires_explicit_success_signal():
     assert not _business_response_succeeded("保存成功")
 
 
+@pytest.mark.parametrize(
+    ("payload", "expected"),
+    [
+        ({"code": 500, "message": "保存失败"}, "业务码=500"),
+        ({"data": {"status": "DENIED"}}, "业务码=DENIED"),
+        ({"success": False}, "显式失败标志"),
+        ({"message": "保存失败"}, "缺少明确业务码或成功标志"),
+        ("保存失败", "响应结构异常"),
+        ({"code": "token=secret"}, "业务码已返回但不可安全记录"),
+    ],
+)
+def test_business_response_diagnostic_is_non_sensitive(payload: object, expected: str):
+    diagnostic = _business_response_diagnostic(payload)
+
+    assert diagnostic == expected
+    assert "secret" not in diagnostic
+
+
 def test_http_200_business_failure_is_not_success():
     pending = {"id": "record-1", "formId": "form-1", "qdzt": "未签到"}
     client = _FakeClient([pending] * 5, submit_response={"code": 500, "message": "保存失败"})
+    diagnostic = Mock()
 
-    assert _service(client).check_in_once("student", "password") == CheckinStatus.DATA_ERROR
+    assert _service(client, diagnostic=diagnostic).check_in_once("student", "password") == CheckinStatus.DATA_ERROR
     assert client.submit_calls == 1
+    diagnostic.assert_called_once_with("签到接口未返回明确成功状态（业务码=500），且服务端状态未变更")
 
 
 def test_submit_success_without_readback_confirmation_is_failure():
@@ -167,16 +193,17 @@ def _http_error(status_code: int) -> requests.HTTPError:
 
 
 @pytest.mark.parametrize(
-    "error",
+    ("error", "classification"),
     [
-        requests.Timeout("timeout"),
-        requests.ConnectionError("connection reset"),
-        _http_error(503),
+        (requests.Timeout("token=secret"), "请求超时"),
+        (requests.ConnectionError("token=secret"), "连接异常"),
+        (_http_error(503), "HTTP 503"),
     ],
 )
 @pytest.mark.parametrize(("confirmed", "expected"), [(True, "success"), (False, "data_error")])
 def test_ambiguous_submit_is_read_back_without_outer_retry(
     error: requests.RequestException,
+    classification: str,
     confirmed: bool,
     expected: str,
 ):
@@ -185,7 +212,8 @@ def test_ambiguous_submit_is_read_back_without_outer_retry(
     client = _FakeClient([pending, *([readback] * 4)])
     client.submit_checkin_form = Mock(side_effect=error)
     sleep = Mock()
-    service = _service(client, sleep=sleep)
+    diagnostic = Mock()
+    service = _service(client, sleep=sleep, diagnostic=diagnostic)
 
     result = service.run_checkin("student", "password", max_attempts=3, retry_delay=8)
 
@@ -194,8 +222,11 @@ def test_ambiguous_submit_is_read_back_without_outer_retry(
     assert client.submit_checkin_form.call_count == 1
     if confirmed:
         sleep.assert_not_called()
+        diagnostic.assert_not_called()
     else:
         assert sleep.call_args_list == [call(0.3), call(0.6), call(1.0)]
+        diagnostic.assert_called_once_with(f"签到请求结果不明确（{classification}），且未能确认服务端签到状态")
+        assert "secret" not in diagnostic.call_args.args[0]
 
 
 def test_already_checked_in_transition_needs_only_status():
