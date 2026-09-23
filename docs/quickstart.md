@@ -13,7 +13,7 @@
 ```bash
 git clone https://github.com/Maximora-byte/swu-checkin.git
 cd swu-checkin
-git checkout v1.1.3
+git checkout v1.1.4
 uv sync --locked --no-dev --python 3.13
 ```
 

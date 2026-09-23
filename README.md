@@ -36,7 +36,7 @@
 ```bash
 git clone https://github.com/Maximora-byte/swu-checkin.git
 cd swu-checkin
-git checkout v1.1.3
+git checkout v1.1.4
 uv sync --locked --no-dev --python 3.13
 ```
 
@@ -56,7 +56,7 @@ uv run --locked --no-dev swu-checkin run
 环境变量缺失时，CLI 会交互询问学号并使用无回显密码输入；`setup` 不保存密码。无人值守运行必须使用 GitHub Secrets、Windows DPAPI 或权限受限的 systemd 环境文件。
 
 > [!TIP]
-> 示例固定到已发布的 `v1.1.3`。部署前可在 [Releases](https://github.com/Maximora-byte/swu-checkin/releases) 查看最新稳定版本，并同时使用该版本的代码、文档和 `uv.lock`，不要混用不同 tag 的文件。
+> 示例固定到已发布的 `v1.1.4`。部署前可在 [Releases](https://github.com/Maximora-byte/swu-checkin/releases) 查看最新稳定版本，并同时使用该版本的代码、文档和 `uv.lock`，不要混用不同 tag 的文件。
 
 ## 常用命令
 
