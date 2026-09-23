@@ -39,10 +39,10 @@ sudo install -d -m 0700 -o root -g root /etc/swu-checkin
 
 ## 2. 安装稳定 release
 
-以下以 `v1.1.3` 为例。升级时替换为新的稳定 tag：
+以下以 `v1.1.4` 为例。升级时替换为新的稳定 tag：
 
 ```bash
-release_tag=v1.1.3
+release_tag=v1.1.4
 release_dir="/opt/swu-checkin-releases/$release_tag"
 
 sudo git clone --branch "$release_tag" --depth 1 \
