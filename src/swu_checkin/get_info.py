@@ -3,6 +3,11 @@ import re
 import time
 from io import BytesIO
 
+# The check-in client does not use ONNX Runtime telemetry. Disable it before
+# importing ddddocr so restricted service users do not trigger device-ID
+# persistence warnings during OCR initialization.
+os.environ["ORT_DISABLE_TELEMETRY"] = "1"
+
 import ddddocr
 import requests
 from PIL import Image

@@ -1,3 +1,4 @@
+import os
 from unittest.mock import Mock
 
 import pytest
@@ -8,6 +9,10 @@ from swu_checkin.get_info import _get_token, get_token, recognize_captcha, valid
 from swu_checkin.oauth_flow import OAuthDiscoveryError
 from swu_checkin.service import CheckinService
 from swu_checkin.status import CheckinStatus
+
+
+def test_onnx_telemetry_is_disabled_before_ocr_initialization():
+    assert os.environ["ORT_DISABLE_TELEMETRY"] == "1"
 
 
 def test_auth_failure_reason_taxonomy_is_complete():

@@ -123,6 +123,41 @@ def business_response_succeeded(payload: object) -> bool:
     )
 
 
+def _business_response_diagnostic(payload: object) -> str:
+    """Classify a submit response without logging its body or message."""
+
+    if not isinstance(payload, dict) or not all(isinstance(key, str) for key in payload):
+        return "响应结构异常"
+    root = cast("Mapping[str, object]", payload)
+    nested_value = root.get("data")
+    nested = cast("Mapping[str, object]", nested_value) if isinstance(nested_value, dict) else {}
+    code_value = root.get("code", root.get("status", nested.get("code", nested.get("status"))))
+    if code_value is not None:
+        return "业务码已返回"
+
+    result_value = root.get(
+        "success",
+        root.get("result", root.get("ok", nested.get("success", nested.get("result", nested.get("ok"))))),
+    )
+    if result_value is False or result_value == 0:
+        return "显式失败标志"
+    if isinstance(result_value, str) and result_value.strip().lower() in {"false", "0", "fail", "failed", "error"}:
+        return "显式失败标志"
+    return "缺少明确业务码或成功标志"
+
+
+def _request_failure_diagnostic(error: requests.exceptions.RequestException) -> str:
+    """Return a fixed, non-sensitive transport failure classification."""
+
+    if isinstance(error, requests.exceptions.HTTPError) and error.response is not None:
+        return f"HTTP {error.response.status_code}"
+    if isinstance(error, requests.exceptions.Timeout):
+        return "请求超时"
+    if isinstance(error, requests.exceptions.ConnectionError):
+        return "连接异常"
+    return "请求异常"
+
+
 def _build_typed_checkin_payload(submission: CheckinSubmission) -> dict[str, object]:
     """Build the existing check-in payload from validated API models."""
 
@@ -403,10 +438,11 @@ class CheckinService:
         payload = _build_typed_checkin_payload(submission)
         try:
             response_payload = client.submit_checkin_form(form_id=submission.transition.form_id, payload=payload)
-        except requests.exceptions.RequestException:
+        except requests.exceptions.RequestException as error:
             if self._confirm_checkin(client):
                 return CheckinStatus.SUCCESS
-            self._diagnostic("签到请求结果不明确，且未能确认服务端签到状态")
+            classification = _request_failure_diagnostic(error)
+            self._diagnostic(f"签到请求结果不明确（{classification}），且未能确认服务端签到状态")
             return CheckinStatus.DATA_ERROR
         business_success = business_response_succeeded(response_payload)
         if self._confirm_checkin(client):
@@ -414,7 +450,8 @@ class CheckinService:
         if business_success:
             self._diagnostic("签到请求已提交，但未能确认服务端签到状态")
         else:
-            self._diagnostic("签到接口未返回明确成功状态，且服务端状态未变更")
+            classification = _business_response_diagnostic(response_payload)
+            self._diagnostic(f"签到接口未返回明确成功状态（{classification}），且服务端状态未变更")
         return CheckinStatus.DATA_ERROR
 
     def _prepare_pre_submit_with_client(
