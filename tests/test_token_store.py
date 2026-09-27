@@ -368,7 +368,7 @@ def test_cached_session_expiry_during_pre_submit_fresh_authenticates_once(failin
     store = Mock()
     store.get.return_value = CachedToken("cached-token", "20260000000")
     cached_client = _pending_client()
-    getattr(cached_client, failing_method).side_effect = SessionExpiredError()
+    getattr(cached_client, failing_method).side_effect = SessionExpiredError("token-secret")
     fresh_client = _pending_client()
     fresh_client.get_transition.side_effect = [
         Transition("record", "form", "未签到"),
@@ -376,10 +376,12 @@ def test_cached_session_expiry_during_pre_submit_fresh_authenticates_once(failin
     ]
     clients = iter([cached_client, fresh_client])
     login = Mock(return_value="fresh-token")
+    diagnostic = Mock()
     service = CheckinService(
         token_provider=login,
         client_factory=lambda *_args: next(clients),
         token_store=store,
+        diagnostic=diagnostic,
     )
 
     assert service.check_in_once("20260000000", "password") is CheckinStatus.SUCCESS
@@ -391,6 +393,7 @@ def test_cached_session_expiry_during_pre_submit_fresh_authenticates_once(failin
         form_id="form",
         payload=ANY,
     )
+    diagnostic.assert_not_called()
 
 
 def test_fresh_auth_failure_after_cached_session_expiry_is_terminal():
@@ -411,37 +414,53 @@ def test_fresh_auth_failure_after_cached_session_expiry_is_terminal():
     cached_client.submit_checkin_form.assert_not_called()
 
 
-def test_fresh_session_expiry_after_cache_fallback_is_terminal_without_loop():
+@pytest.mark.parametrize(
+    ("failing_method", "stage"),
+    [
+        ("get_leave_record_set", "leave"),
+        ("get_transition", "transition"),
+        ("get_student_profile", "student_profile"),
+        ("get_dormitory_info", "dormitory"),
+    ],
+)
+def test_fresh_session_expiry_after_cache_fallback_reports_business_stage(failing_method: str, stage: str):
     store = Mock()
     store.get.return_value = CachedToken("cached-token", "20260000000")
     cached_client = _pending_client()
-    cached_client.get_leave_record_set.side_effect = SessionExpiredError()
+    getattr(cached_client, failing_method).side_effect = SessionExpiredError("cached-token-secret")
     fresh_client = _pending_client()
-    fresh_client.get_leave_record_set.side_effect = SessionExpiredError()
+    getattr(fresh_client, failing_method).side_effect = SessionExpiredError("fresh-token-secret")
     clients = iter([cached_client, fresh_client])
     login = Mock(return_value="fresh-token")
+    diagnostic = Mock()
     service = CheckinService(
         token_provider=login,
         client_factory=lambda *_args: next(clients),
         token_store=store,
+        diagnostic=diagnostic,
     )
 
     assert service.check_in_once("20260000000", "password") is CheckinStatus.DATA_ERROR
     assert store.delete.call_count == 2
     login.assert_called_once_with("20260000000", "password", 10)
     fresh_client.submit_checkin_form.assert_not_called()
+    diagnostic.assert_called_once_with(f"签到失败（stage={stage}，认证会话失效）")
+    assert "cached-token-secret" not in diagnostic.call_args.args[0]
+    assert "fresh-token-secret" not in diagnostic.call_args.args[0]
 
 
 def test_probe_does_not_evict_stale_cached_token():
     store = Mock()
     store.get.return_value = CachedToken("cached-token", "20260000000")
     cached_client = _pending_client()
-    cached_client.get_leave_record_set.side_effect = SessionExpiredError()
+    cached_client.get_leave_record_set.side_effect = SessionExpiredError("token-secret")
     login = Mock()
+    diagnostic = Mock()
     service = CheckinService(
         token_provider=login,
         client_factory=lambda *_args: cached_client,
         token_store=store,
+        diagnostic=diagnostic,
     )
 
     assert service.probe_once("20260000000", "password") is CheckinStatus.DATA_ERROR
@@ -449,6 +468,8 @@ def test_probe_does_not_evict_stale_cached_token():
     store.save.assert_not_called()
     login.assert_not_called()
     cached_client.submit_checkin_form.assert_not_called()
+    diagnostic.assert_called_once_with("签到检测失败（stage=leave，认证会话失效）")
+    assert "token-secret" not in diagnostic.call_args.args[0]
 
 
 @pytest.mark.parametrize(

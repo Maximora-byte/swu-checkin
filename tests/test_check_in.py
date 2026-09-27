@@ -184,14 +184,16 @@ def test_http_200_business_failure_is_not_success():
 
     assert _service(client, diagnostic=diagnostic).check_in_once("student", "password") == CheckinStatus.DATA_ERROR
     assert client.submit_calls == 1
-    diagnostic.assert_called_once_with("签到接口未返回明确成功状态（业务码已返回），且服务端状态未变更")
+    diagnostic.assert_called_once_with("签到失败（stage=submit，业务码已返回），且服务端状态未变更")
 
 
 def test_submit_success_without_readback_confirmation_is_failure():
     pending = {"id": "record-1", "formId": "form-1", "qdzt": "未签到"}
     client = _FakeClient([pending] * 5, submit_response={"code": 200, "message": "保存成功"})
+    diagnostic = Mock()
 
-    assert _service(client).check_in_once("student", "password") == CheckinStatus.DATA_ERROR
+    assert _service(client, diagnostic=diagnostic).check_in_once("student", "password") == CheckinStatus.DATA_ERROR
+    diagnostic.assert_called_once_with("签到失败（stage=confirm，服务端状态未确认）")
 
 
 def test_submit_succeeds_only_after_readback():
@@ -236,13 +238,13 @@ def test_ambiguous_submit_is_read_back_without_outer_retry(
     assert result.status == expected
     assert result.attempts == 1
     assert client.submit_checkin_form.call_count == 1
+    assert call(f"签到失败（stage=submit，{classification}）") in diagnostic.call_args_list
     if confirmed:
         sleep.assert_not_called()
-        diagnostic.assert_not_called()
     else:
         assert sleep.call_args_list == [call(0.3), call(0.6), call(1.0)]
-        diagnostic.assert_called_once_with(f"签到请求结果不明确（{classification}），且未能确认服务端签到状态")
-        assert "secret" not in diagnostic.call_args.args[0]
+        assert call("签到请求结果不明确，且未能确认服务端签到状态") in diagnostic.call_args_list
+    assert "secret" not in "\n".join(item.args[0] for item in diagnostic.call_args_list)
 
 
 def test_already_checked_in_transition_needs_only_status():
@@ -432,7 +434,7 @@ def test_probe_reports_dormitory_schema_failure_without_submitting():
     diagnostics = Mock()
 
     assert _service(client, diagnostic=diagnostics).probe_once("student", "password") == CheckinStatus.DATA_ERROR
-    diagnostics.assert_called_once_with("宿舍数据结构异常")
+    diagnostics.assert_called_once_with("签到检测失败（stage=dormitory，宿舍数据结构异常）")
     assert client.submit_calls == 0
 
 

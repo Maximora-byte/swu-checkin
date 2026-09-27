@@ -7,7 +7,8 @@ import time
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime
-from typing import TypedDict, Unpack, cast
+from enum import StrEnum
+from typing import TypedDict, TypeVar, Unpack, cast
 
 import requests
 
@@ -41,6 +42,63 @@ EXPECTED_DATA_ERRORS = (
     TypeError,
     ApiSchemaError,
 )
+_T = TypeVar("_T")
+
+
+class _FailureStage(StrEnum):
+    """Fixed internal boundaries allowed in safe diagnostics."""
+
+    AUTH = "auth"
+    TOKEN_VALIDATION = "token_validation"
+    LEAVE = "leave"
+    TRANSITION = "transition"
+    STUDENT_PROFILE = "student_profile"
+    DORMITORY = "dormitory"
+    SUBMIT = "submit"
+    CONFIRM = "confirm"
+
+
+class _StageFailure(Exception):
+    """Carry only reviewed failure metadata across orchestration layers."""
+
+    def __init__(
+        self,
+        stage: _FailureStage,
+        category: str,
+        *,
+        status: CheckinStatus = CheckinStatus.DATA_ERROR,
+        retryable: bool = False,
+    ) -> None:
+        self.stage = stage
+        self.category = category
+        self.status = status
+        self.retryable = retryable
+        super().__init__(stage.value, category)
+
+
+class _StagedAuthError(AuthError):
+    """Preserve AuthError compatibility while carrying safe stage metadata."""
+
+    def __init__(
+        self,
+        reason: AuthFailureReason,
+        stage: _FailureStage,
+        category: str,
+        *,
+        retryable: bool,
+    ) -> None:
+        self.stage = stage
+        self.category = category
+        self.retryable = retryable
+        super().__init__(reason)
+
+
+class _StagedSessionExpired(Exception):
+    """Preserve the business read boundary without retaining exception data."""
+
+    def __init__(self, stage: _FailureStage) -> None:
+        self.stage = stage
+        super().__init__(stage.value)
 
 
 class _TokenInvalid(Exception):
@@ -158,6 +216,33 @@ def _request_failure_diagnostic(error: requests.exceptions.RequestException) -> 
     return "请求异常"
 
 
+def _data_failure_diagnostic(error: BaseException) -> str:
+    """Return a fixed parsing/schema category without exception text."""
+
+    if isinstance(error, DormitorySchemaError):
+        return "宿舍数据结构异常"
+    if isinstance(error, json.JSONDecodeError):
+        return "JSON 解析异常"
+    if isinstance(error, ApiSchemaError):
+        return "数据结构异常"
+    return "数据解析异常"
+
+
+def _auth_failure_diagnostic(reason: AuthFailureReason) -> str:
+    """Return reviewed constants for authentication failures."""
+
+    return {
+        AuthFailureReason.CREDENTIAL_REJECTED: "账号凭据未通过认证",
+        AuthFailureReason.CAPTCHA_FAILED: "验证码校验失败",
+        AuthFailureReason.NETWORK_ERROR: "认证网络异常",
+        AuthFailureReason.LOGIN_PAGE_CHANGED: "登录页面结构异常",
+        AuthFailureReason.OAUTH_FLOW_CHANGED: "认证流程结构异常",
+        AuthFailureReason.TICKET_FAILED: "认证票据异常",
+        AuthFailureReason.TOKEN_EXCHANGE_FAILED: "认证令牌校验异常",
+        AuthFailureReason.UNKNOWN: "认证异常",
+    }[reason]
+
+
 def _build_typed_checkin_payload(submission: CheckinSubmission) -> dict[str, object]:
     """Build the existing check-in payload from validated API models."""
 
@@ -273,15 +358,36 @@ class CheckinService:
         return False
 
     @staticmethod
-    def _auth_outcome(error: AuthError) -> _AttemptOutcome:
-        return _AttemptOutcome(
-            status=auth_failure_status(error.reason),
+    def _staged_auth_error(error: AuthError) -> _StagedAuthError:
+        return _StagedAuthError(
+            error.reason,
+            _FailureStage.AUTH,
+            _auth_failure_diagnostic(error.reason),
             retryable=error.reason is AuthFailureReason.NETWORK_ERROR,
         )
 
     @staticmethod
     def _status_outcome(status: CheckinStatus) -> _AttemptOutcome:
         return _AttemptOutcome(status=status, retryable=status is CheckinStatus.NO_TASK)
+
+    def _run_stage(self, stage: _FailureStage, action: Callable[[], _T]) -> _T:
+        """Run one explicit boundary and attach only safe fixed metadata."""
+
+        try:
+            return action()
+        except SessionExpiredError:
+            raise _StagedSessionExpired(stage) from None
+        except requests.exceptions.RequestException as error:
+            raise _StageFailure(
+                stage,
+                _request_failure_diagnostic(error),
+                retryable=self._is_transient_request_error(error),
+            ) from None
+        except (json.JSONDecodeError, KeyError, ValueError, TypeError, ApiSchemaError) as error:
+            raise _StageFailure(stage, _data_failure_diagnostic(error)) from None
+
+    def _diagnose_stage_failure(self, failure: _StageFailure, *, prefix: str = "签到失败") -> None:
+        self._diagnostic(f"{prefix}（stage={failure.stage.value}，{failure.category}）")
 
     def _validate_token(self, token: str) -> tuple[SwuClient, str]:
         client = self._client_factory(token, self.timeout)
@@ -298,16 +404,31 @@ class CheckinService:
                 if self._is_transient_request_error(error)
                 else AuthFailureReason.TOKEN_EXCHANGE_FAILED
             )
-            raise AuthError(reason) from None
+            raise _StagedAuthError(
+                reason,
+                _FailureStage.TOKEN_VALIDATION,
+                _request_failure_diagnostic(error),
+                retryable=self._is_transient_request_error(error),
+            ) from None
         except requests.exceptions.RequestException as error:
             reason = (
                 AuthFailureReason.NETWORK_ERROR
                 if self._is_transient_request_error(error)
                 else AuthFailureReason.TOKEN_EXCHANGE_FAILED
             )
-            raise AuthError(reason) from None
-        except EXPECTED_DATA_ERRORS:
-            raise AuthError(AuthFailureReason.TOKEN_EXCHANGE_FAILED) from None
+            raise _StagedAuthError(
+                reason,
+                _FailureStage.TOKEN_VALIDATION,
+                _request_failure_diagnostic(error),
+                retryable=self._is_transient_request_error(error),
+            ) from None
+        except (json.JSONDecodeError, KeyError, ValueError, TypeError, ApiSchemaError) as error:
+            raise _StagedAuthError(
+                AuthFailureReason.TOKEN_EXCHANGE_FAILED,
+                _FailureStage.TOKEN_VALIDATION,
+                _data_failure_diagnostic(error),
+                retryable=False,
+            ) from None
         return client, student_id
 
     def _authenticated_session(
@@ -334,15 +455,28 @@ class CheckinService:
                     return _AuthenticatedSession(client=client, from_cache=True)
                 self._delete_cached_token(username)
 
-        token = self._token_provider(username, password, self.timeout)
+        try:
+            token = self._token_provider(username, password, self.timeout)
+        except AuthError as error:
+            raise self._staged_auth_error(error) from None
         if not token:
-            raise AuthError(AuthFailureReason.UNKNOWN)
+            raise self._staged_auth_error(AuthError(AuthFailureReason.UNKNOWN)) from None
         try:
             client, student_id = self._validate_token(token)
         except _TokenInvalid:
-            raise AuthError(AuthFailureReason.TOKEN_EXCHANGE_FAILED) from None
+            raise _StagedAuthError(
+                AuthFailureReason.TOKEN_EXCHANGE_FAILED,
+                _FailureStage.TOKEN_VALIDATION,
+                "认证令牌校验异常",
+                retryable=False,
+            ) from None
         if student_id != username:
-            raise AuthError(AuthFailureReason.TOKEN_EXCHANGE_FAILED)
+            raise _StagedAuthError(
+                AuthFailureReason.TOKEN_EXCHANGE_FAILED,
+                _FailureStage.TOKEN_VALIDATION,
+                "认证令牌校验异常",
+                retryable=False,
+            )
         if write_token_cache:
             try:
                 self._token_store.save(username, token, student_id)
@@ -365,12 +499,11 @@ class CheckinService:
             write_token_cache=write_token_cache,
         ).client
 
-    @staticmethod
-    def _prepare_context(client: SwuClient, transition: Transition) -> CheckinSubmission:
-        pending = transition.require_pending()
+    def _prepare_context(self, client: SwuClient, transition: Transition) -> CheckinSubmission:
+        pending = self._run_stage(_FailureStage.TRANSITION, transition.require_pending)
         return CheckinSubmission(
-            student=client.get_student_profile(),
-            dormitory=client.get_dormitory_info(),
+            student=self._run_stage(_FailureStage.STUDENT_PROFILE, client.get_student_profile),
+            dormitory=self._run_stage(_FailureStage.DORMITORY, client.get_dormitory_info),
             transition=pending,
         )
 
@@ -391,7 +524,7 @@ class CheckinService:
                 read_token_cache=read_token_cache,
                 write_token_cache=write_token_cache,
             )
-        except (AuthError, *EXPECTED_DATA_ERRORS):
+        except (AuthError, _StageFailure, *EXPECTED_DATA_ERRORS):
             client = None
         if client is None:
             return DoctorReport(False, False, False, False, False)
@@ -427,8 +560,12 @@ class CheckinService:
             if delay:
                 self._sleep(delay)
             try:
-                transition = client.get_transition()
-            except EXPECTED_DATA_ERRORS:
+                transition = self._run_stage(_FailureStage.CONFIRM, client.get_transition)
+            except _StagedSessionExpired:
+                self._diagnostic("签到状态确认失败（stage=confirm，认证会话失效）")
+                continue
+            except _StageFailure as failure:
+                self._diagnose_stage_failure(failure, prefix="签到状态确认失败")
                 continue
             if transition and transition.is_checked_in:
                 return True
@@ -439,30 +576,42 @@ class CheckinService:
         try:
             response_payload = client.submit_checkin_form(form_id=submission.transition.form_id, payload=payload)
         except requests.exceptions.RequestException as error:
+            failure = _StageFailure(
+                _FailureStage.SUBMIT,
+                _request_failure_diagnostic(error),
+                retryable=self._is_transient_request_error(error),
+            )
+            self._diagnose_stage_failure(failure)
             if self._confirm_checkin(client):
                 return CheckinStatus.SUCCESS
-            classification = _request_failure_diagnostic(error)
-            self._diagnostic(f"签到请求结果不明确（{classification}），且未能确认服务端签到状态")
+            self._diagnostic("签到请求结果不明确，且未能确认服务端签到状态")
+            return CheckinStatus.DATA_ERROR
+        except (json.JSONDecodeError, KeyError, ValueError, TypeError, ApiSchemaError) as error:
+            self._diagnose_stage_failure(_StageFailure(_FailureStage.SUBMIT, _data_failure_diagnostic(error)))
             return CheckinStatus.DATA_ERROR
         business_success = business_response_succeeded(response_payload)
         if self._confirm_checkin(client):
             return CheckinStatus.SUCCESS
         if business_success:
-            self._diagnostic("签到请求已提交，但未能确认服务端签到状态")
+            self._diagnostic("签到失败（stage=confirm，服务端状态未确认）")
         else:
             classification = _business_response_diagnostic(response_payload)
-            self._diagnostic(f"签到接口未返回明确成功状态（{classification}），且服务端状态未变更")
+            self._diagnostic(f"签到失败（stage=submit，{classification}），且服务端状态未变更")
         return CheckinStatus.DATA_ERROR
 
     def _prepare_pre_submit_with_client(
         self, client: SwuClient
     ) -> tuple[CheckinStatus | None, SwuClient, CheckinSubmission | None]:
-        vacation_status = client.get_leave_record_set().evaluate()
+        vacation_status = self._run_stage(
+            _FailureStage.LEAVE,
+            lambda: client.get_leave_record_set().evaluate(),
+        )
         if vacation_status is VacationStatus.UNKNOWN:
+            self._diagnostic("签到失败（stage=leave，请假状态无法安全确认）")
             return CheckinStatus.DATA_ERROR, client, None
         if vacation_status is VacationStatus.ACTIVE_LEAVE:
             return CheckinStatus.ON_LEAVE, client, None
-        transition = client.get_transition()
+        transition = self._run_stage(_FailureStage.TRANSITION, client.get_transition)
         if not transition:
             return CheckinStatus.NO_TASK, client, None
         if transition.is_checked_in:
@@ -479,17 +628,23 @@ class CheckinService:
         session = self._authenticated_session(username, password)
         try:
             return self._prepare_pre_submit_with_client(session.client)
-        except SessionExpiredError:
+        except _StagedSessionExpired as failure:
             if not session.from_cache or not allow_cached_session_recovery:
-                raise AuthError(AuthFailureReason.TOKEN_EXCHANGE_FAILED) from None
+                raise _StageFailure(
+                    failure.stage,
+                    "认证会话失效",
+                ) from None
 
         self._delete_cached_token(username)
         fresh = self._authenticated_session(username, password, read_token_cache=False)
         try:
             return self._prepare_pre_submit_with_client(fresh.client)
-        except SessionExpiredError:
+        except _StagedSessionExpired as failure:
             self._delete_cached_token(username)
-            raise AuthError(AuthFailureReason.TOKEN_EXCHANGE_FAILED) from None
+            raise _StageFailure(
+                failure.stage,
+                "认证会话失效",
+            ) from None
 
     def _check_in_attempt(self, username: str, password: str) -> _AttemptOutcome:
         try:
@@ -505,15 +660,12 @@ class CheckinService:
             return self._status_outcome(self._submit_checkin(client, submission))
         except (KeyboardInterrupt, SystemExit):
             raise
-        except AuthError as error:
-            return self._auth_outcome(error)
-        except DormitorySchemaError:
-            self._diagnostic("宿舍数据结构异常")
-            return _AttemptOutcome(CheckinStatus.DATA_ERROR, retryable=False)
-        except requests.exceptions.RequestException as error:
-            return _AttemptOutcome(CheckinStatus.DATA_ERROR, retryable=self._is_transient_request_error(error))
-        except EXPECTED_DATA_ERRORS:
-            return _AttemptOutcome(CheckinStatus.DATA_ERROR, retryable=False)
+        except _StagedAuthError as failure:
+            self._diagnostic(f"签到失败（stage={failure.stage.value}，{failure.category}）")
+            return _AttemptOutcome(auth_failure_status(failure.reason), retryable=failure.retryable)
+        except _StageFailure as failure:
+            self._diagnose_stage_failure(failure)
+            return _AttemptOutcome(failure.status, retryable=failure.retryable)
 
     def check_in_once(self, username: str, password: str) -> CheckinStatus:
         """Execute one attempt while preserving the historical status-only API."""
@@ -534,13 +686,12 @@ class CheckinService:
             return CheckinStatus.PROBE_PENDING
         except (KeyboardInterrupt, SystemExit):
             raise
-        except AuthError as error:
-            return auth_failure_status(error.reason)
-        except DormitorySchemaError:
-            self._diagnostic("宿舍数据结构异常")
-            return CheckinStatus.DATA_ERROR
-        except EXPECTED_DATA_ERRORS:
-            return CheckinStatus.DATA_ERROR
+        except _StagedAuthError as failure:
+            self._diagnostic(f"签到检测失败（stage={failure.stage.value}，{failure.category}）")
+            return auth_failure_status(failure.reason)
+        except _StageFailure as failure:
+            self._diagnose_stage_failure(failure, prefix="签到检测失败")
+            return failure.status
 
     def run_checkin(
         self,
