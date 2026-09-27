@@ -553,6 +553,9 @@ class CheckinService:
                 self._sleep(delay)
             try:
                 transition = self._run_stage(_FailureStage.CONFIRM, client.get_transition)
+            except SessionExpiredError:
+                self._diagnostic("签到状态确认失败（stage=confirm，认证会话失效）")
+                continue
             except _StageFailure as failure:
                 self._diagnose_stage_failure(failure, prefix="签到状态确认失败")
                 continue

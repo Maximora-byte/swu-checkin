@@ -13,6 +13,7 @@ from swu_checkin.api_models import (
     Transition,
 )
 from swu_checkin.auth import AuthError, AuthFailureReason
+from swu_checkin.client import SessionExpiredError
 from swu_checkin.service import CheckinService
 
 
@@ -181,6 +182,54 @@ def test_ambiguous_submit_and_confirm_are_distinct_and_never_post_twice(
     assert call(f"签到失败（stage=submit，{classification}）") in diagnostic.call_args_list
     assert diagnostic.call_args_list.count(call("签到状态确认失败（stage=confirm，请求超时）")) == 4
     assert sleep.call_args_list == [call(0.3), call(0.6), call(1.0)]
+
+
+def test_confirm_session_expiry_is_safe_readback_failure_without_resubmit():
+    client = _pending_client()
+    client.get_transition.side_effect = [
+        Transition("record", "form", "未签到"),
+        *([SessionExpiredError("token-secret response-secret")] * 4),
+    ]
+    diagnostic = Mock()
+    service = _service(client, diagnostic=diagnostic)
+
+    result = service.run_checkin("student", "password", max_attempts=3, retry_delay=8)
+
+    assert result.status == "data_error"
+    assert result.attempts == 1
+    assert client.submit_checkin_form.call_count == 1
+    service._token_provider.assert_called_once_with("student", "password", 10)
+    service._token_store.delete.assert_not_called()
+    expected = call("签到状态确认失败（stage=confirm，认证会话失效）")
+    assert diagnostic.call_args_list.count(expected) == 4
+    output = "\n".join(item.args[0] for item in diagnostic.call_args_list)
+    assert "token-secret" not in output
+    assert "response-secret" not in output
+
+
+def test_ambiguous_submit_with_confirm_session_expiry_remains_single_post():
+    client = _pending_client()
+    client.get_transition.side_effect = [
+        Transition("record", "form", "未签到"),
+        *([SessionExpiredError("cookie-secret")] * 4),
+    ]
+    client.submit_checkin_form.side_effect = requests.Timeout("ticket-secret")
+    diagnostic = Mock()
+    service = _service(client, diagnostic=diagnostic)
+
+    result = service.run_checkin("student", "password", max_attempts=3, retry_delay=8)
+
+    assert result.status == "data_error"
+    assert result.attempts == 1
+    assert client.submit_checkin_form.call_count == 1
+    service._token_provider.assert_called_once_with("student", "password", 10)
+    service._token_store.delete.assert_not_called()
+    assert call("签到失败（stage=submit，请求超时）") in diagnostic.call_args_list
+    expected = call("签到状态确认失败（stage=confirm，认证会话失效）")
+    assert diagnostic.call_args_list.count(expected) == 4
+    output = "\n".join(item.args[0] for item in diagnostic.call_args_list)
+    assert "ticket-secret" not in output
+    assert "cookie-secret" not in output
 
 
 @pytest.mark.parametrize(

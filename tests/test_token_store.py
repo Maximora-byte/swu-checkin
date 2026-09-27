@@ -368,7 +368,7 @@ def test_cached_session_expiry_during_pre_submit_fresh_authenticates_once(failin
     store = Mock()
     store.get.return_value = CachedToken("cached-token", "20260000000")
     cached_client = _pending_client()
-    getattr(cached_client, failing_method).side_effect = SessionExpiredError()
+    getattr(cached_client, failing_method).side_effect = SessionExpiredError("token-secret")
     fresh_client = _pending_client()
     fresh_client.get_transition.side_effect = [
         Transition("record", "form", "未签到"),
@@ -376,10 +376,12 @@ def test_cached_session_expiry_during_pre_submit_fresh_authenticates_once(failin
     ]
     clients = iter([cached_client, fresh_client])
     login = Mock(return_value="fresh-token")
+    diagnostic = Mock()
     service = CheckinService(
         token_provider=login,
         client_factory=lambda *_args: next(clients),
         token_store=store,
+        diagnostic=diagnostic,
     )
 
     assert service.check_in_once("20260000000", "password") is CheckinStatus.SUCCESS
@@ -391,6 +393,7 @@ def test_cached_session_expiry_during_pre_submit_fresh_authenticates_once(failin
         form_id="form",
         payload=ANY,
     )
+    diagnostic.assert_not_called()
 
 
 def test_fresh_auth_failure_after_cached_session_expiry_is_terminal():
@@ -436,12 +439,14 @@ def test_probe_does_not_evict_stale_cached_token():
     store = Mock()
     store.get.return_value = CachedToken("cached-token", "20260000000")
     cached_client = _pending_client()
-    cached_client.get_leave_record_set.side_effect = SessionExpiredError()
+    cached_client.get_leave_record_set.side_effect = SessionExpiredError("token-secret")
     login = Mock()
+    diagnostic = Mock()
     service = CheckinService(
         token_provider=login,
         client_factory=lambda *_args: cached_client,
         token_store=store,
+        diagnostic=diagnostic,
     )
 
     assert service.probe_once("20260000000", "password") is CheckinStatus.DATA_ERROR
@@ -449,6 +454,8 @@ def test_probe_does_not_evict_stale_cached_token():
     store.save.assert_not_called()
     login.assert_not_called()
     cached_client.submit_checkin_form.assert_not_called()
+    diagnostic.assert_called_once_with("签到检测失败（stage=token_validation，认证令牌校验异常）")
+    assert "token-secret" not in diagnostic.call_args.args[0]
 
 
 @pytest.mark.parametrize(
