@@ -184,14 +184,16 @@ def test_http_200_business_failure_is_not_success():
 
     assert _service(client, diagnostic=diagnostic).check_in_once("student", "password") == CheckinStatus.DATA_ERROR
     assert client.submit_calls == 1
-    diagnostic.assert_called_once_with("签到接口未返回明确成功状态（业务码已返回），且服务端状态未变更")
+    diagnostic.assert_called_once_with("签到失败（stage=submit，业务码已返回），且服务端状态未变更")
 
 
 def test_submit_success_without_readback_confirmation_is_failure():
     pending = {"id": "record-1", "formId": "form-1", "qdzt": "未签到"}
     client = _FakeClient([pending] * 5, submit_response={"code": 200, "message": "保存成功"})
+    diagnostic = Mock()
 
-    assert _service(client).check_in_once("student", "password") == CheckinStatus.DATA_ERROR
+    assert _service(client, diagnostic=diagnostic).check_in_once("student", "password") == CheckinStatus.DATA_ERROR
+    diagnostic.assert_called_once_with("签到失败（stage=confirm，服务端状态未确认）")
 
 
 def test_submit_succeeds_only_after_readback():

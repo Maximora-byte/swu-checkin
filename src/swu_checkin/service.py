@@ -93,6 +93,14 @@ class _StagedAuthError(AuthError):
         super().__init__(reason)
 
 
+class _StagedSessionExpired(Exception):
+    """Preserve the business read boundary without retaining exception data."""
+
+    def __init__(self, stage: _FailureStage) -> None:
+        self.stage = stage
+        super().__init__(stage.value)
+
+
 class _TokenInvalid(Exception):
     """The validation endpoint explicitly rejected a bearer token."""
 
@@ -368,7 +376,7 @@ class CheckinService:
         try:
             return action()
         except SessionExpiredError:
-            raise
+            raise _StagedSessionExpired(stage) from None
         except requests.exceptions.RequestException as error:
             raise _StageFailure(
                 stage,
@@ -553,7 +561,7 @@ class CheckinService:
                 self._sleep(delay)
             try:
                 transition = self._run_stage(_FailureStage.CONFIRM, client.get_transition)
-            except SessionExpiredError:
+            except _StagedSessionExpired:
                 self._diagnostic("签到状态确认失败（stage=confirm，认证会话失效）")
                 continue
             except _StageFailure as failure:
@@ -585,10 +593,10 @@ class CheckinService:
         if self._confirm_checkin(client):
             return CheckinStatus.SUCCESS
         if business_success:
-            self._diagnostic("签到请求已提交，但未能确认服务端签到状态")
+            self._diagnostic("签到失败（stage=confirm，服务端状态未确认）")
         else:
             classification = _business_response_diagnostic(response_payload)
-            self._diagnostic(f"签到接口未返回明确成功状态（{classification}），且服务端状态未变更")
+            self._diagnostic(f"签到失败（stage=submit，{classification}），且服务端状态未变更")
         return CheckinStatus.DATA_ERROR
 
     def _prepare_pre_submit_with_client(
@@ -599,6 +607,7 @@ class CheckinService:
             lambda: client.get_leave_record_set().evaluate(),
         )
         if vacation_status is VacationStatus.UNKNOWN:
+            self._diagnostic("签到失败（stage=leave，请假状态无法安全确认）")
             return CheckinStatus.DATA_ERROR, client, None
         if vacation_status is VacationStatus.ACTIVE_LEAVE:
             return CheckinStatus.ON_LEAVE, client, None
@@ -619,26 +628,22 @@ class CheckinService:
         session = self._authenticated_session(username, password)
         try:
             return self._prepare_pre_submit_with_client(session.client)
-        except SessionExpiredError:
+        except _StagedSessionExpired as failure:
             if not session.from_cache or not allow_cached_session_recovery:
-                raise _StagedAuthError(
-                    AuthFailureReason.TOKEN_EXCHANGE_FAILED,
-                    _FailureStage.TOKEN_VALIDATION,
-                    "认证令牌校验异常",
-                    retryable=False,
+                raise _StageFailure(
+                    failure.stage,
+                    "认证会话失效",
                 ) from None
 
         self._delete_cached_token(username)
         fresh = self._authenticated_session(username, password, read_token_cache=False)
         try:
             return self._prepare_pre_submit_with_client(fresh.client)
-        except SessionExpiredError:
+        except _StagedSessionExpired as failure:
             self._delete_cached_token(username)
-            raise _StagedAuthError(
-                AuthFailureReason.TOKEN_EXCHANGE_FAILED,
-                _FailureStage.TOKEN_VALIDATION,
-                "认证令牌校验异常",
-                retryable=False,
+            raise _StageFailure(
+                failure.stage,
+                "认证会话失效",
             ) from None
 
     def _check_in_attempt(self, username: str, password: str) -> _AttemptOutcome:

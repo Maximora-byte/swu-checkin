@@ -15,6 +15,7 @@ from swu_checkin.api_models import (
 from swu_checkin.auth import AuthError, AuthFailureReason
 from swu_checkin.client import SessionExpiredError
 from swu_checkin.service import CheckinService
+from swu_checkin.status import VacationStatus
 
 
 def _http_error(status_code: int, secret: str = "") -> requests.HTTPError:
@@ -150,6 +151,35 @@ def test_dormitory_schema_uses_fixed_stage_and_category():
     assert result.status == "data_error"
     assert result.attempts == 1
     assert diagnostic.call_args_list == [call("签到失败（stage=dormitory，宿舍数据结构异常）")]
+
+
+def test_unknown_leave_status_emits_fixed_safe_stage():
+    client = _pending_client()
+    leave_records = Mock()
+    leave_records.evaluate.return_value = VacationStatus.UNKNOWN
+    client.get_leave_record_set.return_value = leave_records
+    diagnostic = Mock()
+
+    result = _service(client, diagnostic=diagnostic).run_checkin("student", "password")
+
+    assert result.status == "data_error"
+    assert result.attempts == 1
+    diagnostic.assert_called_once_with("签到失败（stage=leave，请假状态无法安全确认）")
+    client.submit_checkin_form.assert_not_called()
+
+
+@pytest.mark.parametrize("status_code", [401, 403])
+def test_token_validation_rejection_keeps_token_validation_stage(status_code: int):
+    client = _pending_client()
+    client.get_student_id.side_effect = _http_error(status_code, "token-secret")
+    diagnostic = Mock()
+
+    result = _service(client, diagnostic=diagnostic).run_checkin("student", "password", max_attempts=3, retry_delay=8)
+
+    assert result.status == "data_error"
+    assert result.attempts == 1
+    diagnostic.assert_called_once_with("签到失败（stage=token_validation，认证令牌校验异常）")
+    assert "token-secret" not in diagnostic.call_args.args[0]
 
 
 @pytest.mark.parametrize(
