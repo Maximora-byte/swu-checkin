@@ -20,6 +20,12 @@
 - **跨平台部署**：支持 GitHub Actions、Windows Task Scheduler 与 systemd timer。
 - **可复现交付**：Python 3.13、`uv.lock`、Linux/Windows CI、wheel/sdist 安装验证和依赖审计。
 
+## Windows desktop preview（开发构建）
+
+新增中文窗口、DPAPI 保存、只读检测、明确确认的手动签到，以及默认关闭的可选定时任务。提供 Windows x64 的独立应用与安装包构建流程；已在 Windows Server 2022 x64 完成安装与 GUI 冒烟测试；尚未完成干净 Windows 10/11 标准用户验收。当前为未签名开发构建，未正式发布。详见 [桌面版与构建指南](docs/windows-desktop.md)。
+
+本工具使用学校记录的寝室坐标，不测量实际 GPS，技术提交成功不证明人在寝。仅在本人确实在寝并符合学校规则时使用正式签到；自动模式必须单独授权，不满足条件时提前停用。
+
 ## 选择运行方式
 
 | 场景 | 推荐方式 | 特点 |
@@ -92,7 +98,7 @@ swu-checkin probe --json   # 只读 probe 的 schema v1 JSON
 
 - 凭据只能进入环境变量、GitHub Secrets、Windows DPAPI 或 root-only 环境文件；不得写入仓库、Issue、截图或日志。
 - 日志不输出账号值、密码、验证码、token、ticket、OAuth state/code、完整回调 URL、宿舍地址或坐标。
-- 项目只使用学校接口返回并经过校验的数据，不提供定位伪造、反检测或认证绕过。
+- 项目使用学校接口返回的宿舍坐标并沿用现有提交字段，不测量用户实际 GPS，也不能证明本人在寝；不得将技术提交成功当作真实位置证明。不提供新增反检测或认证绕过功能。
 - `probe`、`doctor`、`setup` 和 `status` 不调用签到提交接口；只有显式 `run` 或无子命令兼容入口会进入正式流程。`probe` 会复用有效 cache，若 cache 在身份校验阶段明确失效，则可能 fresh-auth 并替换本地 cache。
 - POST 发生超时、连接中断或 5xx 等不明确结果时，不会通过重新登录再发第二次 POST。
 - cached session 只有在提交前只读阶段出现明确 401/403 时才会被清理并 fresh-auth 一次。

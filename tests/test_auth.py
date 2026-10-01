@@ -301,3 +301,27 @@ def test_legacy_get_token_still_returns_empty_string_on_failure(monkeypatch: pyt
     )
 
     assert get_token("student", "wrong-password") == ""
+
+
+@pytest.mark.parametrize("status_code", [300, 301, 302, 303, 304, 307, 308, 399])
+def test_token_exchange_rejects_redirect_without_following_or_reading_body(monkeypatch, status_code):
+    session, _discovery, _recognition = _mock_server_captcha_results(monkeypatch, [None])
+    callback = Mock(url="https://of.swu.edu.cn/&ticket=synthetic")
+    redirect = requests.Response()
+    redirect.status_code = status_code
+    redirect.headers["Location"] = "http://outside.invalid/collect?token=redirect-secret"
+    redirect.json = Mock(return_value={"data": "unexpected-token"})
+    session.get.side_effect = [callback, redirect]
+
+    with pytest.raises(AuthError) as caught:
+        _get_token("synthetic-user", "synthetic-password", timeout=1)
+
+    assert caught.value.reason is AuthFailureReason.TOKEN_EXCHANGE_FAILED
+    assert "redirect-secret" not in str(caught.value)
+    assert "outside.invalid" not in str(caught.value)
+    assert "synthetic" not in str(caught.value)
+    assert session.get.call_count == 2
+    exchange_call = session.get.call_args_list[-1]
+    assert exchange_call.args[0] == "https://of.swu.edu.cn/gateway/fighter-middle/api/integrate/uaap/cas/exchange-token"
+    assert exchange_call.kwargs["allow_redirects"] is False
+    redirect.json.assert_not_called()

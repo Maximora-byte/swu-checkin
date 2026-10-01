@@ -40,7 +40,14 @@ class SwuClient:
         return headers
 
     @staticmethod
+    def _reject_redirect(response: requests.Response) -> None:
+        """Never forward bearer credentials or form data to a redirect target."""
+        if response.status_code in range(300, 400):
+            raise requests.HTTPError("Unexpected business API redirect", response=response)
+
+    @staticmethod
     def _json_object(response: requests.Response, *, label: str) -> dict[str, object]:
+        SwuClient._reject_redirect(response)
         try:
             response.raise_for_status()
         except requests.HTTPError as error:
@@ -62,6 +69,7 @@ class SwuClient:
             params={"appType": "fighter-portal"},
             headers=self._headers(),
             timeout=self.timeout,
+            allow_redirects=False,
         )
         return self._json_object(response, label="student")
 
@@ -79,6 +87,7 @@ class SwuClient:
             headers=self._headers(json_content=True),
             data=json.dumps({}),
             timeout=self.timeout,
+            allow_redirects=False,
         )
         return self._json_object(response, label="dormitory")
 
@@ -96,6 +105,7 @@ class SwuClient:
             headers=self._headers(),
             data={"pageNum": 1, "pageSize": 1},
             timeout=self.timeout,
+            allow_redirects=False,
         )
         return self._json_object(response, label="transition")
 
@@ -125,6 +135,7 @@ class SwuClient:
             params={"pageNum": page_num, "pageSize": LEAVE_PAGE_SIZE},
             headers=self._headers(),
             timeout=self.timeout,
+            allow_redirects=False,
         )
         payload = self._json_object(response, label="leave")
         parsed = LeaveRecords.from_response(payload)
@@ -169,6 +180,8 @@ class SwuClient:
             params={"formId": form_id, "isSubmitProcess": False},
             data=json.dumps(payload),
             timeout=self.timeout,
+            allow_redirects=False,
         )
+        self._reject_redirect(response)
         response.raise_for_status()
         return response.json()
