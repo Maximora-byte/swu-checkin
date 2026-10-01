@@ -91,8 +91,11 @@ def run_smoke() -> None:
                 "$ErrorActionPreference='Stop'; $ProgressPreference='SilentlyContinue'; "
                 "try { $s=New-Object -ComObject Schedule.Service; $s.Connect(); "
                 "$t=$s.GetFolder('\\').GetTask('" + name + "'); $d=$t.Definition; "
-                "$a=$d.Actions.Item(1); $p=@{Name=$t.Name; Command=$a.Path; Arguments=$a.Arguments; "
-                "WorkingDirectory=$a.WorkingDirectory; UserId=$d.Principal.UserId; "
+                "$a=$d.Actions.Item(1); $u=$d.Principal.UserId; "
+                "if ($u -notmatch '^S-1-') { "
+                "$u=([Security.Principal.NTAccount]$u).Translate([Security.Principal.SecurityIdentifier]).Value }; "
+                "$p=@{Name=$t.Name; Command=$a.Path; Arguments=$a.Arguments; "
+                "WorkingDirectory=$a.WorkingDirectory; UserId=$u; "
                 "RunLevel=[int]$d.Principal.RunLevel; LogonType=[int]$d.Principal.LogonType; "
                 "StartWhenAvailable=[bool]$d.Settings.StartWhenAvailable}; "
                 "[Console]::Out.Write((ConvertTo-Json -InputObject $p -Compress)); exit 0 } catch { exit 3 }"
@@ -106,6 +109,9 @@ def run_smoke() -> None:
                     "-EncodedCommand",
                     base64.b64encode(script.encode("utf-16-le")).decode("ascii"),
                 ],
+            )
+            print(
+                f"Harmless task property query: exit={properties.returncode}, stderr_present={bool(properties.stderr)}"
             )
             if properties.returncode or properties.stderr.strip():
                 raise RuntimeError("Harmless task property query failed")
@@ -121,6 +127,10 @@ def run_smoke() -> None:
                 "StartWhenAvailable": False,
             }
             if not isinstance(values, dict) or values != expected:
+                if isinstance(values, dict):
+                    for key in expected:
+                        if values.get(key) != expected[key]:
+                            print("Harmless effective task property mismatch: " + key)
                 raise RuntimeError("Harmless task effective property verification failed")
             print("Harmless task stage: delete")
             deleted = backend._system_command("schtasks.exe", ["/Delete", "/TN", name, "/F"])
