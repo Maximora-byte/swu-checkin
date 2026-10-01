@@ -1,5 +1,6 @@
 """Offline regression coverage for desktop storage, scheduling and safety boundaries."""
 
+import base64
 import json
 import subprocess
 from datetime import UTC, datetime
@@ -65,12 +66,13 @@ def command_mock(monkeypatch, backend, *, create_code=0, exists=True):
         calls.append((executable, args))
         if executable == "whoami.exe":
             return SimpleNamespace(returncode=0, stdout='"TEST\\User","S-1-5-21-123"\n')
-        if args[0] == "/Query":
-            code = 1 if args[2] == desktop.LEGACY_TASK_NAME else int(not exists)
-            return SimpleNamespace(returncode=code, stdout="")
+        if executable.endswith("powershell.exe"):
+            script = base64.b64decode(args[-1]).decode("utf-16-le")
+            present = desktop.LEGACY_TASK_NAME not in script and exists
+            return SimpleNamespace(returncode=0, stdout="SWU_TASK_EXISTS" if present else "SWU_TASK_ABSENT", stderr="")
         if args[0] == "/Create":
             xml_path = Path(args[args.index("/XML") + 1])
-            ET.fromstring(xml_path.read_text(encoding="utf-16"))
+            ET.fromstring(xml_path.read_bytes())
             return SimpleNamespace(returncode=create_code, stdout="")
         return SimpleNamespace(returncode=0, stdout="")
 
@@ -156,6 +158,7 @@ def test_task_xml_escapes_paths_and_has_beijing_daily_triggers():
     assert xml.findtext(".//t:WorkingDirectory", namespaces=ns) == str(PureWindowsPath(executable).parent)
     assert xml.findtext(".//t:LogonType", namespaces=ns) == "InteractiveToken"
     assert xml.findtext(".//t:RunLevel", namespaces=ns) == "LeastPrivilege"
+    assert xml.findtext(".//t:StartWhenAvailable", namespaces=ns) == "false"
     assert [node.text for node in xml.findall(".//t:StartBoundary", ns)] == [
         "2026-10-02T21:15:00+08:00",
         "2026-10-01T21:45:00+08:00",
@@ -166,7 +169,7 @@ def test_task_xml_escapes_paths_and_has_beijing_daily_triggers():
 def test_schedule_defaults_off(backend, monkeypatch):
     calls = command_mock(monkeypatch, backend, exists=False)
     assert backend.schedule_enabled() is False
-    assert all(args[0] == "/Query" for _, args in calls)
+    assert all(executable.endswith("powershell.exe") for executable, _ in calls)
     assert not backend.config_path.exists()
 
 
@@ -430,7 +433,10 @@ def test_frozen_task_xml_uses_installed_executable(backend, monkeypatch):
 
     def capture(executable, args):
         if args[0] == "/Create":
-            captured.append(ET.fromstring(Path(args[args.index("/XML") + 1]).read_text(encoding="utf-16")))
+            raw = Path(args[args.index("/XML") + 1]).read_bytes()
+            assert raw.startswith((b"\xff\xfe", b"\xfe\xff"))
+            assert raw.decode("utf-16").startswith("<?xml version='1.0' encoding='utf-16'?>")
+            captured.append(ET.fromstring(raw))
         return original(executable, args)
 
     monkeypatch.setattr(backend, "_system_command", capture)
@@ -441,6 +447,10 @@ def test_frozen_task_xml_uses_installed_executable(backend, monkeypatch):
     assert captured[0].findtext(".//t:Arguments", namespaces=ns) == "--scheduled"
     assert captured[0].findtext(".//t:WorkingDirectory", namespaces=ns) == r"C:\Program Files\SWUCheckin"
     assert "synthetic-password" not in ET.tostring(captured[0], encoding="unicode")
+    assert captured[0].findtext(".//t:UserId", namespaces=ns) == "S-1-5-21-123"
+    assert captured[0].findtext(".//t:StartWhenAvailable", namespaces=ns) == "false"
+    boundaries = [node.text for node in captured[0].findall(".//t:StartBoundary", ns)]
+    assert [value[11:] for value in boundaries] == ["21:15:00+08:00", "21:45:00+08:00"]
 
 
 @pytest.mark.parametrize("entrypoint", ["cli", "gui", "scheduled"])
@@ -496,3 +506,78 @@ def test_readonly_entrypoints_never_use_formal_wrapper(backend, monkeypatch, ent
             monkeypatch.setattr(backend, "load_credentials", lambda: ("synthetic-user", "synthetic-password"))
             assert backend.run_scheduled() == 0
     wrapper.assert_not_called()
+
+
+@pytest.mark.parametrize("marker,expected", [("SWU_TASK_EXISTS", True), ("SWU_TASK_ABSENT", False)])
+def test_task_query_requires_definite_success_marker(backend, monkeypatch, marker, expected):
+    query = Mock(return_value=SimpleNamespace(returncode=0, stdout=marker, stderr=""))
+    monkeypatch.setattr(backend, "_system_command", query)
+    assert backend._task_exists(desktop.TASK_NAME) is expected
+    executable, args = query.call_args.args
+    assert executable == r"WindowsPowerShell\v1.0\powershell.exe"
+    assert args[:4] == ["-NoLogo", "-NoProfile", "-NonInteractive", "-EncodedCommand"]
+    script = base64.b64decode(args[-1]).decode("utf-16-le")
+    assert "$f.GetTask('SWUCheckin-Desktop')" in script
+    assert "$f=$s.GetFolder('\\') } catch { exit 3 }" in script
+    assert "COMException" in script and "-2147024894" in script
+    assert "/Create" not in script and "/Delete" not in script
+
+
+@pytest.mark.parametrize(
+    "code,out,err",
+    [
+        (1, "", "not found"),
+        (5, "", "access denied token-secret"),
+        (3, "", "service failure"),
+        (2, "SWU_TASK_ABSENT", ""),
+        (0, "", ""),
+        (0, "unrecognized user-path", ""),
+        (0, "SWU_TASK_ABSENT", "warning password-secret"),
+    ],
+)
+def test_task_query_unknown_fails_closed_without_leak(backend, monkeypatch, code, out, err):
+    monkeypatch.setattr(
+        backend, "_system_command", Mock(return_value=SimpleNamespace(returncode=code, stdout=out, stderr=err))
+    )
+    with pytest.raises(desktop.DesktopError) as caught:
+        backend._task_exists(desktop.TASK_NAME)
+    assert caught.value.code is desktop.DesktopErrorCode.TASK_QUERY_FAILED
+    assert str(caught.value) == "无法确认计划任务状态"
+
+
+@pytest.mark.parametrize("error", [OSError("sensitive-path"), subprocess.TimeoutExpired("token-secret", 30)])
+def test_task_query_process_failure_is_fixed_error(backend, monkeypatch, error):
+    monkeypatch.setattr(backend, "_system_command", Mock(side_effect=error))
+    with pytest.raises(desktop.DesktopError, match="^无法确认计划任务状态$"):
+        backend._task_exists(desktop.TASK_NAME)
+
+
+@pytest.mark.parametrize("operation", ["mode", "enable", "disable"])
+@pytest.mark.parametrize("failed_name", [desktop.TASK_NAME, desktop.LEGACY_TASK_NAME])
+def test_unknown_task_state_prevents_schedule_mutation(backend, monkeypatch, operation, failed_name):
+    backend.save_credentials("synthetic-user", "synthetic-password")
+    calls = command_mock(monkeypatch, backend)
+    config(backend, enabled=False)
+    previous = backend.config_path.read_bytes()
+
+    def query(name):
+        if name == failed_name:
+            raise desktop.DesktopError(desktop.DesktopErrorCode.TASK_QUERY_FAILED)
+        return False
+
+    monkeypatch.setattr(backend, "_task_exists", query)
+    if failed_name == desktop.LEGACY_TASK_NAME and operation != "enable":
+        # Mode/disable only concern the current desktop task, not a legacy one.
+        if operation == "mode":
+            assert backend.schedule_mode() is None
+        else:
+            backend.set_schedule(False)
+    else:
+        with pytest.raises(desktop.DesktopError, match="^无法确认计划任务状态$"):
+            if operation == "mode":
+                backend.schedule_mode()
+            else:
+                backend.set_schedule(operation == "enable")
+        assert backend.config_path.read_bytes() == previous
+    assert not any(args[0] in {"/Create", "/Delete"} for _, args in calls)
+    assert not list(backend.root.glob(".task-*"))

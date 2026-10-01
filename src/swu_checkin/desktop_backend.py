@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import base64
 import csv
 import io
 import json
@@ -48,7 +49,7 @@ def _atomic_write(path: Path, data: bytes) -> None:
             os.unlink(name)
 
 
-def task_xml(executable: str, sid: str, now: datetime | None = None) -> str:
+def task_xml(executable: str, sid: str, now: datetime | None = None) -> bytes:
     """A per-user non-elevated task; paths are XML escaped, never shell interpolated."""
     if not executable or not sid:
         raise DesktopError(DesktopErrorCode.TASK_IDENTITY_MISSING)
@@ -82,7 +83,7 @@ def task_xml(executable: str, sid: str, now: datetime | None = None) -> str:
         ("MultipleInstancesPolicy", "IgnoreNew"),
         ("DisallowStartIfOnBatteries", "false"),
         ("StopIfGoingOnBatteries", "false"),
-        ("StartWhenAvailable", "true"),
+        ("StartWhenAvailable", "false"),
         ("RunOnlyIfNetworkAvailable", "true"),
         ("ExecutionTimeLimit", "PT15M"),
         ("Enabled", "true"),
@@ -94,7 +95,7 @@ def task_xml(executable: str, sid: str, now: datetime | None = None) -> str:
     element(execution, "Command", executable)
     element(execution, "Arguments", "--scheduled")
     element(execution, "WorkingDirectory", str(PureWindowsPath(executable).parent))
-    return ET.tostring(root, encoding="unicode", xml_declaration=True)
+    return ET.tostring(root, encoding="utf-16", xml_declaration=True)
 
 
 class DesktopBackend:
@@ -213,7 +214,39 @@ class DesktopBackend:
         )
 
     def _task_exists(self, name: str) -> bool:
-        return self._system_command("schtasks.exe", ["/Query", "/TN", name, "/XML"]).returncode == 0
+        # schtasks exit 1 conflates missing tasks, access denial and service
+        # failures. Query the exact root task via COM instead; only GetTask's
+        # explicit ERROR_FILE_NOT_FOUND is absence. Never parse localized text.
+        literal = name.replace("'", "''")
+        script = (
+            "$ErrorActionPreference='Stop'; "
+            "try { $s=New-Object -ComObject Schedule.Service; $s.Connect(); "
+            "$f=$s.GetFolder('\\') } catch { exit 3 }; "
+            "try { $null=$f.GetTask('" + literal + "'); "
+            "[Console]::Out.Write('SWU_TASK_EXISTS'); exit 0 } catch { "
+            "$e=$_.Exception; while ($null -ne $e) { "
+            "if ($e -is [Runtime.InteropServices.COMException] -and $e.HResult -eq -2147024894) { "
+            "[Console]::Out.Write('SWU_TASK_ABSENT'); exit 0 }; $e=$e.InnerException }; exit 3 }"
+        )
+        try:
+            result = self._system_command(
+                r"WindowsPowerShell\v1.0\powershell.exe",
+                [
+                    "-NoLogo",
+                    "-NoProfile",
+                    "-NonInteractive",
+                    "-EncodedCommand",
+                    base64.b64encode(script.encode("utf-16-le")).decode("ascii"),
+                ],
+            )
+            if result.returncode == 0 and not result.stderr.strip():
+                if result.stdout.strip() == "SWU_TASK_EXISTS":
+                    return True
+                if result.stdout.strip() == "SWU_TASK_ABSENT":
+                    return False
+        except Exception:
+            pass
+        raise DesktopError(DesktopErrorCode.TASK_QUERY_FAILED) from None
 
     def _read_config(self) -> dict:
         try:
@@ -257,10 +290,11 @@ class DesktopBackend:
         credentials = self.load_credentials()
         if credentials is None:
             raise DesktopError(DesktopErrorCode.SAVED_CREDENTIALS_REQUIRED)
-        if not self.diagnose(*credentials):
-            raise DesktopError(DesktopErrorCode.DIAGNOSIS_FAILED)
+        self._task_exists(TASK_NAME)  # Unknown current state must not permit overwrite.
         if self._task_exists(LEGACY_TASK_NAME):
             raise DesktopError(DesktopErrorCode.LEGACY_TASK_EXISTS)
+        if not self.diagnose(*credentials):
+            raise DesktopError(DesktopErrorCode.DIAGNOSIS_FAILED)
         identity = self._system_command("whoami.exe", ["/user", "/fo", "csv", "/nh"])
         try:
             sid = next(csv.reader(io.StringIO(identity.stdout)))[1]
@@ -273,7 +307,7 @@ class DesktopBackend:
         self.root.mkdir(mode=0o700, parents=True, exist_ok=True)
         fd, filename = tempfile.mkstemp(suffix=".xml", prefix=".task-", dir=self.root)
         try:
-            with os.fdopen(fd, "w", encoding="utf-16") as handle:
+            with os.fdopen(fd, "wb") as handle:
                 handle.write(task_xml(sys.executable, sid))
             _atomic_write(self.config_path, payload)
             result = self._system_command("schtasks.exe", ["/Create", "/TN", TASK_NAME, "/XML", filename, "/F"])

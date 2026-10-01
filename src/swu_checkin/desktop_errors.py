@@ -23,6 +23,7 @@ class DesktopErrorCode(Enum):
     DIAGNOSIS_FAILED = "diagnosis_failed"
     LEGACY_TASK_EXISTS = "legacy_task_exists"
     USER_IDENTITY_FAILED = "user_identity_failed"
+    TASK_QUERY_FAILED = "task_query_failed"
     TASK_CREATE_FAILED = "task_create_failed"
 
 
@@ -46,6 +47,7 @@ ERROR_MESSAGES = MappingProxyType(
         DesktopErrorCode.DIAGNOSIS_FAILED: "保存账号的只读检测未通过，未启用计划任务。",
         DesktopErrorCode.LEGACY_TASK_EXISTS: "发现旧版 SWUCheckin-Daily 任务，请先在任务计划程序删除旧任务登记（保留账号配置），避免两套定时同时运行。",
         DesktopErrorCode.USER_IDENTITY_FAILED: "无法确认 Windows 用户身份。",
+        DesktopErrorCode.TASK_QUERY_FAILED: "无法确认计划任务状态",
         DesktopErrorCode.TASK_CREATE_FAILED: "计划任务创建失败，请检查当前用户的任务计划权限。",
     }
 )

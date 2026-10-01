@@ -128,6 +128,9 @@ def app():
     app.schedule = Mock()
     app.schedule_mode = Mock()
     app.current_schedule_mode = None
+    app.schedule_state_known = True
+    app.schedule_status = Mock()
+    app.schedule_toggle = Mock()
     app.mode_controls = []
     app.run = Mock()
     app.append = Mock()
@@ -325,3 +328,30 @@ def test_error_message_vocabulary_is_complete_and_immutable():
     assert set(ERROR_MESSAGES) == set(DesktopErrorCode)
     with pytest.raises(TypeError):
         ERROR_MESSAGES[DesktopErrorCode.WINDOWS_REQUIRED] = "external"
+
+
+def test_unknown_schedule_restore_never_displays_disabled(app):
+    app._restore_local_state()
+    restored = app.run.call_args.args[2]
+    restored(False, "无法确认计划任务状态")
+    assert app.schedule_state_known is False
+    app.schedule_status.set.assert_called_with("计划任务状态未知：无法确认计划任务状态")
+    app.schedule_toggle.configure.assert_called_with(state="disabled")
+    app.schedule.set.assert_not_called()
+
+
+def test_unknown_schedule_state_cannot_enable_or_disable(app):
+    app.schedule_state_known = False
+    app.change_schedule()
+    app.backend.set_schedule.assert_not_called()
+    app.run.assert_not_called()
+    app.schedule_status.set.assert_called_with("计划任务状态未知：无法确认计划任务状态")
+
+
+def test_schedule_change_query_failure_marks_unknown(app):
+    app.schedule.get.return_value = False
+    app.change_schedule()
+    changed = app.run.call_args.args[2]
+    changed(False, "无法确认计划任务状态")
+    assert app.schedule_state_known is False
+    app.schedule_status.set.assert_called_with("计划任务状态未知：无法确认计划任务状态")

@@ -130,11 +130,13 @@ class DesktopApp:
             control.pack(anchor="w")
             self.controls.append(control)
             self.mode_controls.append(control)
-        schedule_toggle = ttk.Checkbutton(
+        self.schedule_toggle = ttk.Checkbutton(
             schedule, text="启用每日计划任务", variable=self.schedule, command=self.change_schedule
         )
-        schedule_toggle.pack(anchor="w", pady=(5, 0))
-        self.controls.append(schedule_toggle)
+        self.schedule_toggle.pack(anchor="w", pady=(5, 0))
+        self.controls.append(self.schedule_toggle)
+        self.schedule_status = tk.StringVar(value="计划任务状态未知（正在读取本地状态）")
+        ttk.Label(schedule, textvariable=self.schedule_status).pack(anchor="w")
         ttk.Label(
             schedule,
             text="北京时间每日 21:15 / 21:45；电脑须开机联网且用户已登录。睡眠 / 关机不保证运行。\n"
@@ -145,6 +147,7 @@ class DesktopApp:
         ttk.Label(panel, textvariable=self.progress).pack(anchor="w", pady=(0, 5))
         self.output = tk.Text(panel, height=9, wrap="word", state="disabled", font=("Microsoft YaHei UI", 10))
         self.output.pack(fill="both", expand=True)
+        self.schedule_state_known = False
         self.current_schedule_mode: str | None = None
         self._restore_local_state()
         root.after(100, self._poll)
@@ -155,7 +158,10 @@ class DesktopApp:
 
         def restored(success: bool, value: Any) -> None:
             if not success:
+                self.schedule_state_known = False
+                self._sync_schedule()
                 return
+            self.schedule_state_known = True
             credentials, self.current_schedule_mode = value
             if credentials:
                 self.username.set(credentials[0])
@@ -166,6 +172,14 @@ class DesktopApp:
         self.run("读取本地配置（不联网）", load, restored)
 
     def _sync_schedule(self) -> None:
+        if not self.schedule_state_known:
+            self.schedule_status.set("计划任务状态未知：无法确认计划任务状态")
+            self.schedule_toggle.configure(state="disabled")
+            for control in self.mode_controls:
+                control.configure(state="disabled")
+            return
+        self.schedule_status.set("计划任务已启用" if self.current_schedule_mode else "计划任务已关闭")
+        self.schedule_toggle.configure(state="normal")
         self.schedule.set(self.current_schedule_mode is not None)
         if self.current_schedule_mode:
             self.schedule_mode.set(self.current_schedule_mode)
@@ -253,7 +267,7 @@ class DesktopApp:
         self.run("读取本地状态", self.backend.status_text)
 
     def change_schedule(self) -> None:
-        if self.controller.busy:
+        if self.controller.busy or not self.schedule_state_known:
             self._sync_schedule()
             return
         enabled, mode = self.schedule.get(), self.schedule_mode.get()
@@ -278,7 +292,11 @@ class DesktopApp:
                 else "每日计划任务已关闭。"
             )
 
-        self.run("更新计划任务", change, lambda _success, _value: self._sync_schedule())
+        def changed(success: bool, _value: Any) -> None:
+            self.schedule_state_known = success
+            self._sync_schedule()
+
+        self.run("更新计划任务", change, changed)
 
     def close(self) -> None:
         if self.controller.busy:
