@@ -1,12 +1,12 @@
-# Windows desktop preview（开发构建）
+# Windows desktop preview（2.0.0）
 
-本页描述已通过 [PR #33](https://github.com/Maximora-byte/swu-checkin/pull/33) 合入 `main` 的桌面预览功能。当前提供 Windows x64 独立应用与安装包构建，不需要使用者安装 Python、uv 或 OCR 模型。产物未签名，尚无桌面版 Release，也尚未完成干净 Windows 10/11 标准用户验收。Python 发布版与桌面预览构建不是同一种产物。
+本页描述源自 [PR #33](https://github.com/Maximora-byte/swu-checkin/pull/33) 的桌面预览功能，当前源码版本为 `2.0.0`。Windows x64 独立应用与安装包不需要使用者安装 Python、uv 或 OCR 模型。产物仍未签名，也尚未完成干净 Windows 10/11 标准用户验收。发布范围见 [v2.0.0 发布说明](releases/v2.0.0.md)，实际发布状态和下载文件以 [GitHub Releases](https://github.com/Maximora-byte/swu-checkin/releases) 为准。Python 分发包与桌面预览安装包是不同产物。
 
 合并时的验证记录：[Windows Server 2022 x64 构建与冒烟测试](https://github.com/Maximora-byte/swu-checkin/actions/runs/36897730511)、[合并后普通 CI](https://github.com/Maximora-byte/swu-checkin/actions/runs/36901319136)。这些记录只证明相应 commit 的检查结果，不构成学校认证、Windows 10/11 全面支持或后续构建的保证。
 
 ## 面向使用者
 
-开发构建的分发文件为 `SWUCheckin-<版本>-win-x64-Setup.exe`。双击安装，然后从开始菜单打开 **SWU Checkin**；用户无需另装 Python、uv 或 OCR 模型。支持目标是 Windows 10/11 x64，其他架构未验收。不要从同名第三方下载站获取，也不要把旧 Python tag 的 ZIP 当作 EXE 安装包。
+安装程序文件为 `SWUCheckin-<版本>-win-x64-Setup.exe`（本版本目标为 `SWUCheckin-2.0.0-win-x64-Setup.exe`）。先在本仓库 Releases 中确认该资产确实存在、来源与校验值匹配，再安装并从开始菜单打开 **SWU Checkin**；用户无需另装 Python、uv 或 OCR 模型。支持目标是 Windows 10/11 x64，其他架构未验收。不要从同名第三方下载站获取，也不要把 GitHub 自动生成的 Source code ZIP 或 Python sdist 当作 EXE 安装包。
 
 - 默认安装到 `%LOCALAPPDATA%\Programs\SWUCheckin`，仅当前用户可用，无需管理员权限
 - 默认打开图形窗口；安装程序不会登录账号、注册计划任务或自动启动程序
@@ -103,7 +103,9 @@
 
 构建实现参考：[PyInstaller 使用文档](https://pyinstaller.org/en/v6.16.0/usage.html)、[Inno Setup 非管理员安装](https://jrsoftware.org/ishelp/topic_setup_privilegesrequired.htm)。
 
-工作流已经进入默认分支，可以从 [Actions](https://github.com/Maximora-byte/swu-checkin/actions/workflows/windows-desktop.yml) 手动选择受信任的 ref 构建。下载对应 run 的 `swu-checkin-windows-x64-<commit>` artifact 后，检查 `BUILD-INFO.json` 的 commit、dirty 标记和校验清单；PR run 的 `github.sha` 可能是临时 merge-test commit。artifact 保留 14 天、可能需要 GitHub 登录，并不是永久发布地址。不要只按安装包的 `1.1.5` 文件名判断它是否包含最新修复。
+正式下载入口以本仓库 [Releases](https://github.com/Maximora-byte/swu-checkin/releases) 中实际列出的资产为准；Release 资产必须对应其说明中的 tag commit 与构建 run。若该版本未列出桌面资产，不要假设 Python 发布工作流已经生成 EXE。
+
+开发者也可从 [Actions](https://github.com/Maximora-byte/swu-checkin/actions/workflows/windows-desktop.yml) 手动选择受信任的 ref 构建。下载对应 run 的 `swu-checkin-windows-x64-<commit>` artifact 后，检查 `BUILD-INFO.json` 的 commit、dirty 标记和校验清单；PR run 的 `github.sha` 可能是临时 merge-test commit。artifact 保留 14 天、可能需要 GitHub 登录，并不是永久发布地址。无论文件名版本为何，都要核对实际来源，不能把旧构建重命名为 `2.0.0`。
 
 ## 体积审查
 

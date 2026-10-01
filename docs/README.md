@@ -15,9 +15,10 @@
 - [安全模型](security.md)：凭据、TokenStore、提交安全与日志边界
 - [OAuth 登录发现](oauth-login-discovery.md)：可信主机、redirect 与回调校验
 - [维护与项目归属](../MAINTAINERS.md)
+- [v2.0.0 发布说明](releases/v2.0.0.md)：版本变化、交付目标、升级与已知限制
 - [开发、CI 与发布](development.md)：代码结构、离线测试、质量门禁与不同产物
 - [贡献指南](../CONTRIBUTING.md)
 
-`main` 包含合入的桌面预览功能；已发布 Python tag 与桌面 CI artifact 是不同交付渠道。桌面版目前未签名、尚无正式 Release，支持与验收限制见对应指南。
+当前源码版本为 `2.0.0`，包含桌面预览功能；源码 checkout、Python 分发包、Windows 安装包与桌面 CI artifact 是不同交付物。实际发布状态以本仓库 [Releases](https://github.com/Maximora-byte/swu-checkin/releases) 为准。桌面版仍未签名、尚未完成干净 Windows 10/11 标准用户验收，支持与验收限制见对应指南。
 
 所有文档均以所在 commit/tag 的代码为准。部署时不要把不同版本的 README、`uv.lock`、Windows 脚本或 systemd unit 混合使用。

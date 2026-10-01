@@ -20,11 +20,11 @@
 - **跨平台部署**：支持 GitHub Actions、Windows Task Scheduler 与 systemd timer。
 - **可追溯交付**：Python 3.13、`uv.lock`、Linux/Windows CI、wheel/sdist 安装验证和依赖审计。
 
-## Windows desktop preview（开发构建）
+## Windows desktop preview（2.0.0）
 
 桌面功能已通过 [PR #33](https://github.com/Maximora-byte/swu-checkin/pull/33) 合入 `main`：中文窗口、当前用户 DPAPI 保存、只读检测、确认后的手动签到，以及默认关闭的可选定时任务。Windows x64 安装包内置 Python 与运行所需资源，使用者无需另装 Python、uv 或 OCR 模型。
 
-当前桌面版仍是未签名开发构建，没有桌面版 Release。Windows Server 2022 x64 CI 已覆盖冻结自测、安装、GUI 关闭重开、卸载，以及独立无害计划任务的注册/查询/删除；尚未完成干净 Windows 10/11 标准用户验收。下载来源、使用步骤与限制见 [桌面版与构建指南](docs/windows-desktop.md)。
+当前源码版本为 `2.0.0`；Windows 桌面产物仍是未签名预览版。发布范围与升级说明见 [v2.0.0 发布说明](docs/releases/v2.0.0.md)，实际发布状态和可下载资产以 [GitHub Releases](https://github.com/Maximora-byte/swu-checkin/releases) 为准。Windows Server 2022 x64 CI 已覆盖冻结自测、安装、GUI 关闭重开、卸载，以及独立无害计划任务的注册/查询/删除；尚未完成干净 Windows 10/11 标准用户验收。使用步骤与限制见 [桌面版与构建指南](docs/windows-desktop.md)。
 
 本工具使用学校记录的寝室坐标，不测量实际 GPS，技术提交成功不证明人在寝。仅在本人确实在寝并符合学校规则时使用正式签到；自动模式必须单独授权，不满足条件时提前停用。
 
@@ -34,7 +34,7 @@
 | --- | --- | --- |
 | 先确认账号和接口是否可用 | [本地 CLI](docs/quickstart.md) | 最快；先 `setup` / `probe`，再决定是否正式运行 |
 | 长期在线 Linux 主机 | [systemd 部署](DEPLOYMENT.md) | 时间稳定、权限隔离、双次 timer、可选 Telegram 汇总 |
-| 想使用 Windows 中文窗口 | [桌面预览版](docs/windows-desktop.md) | 独立 EXE；默认不联网、不启用任务；当前未签名、未正式发布 |
+| 想使用 Windows 中文窗口 | [桌面预览版](docs/windows-desktop.md) | 独立 EXE；默认不联网、不启用任务；未签名，下载以 Releases 资产为准 |
 | 已使用 Windows Python 脚本部署 | [Windows 脚本指南](docs/windows.md) | 需要 uv/Python；安装诊断成功后会启用正式定时任务 |
 | 没有自己的服务器 | [GitHub Actions](GITHUB_ACTIONS.md) | 配置简单，但 cron 可能排队延迟，不保证准点 |
 
@@ -64,7 +64,7 @@ uv run --locked --no-dev swu-checkin run
 `run` / `probe` / `doctor` 的环境凭据缺失时会交互询问；`setup` 总是交互输入。密码无回显，`setup` 不保存凭据。无人值守运行必须使用 GitHub Secrets、Windows DPAPI 或权限受限的 systemd 环境文件。
 
 > [!TIP]
-> 上例检出当前默认分支，不等于安装已发布稳定版。需要稳定 Python 发布版时，请从 [Releases](https://github.com/Maximora-byte/swu-checkin/releases) 选择 tag，并同时使用该 tag 的代码、文档和 `uv.lock`。已发布的 [v1.1.5](https://github.com/Maximora-byte/swu-checkin/releases/tag/v1.1.5) 提供 wheel/sdist，不含 PR #33 的桌面功能；当前源码的版本字符串仍为 `1.1.5`，识别预览构建还需 commit 与 `BUILD-INFO.json`。
+> 上例检出当前默认分支，不等于安装已发布版本。需要 Python 发布版时，请从 [Releases](https://github.com/Maximora-byte/swu-checkin/releases) 选择 tag，并同时使用该 tag 的代码、文档和 `uv.lock`。当前源码以 `v2.0.0` 为发布目标；旧 [v1.1.5](https://github.com/Maximora-byte/swu-checkin/releases/tag/v1.1.5) 只有 wheel/sdist，不含桌面功能。版本号本身不能证明资产已发布或通过验收，桌面构建还需核对 commit、`BUILD-INFO.json` 与校验清单。
 
 ## 常用命令
 
@@ -117,6 +117,7 @@ swu-checkin probe --json   # probe 的 schema v1 JSON，不提交签到
 - [GitHub Actions 指南](GITHUB_ACTIONS.md)：Secrets、多账号、通知和排队延迟
 - [故障排查](docs/troubleshooting.md)：状态 3/4、缓存 session、锁、Actions 和安全报告
 - [安全模型](docs/security.md)：认证、TokenStore、提交安全、日志与支持边界
+- [v2.0.0 发布说明](docs/releases/v2.0.0.md)：相对 v1.1.5 的变化、交付目标与已知限制
 - [开发、CI 与发布](docs/development.md)：模块分工、离线验证、发布边界
 - [贡献指南](CONTRIBUTING.md) / [维护与归属](MAINTAINERS.md)
 

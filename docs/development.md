@@ -4,12 +4,13 @@
 
 ## 1. 版本与分发边界
 
-截至 2026-10-01：
+当前源码以 `v2.0.0` 为发布目标：
 
-- 最新 Python/CLI Release 为 [`v1.1.5`](https://github.com/Maximora-byte/swu-checkin/releases/tag/v1.1.5)（2026-09-27），上传资产为 `.whl` 与 `.tar.gz`
-- Windows desktop preview 已通过 [PR #33](https://github.com/Maximora-byte/swu-checkin/pull/33) 合入 `main`，合并 commit 为 `e900fd17d3c0d4325c666b1fc573cf33015911ef`
-- `pyproject.toml` 与 `swu_checkin.__version__` 仍为 `1.1.5`，但 `main` 已比这个稳定 tag 多出改动。版本号相同不代表源码、功能或二进制相同，应同时记录 commit 与 artifact 来源
-- 此次合并没有发布 Windows 安装包 Release。桌面产物仍为未签名开发构建；已做 GitHub-hosted Windows Server 2022 x64 构建/安装 smoke，干净 Windows 10/11 x64 标准用户验收仍未完成
+- `pyproject.toml`、`swu_checkin.__version__` 与 `uv.lock` 的项目版本为 `2.0.0`；变更摘要与交付目标见 [v2.0.0 发布说明](releases/v2.0.0.md)
+- 旧 [`v1.1.5`](https://github.com/Maximora-byte/swu-checkin/releases/tag/v1.1.5) 只提供 Python `.whl` 与 `.tar.gz`，不含桌面功能
+- Windows desktop preview 来自 [PR #33](https://github.com/Maximora-byte/swu-checkin/pull/33)，合并 commit 为 `e900fd17d3c0d4325c666b1fc573cf33015911ef`；版本准备不会替代该发布 commit 自身的验证
+- 实际发布状态与可下载资产以 [GitHub Releases](https://github.com/Maximora-byte/swu-checkin/releases) 为准。版本号或源码说明不证明已经完成发布；Release 应记录 tag commit、对应 CI run 与资产来源
+- 桌面产物仍为未签名预览版；已做 GitHub-hosted Windows Server 2022 x64 构建/安装 smoke，干净 Windows 10/11 x64 标准用户验收仍未完成
 
 Python Release、Windows Actions artifact、源码 checkout 是不同交付物。不要把桌面预览构建描述为已签名、稳定版或已完成 Windows 10/11 全面验收。具体桌面使用、构建环境和人工验收清单见 [桌面版指南](windows-desktop.md)。
 
@@ -127,6 +128,8 @@ uv run --locked python scripts/release/verify_artifacts.py \
 3. 仅上传这两类已验证分发包作为保留 1 天的中间 artifact
 4. `release-publish` 才取得 `contents: write`；它不 checkout 或运行项目代码，只下载对应 artifact、核对数量，并用已存在的 tag 创建 GitHub Release、生成 notes
 5. 已有同名 Release 时拒绝覆盖；该流程没有 PyPI 上传，也不上传 Windows EXE
+
+如发布同时包含 Windows 桌面预览，需另行取得与 tag commit 一致的 Windows 构建产物，核对 `BUILD-INFO.json`、工具链与校验清单，并在发布说明中标明来源 run、未签名状态与验收限制。不要把旧版本或其他 commit 的 artifact 改名后作为新版本上传；完整 onedir 分发需保留全部资源与许可。重新封装 ZIP 时还需为上传文件计算校验值，目录内的原始清单不会自动覆盖新 ZIP。
 
 Release 自身不会重跑普通 CI 的所有平台/systemd/DAC/漏洞审计 job。发布前仍需确认目标 commit 的普通 CI 与适用平台验证；tag 匹配和祖先检查不能替代这些证据。版本变更需保持 `pyproject.toml`、`src/swu_checkin/__init__.py` 与锁文件一致；不要移动已发布 tag 或用同名版本重新包装不同内容。
 
