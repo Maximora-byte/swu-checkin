@@ -297,7 +297,10 @@ def _get_token(username: str, password: str, timeout: int, max_login_attempts: i
             TOKEN_EXCHANGE_URL,
             params={"token": token_st, "remember": "true"},
             timeout=timeout,
+            allow_redirects=False,
         )
+        if response.status_code in range(300, 400):
+            raise AuthError(AuthFailureReason.TOKEN_EXCHANGE_FAILED)
         response.raise_for_status()
         try:
             token_response = response.json()

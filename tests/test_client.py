@@ -49,6 +49,7 @@ def test_client_uses_token_headers_timeout_and_response_validation():
         params={"appType": "fighter-portal"},
         headers={"fighter-auth-token": "secret-token"},
         timeout=7,
+        allow_redirects=False,
     )
     session.get.return_value.raise_for_status.assert_called_once_with()
 
@@ -267,3 +268,63 @@ def test_client_transition_accepts_status_only_terminal_record():
 
     assert transition == Transition(record_id=None, form_id=None, checkin_status="已签到")
     assert transition.is_checked_in is True
+
+
+@pytest.mark.parametrize("status_code", [300, 301, 302, 303, 304, 307, 308, 399])
+@pytest.mark.parametrize(
+    "operation",
+    ["get_student_profile", "get_dormitory", "get_transition", "get_leave_records", "submit_checkin_form"],
+)
+def test_business_redirects_are_rejected_without_following_or_parsing(status_code, operation):
+    response = requests.Response()
+    response.status_code = status_code
+    response.headers["Location"] = "http://outside.invalid/collect"
+    response.json = Mock(return_value={"code": 200})
+    session = Mock()
+    session.get.return_value = response
+    session.post.return_value = response
+    client = SwuClient("synthetic-token", session=session)
+
+    with pytest.raises(requests.HTTPError, match="Unexpected business API redirect"):
+        if operation == "submit_checkin_form":
+            client.submit_checkin_form(form_id="synthetic-form", payload={"id": "synthetic-record"})
+        else:
+            getattr(client, operation)()
+
+    calls = session.get.call_args_list + session.post.call_args_list
+    assert len(calls) == 1
+    assert calls[0].kwargs["allow_redirects"] is False
+    assert calls[0].args[0] != response.headers["Location"]
+    response.json.assert_not_called()
+
+
+@pytest.mark.parametrize("status_code", [302, 307, 308])
+def test_real_session_never_sends_redirected_request(status_code):
+    sent = []
+
+    class RedirectAdapter(requests.adapters.BaseAdapter):
+        def send(self, request, **kwargs):
+            sent.append(request)
+            response = requests.Response()
+            response.status_code = status_code
+            response.headers["Location"] = "http://outside.invalid/collect"
+            response.request = request
+            response.url = request.url
+            response._content = b"{}"
+            return response
+
+        def close(self):
+            pass
+
+    # A real requests.Session with in-memory adapters exercises its redirect
+    # handling without opening sockets or contacting any external service.
+    with requests.Session() as session:
+        session.trust_env = False
+        session.mount("https://", RedirectAdapter())
+        session.mount("http://", RedirectAdapter())
+        client = SwuClient("synthetic-token", session=session)
+        with pytest.raises(requests.HTTPError, match="Unexpected business API redirect"):
+            client.submit_checkin_form(form_id="synthetic-form", payload={"id": "synthetic-record"})
+
+    assert len(sent) == 1
+    assert sent[0].url.startswith(CHECKIN_FORM_URL)

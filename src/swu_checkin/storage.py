@@ -39,7 +39,7 @@ def load_run_status(status_path: str) -> StoredRunStatus | None:
         payload = json.loads(path.read_text(encoding="utf-8"))
     except FileNotFoundError:
         return None
-    except (json.JSONDecodeError, OSError) as error:
+    except (json.JSONDecodeError, OSError, UnicodeError) as error:
         raise StatusStorageError("无法读取本地状态文件") from error
     if not isinstance(payload, dict) or set(payload) != {"date", "attempts", "successful"}:
         raise StatusStorageError("本地状态文件结构无效")
@@ -84,15 +84,18 @@ def record_run_status(status_path: str, result: CheckinStatus | int) -> None:
     path = Path(status_path)
     now = now_shanghai()
     today = now.date().isoformat()
-    current: dict = {}
     try:
-        current = json.loads(path.read_text(encoding="utf-8"))
-    except (FileNotFoundError, json.JSONDecodeError, OSError, TypeError):
-        pass
+        current = load_run_status(status_path)
+    except StatusStorageError:
+        current = None
 
-    attempts = current.get("attempts", []) if current.get("date") == today else []
-    if not isinstance(attempts, list):
-        attempts = []
+    # Discard malformed history rather than preserving unvalidated server data
+    # or allowing a corrupt local file to hide the result of a completed run.
+    attempts = (
+        [{"at": attempt.at, "code": attempt.code, "message": attempt.message} for attempt in current.attempts]
+        if current is not None and current.date == today
+        else []
+    )
     attempts.append(
         {
             "at": now.isoformat(timespec="seconds"),

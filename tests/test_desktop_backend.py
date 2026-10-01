@@ -1,0 +1,421 @@
+"""Offline regression coverage for desktop storage, scheduling and safety boundaries."""
+
+import json
+import subprocess
+from datetime import UTC, datetime
+from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import Mock
+from xml.etree import ElementTree as ET
+
+import pytest
+
+from swu_checkin import desktop_backend as desktop
+from swu_checkin.models import CheckinResult
+from swu_checkin.runtime_lock import RuntimeLock, RuntimeLockBusy
+from swu_checkin.status import CheckinStatus
+
+
+class FakeProtector:
+    """Opaque in-memory test cipher: no production credentials or DPAPI calls."""
+
+    blobs = {}
+
+    def protect(self, plaintext):
+        blob = f"opaque-test-blob-{len(self.blobs)}".encode()
+        self.blobs[blob] = plaintext
+        return blob
+
+    def unprotect(self, ciphertext):
+        return self.blobs[ciphertext]
+
+
+@pytest.fixture(autouse=True)
+def offline(monkeypatch, tmp_path):
+    monkeypatch.setattr(desktop, "WindowsDpapiProtector", FakeProtector)
+    monkeypatch.setattr(desktop.subprocess, "run", Mock(side_effect=AssertionError("Unexpected subprocess")))
+    monkeypatch.setattr(desktop, "run_checkin", Mock(side_effect=AssertionError("Unexpected submission")))
+    monkeypatch.setattr(desktop, "run_probe", Mock(side_effect=AssertionError("Unexpected network")))
+    monkeypatch.setattr(desktop, "CheckinService", Mock(side_effect=AssertionError("Unexpected network")))
+    monkeypatch.setenv("SWUDK_LOCK_FILE", str(tmp_path / "shared-cli.lock"))
+    monkeypatch.delenv("SWUDK_PROBE_ONLY", raising=False)
+
+
+@pytest.fixture
+def backend(tmp_path):
+    return desktop.DesktopBackend(tmp_path / "app")
+
+
+def result(mode="checkin", status=None):
+    status = (
+        status if status is not None else (CheckinStatus.SUCCESS if mode == "checkin" else CheckinStatus.PROBE_PENDING)
+    )
+    return CheckinResult.from_status(status, attempts=1, duration_ms=12, mode=mode)
+
+
+def config(backend, **values):
+    backend.root.mkdir(parents=True, exist_ok=True)
+    backend.config_path.write_text(json.dumps({"schema_version": 1, **values}), encoding="utf-8")
+
+
+def command_mock(monkeypatch, backend, *, create_code=0, exists=True):
+    calls = []
+
+    def command(executable, args):
+        calls.append((executable, args))
+        if executable == "whoami.exe":
+            return SimpleNamespace(returncode=0, stdout='"TEST\\User","S-1-5-21-123"\n')
+        if args[0] == "/Query":
+            code = 1 if args[2] == desktop.LEGACY_TASK_NAME else int(not exists)
+            return SimpleNamespace(returncode=code, stdout="")
+        if args[0] == "/Create":
+            xml_path = Path(args[args.index("/XML") + 1])
+            ET.fromstring(xml_path.read_text(encoding="utf-16"))
+            return SimpleNamespace(returncode=create_code, stdout="")
+        return SimpleNamespace(returncode=0, stdout="")
+
+    monkeypatch.setattr(backend, "_system_command", command)
+    monkeypatch.setattr(backend, "diagnose", Mock(return_value=True))
+    monkeypatch.setattr(desktop.sys, "frozen", True, raising=False)
+    return calls
+
+
+def test_credentials_are_encrypted_and_roundtrip(backend):
+    backend.save_credentials("  synthetic-user  ", "synthetic-password")
+    assert backend.load_credentials() == ("synthetic-user", "synthetic-password")
+    data = backend.credential_path.read_bytes()
+    assert b"synthetic-user" not in data
+    assert b"synthetic-password" not in data
+    assert list(backend.root.iterdir()) == [backend.credential_path]
+
+
+@pytest.mark.parametrize(("username", "password"), [("", "x"), ("  ", "x"), ("x", "")])
+def test_empty_credentials_rejected(backend, username, password):
+    with pytest.raises(desktop.DesktopError):
+        backend.save_credentials(username, password)
+    assert not backend.root.exists()
+
+
+def test_atomic_credentials_replace_failure_preserves_old_ciphertext(backend, monkeypatch):
+    backend.save_credentials("old", "old-secret")
+    original = backend.credential_path.read_bytes()
+    monkeypatch.setattr(desktop.os, "replace", Mock(side_effect=OSError("synthetic-secret")))
+    with pytest.raises(desktop.DesktopError) as error:
+        backend.save_credentials("new", "new-secret")
+    assert "synthetic-secret" not in str(error.value)
+    assert backend.credential_path.read_bytes() == original
+    assert list(backend.root.iterdir()) == [backend.credential_path]
+
+
+def test_failed_encryption_never_writes_plaintext(backend, monkeypatch):
+    monkeypatch.setattr(FakeProtector, "protect", Mock(side_effect=ValueError("synthetic-password")))
+    with pytest.raises(desktop.DesktopError) as error:
+        backend.save_credentials("user", "synthetic-password")
+    assert "synthetic-password" not in str(error.value)
+    assert not backend.credential_path.exists()
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        [],
+        {},
+        {"schema_version": True, "username": "x", "password": "y"},
+        {"schema_version": 1, "username": 4, "password": "x"},
+    ],
+)
+def test_invalid_credential_payload_rejected(backend, payload):
+    backend.root.mkdir()
+    backend.credential_path.write_bytes(FakeProtector().protect(json.dumps(payload).encode()))
+    with pytest.raises(desktop.DesktopError):
+        backend.load_credentials()
+
+
+def test_missing_and_corrupt_credentials(backend):
+    assert backend.load_credentials() is None
+    backend.root.mkdir()
+    backend.credential_path.write_bytes(b"corrupt-ciphertext")
+    with pytest.raises(desktop.DesktopError):
+        backend.load_credentials()
+
+
+@pytest.mark.parametrize("raw", ["{", "[]", '{"schema_version":2}', '{"schema_version":true}'])
+def test_malformed_config_rejected(backend, raw):
+    backend.root.mkdir()
+    backend.config_path.write_text(raw)
+    with pytest.raises(desktop.DesktopError):
+        backend._read_config()
+
+
+def test_task_xml_escapes_paths_and_has_beijing_daily_triggers():
+    executable = '/test/app & "quoted"/checkin.exe'
+    xml = ET.fromstring(desktop.task_xml(executable, "S-1-5-21-123", datetime(2026, 10, 1, 13, 30, tzinfo=UTC)))
+    ns = {"t": desktop.TASK_NS}
+    assert xml.findtext(".//t:Command", namespaces=ns) == executable
+    assert xml.findtext(".//t:Arguments", namespaces=ns) == "--scheduled"
+    assert xml.findtext(".//t:WorkingDirectory", namespaces=ns) == str(Path(executable).parent)
+    assert xml.findtext(".//t:LogonType", namespaces=ns) == "InteractiveToken"
+    assert xml.findtext(".//t:RunLevel", namespaces=ns) == "LeastPrivilege"
+    assert [node.text for node in xml.findall(".//t:StartBoundary", ns)] == [
+        "2026-10-02T21:15:00+08:00",
+        "2026-10-01T21:45:00+08:00",
+    ]
+    assert [node.text for node in xml.findall(".//t:DaysInterval", ns)] == ["1", "1"]
+
+
+def test_schedule_defaults_off(backend, monkeypatch):
+    calls = command_mock(monkeypatch, backend, exists=False)
+    assert backend.schedule_enabled() is False
+    assert all(args[0] == "/Query" for _, args in calls)
+    assert not backend.config_path.exists()
+
+
+def test_disabled_config_reports_schedule_off(backend, monkeypatch):
+    command_mock(monkeypatch, backend)
+    config(backend, enabled=False, mode="checkin")
+    assert backend.schedule_mode() is None
+
+
+@pytest.mark.parametrize("mode", ["probe", "checkin"])
+def test_schedule_explicit_mode_selection(backend, monkeypatch, mode):
+    backend.save_credentials("test", "test-password")
+    calls = command_mock(monkeypatch, backend)
+    backend.set_schedule(True, mode)
+    assert json.loads(backend.config_path.read_text())["mode"] == mode
+    assert backend.schedule_mode() == mode
+    assert any(args[0] == "/Create" for _, args in calls)
+    assert not list(backend.root.glob(".task-*"))
+
+
+@pytest.mark.parametrize("previous", [None, {"enabled": True, "mode": "probe"}])
+def test_schedule_registration_failure_rolls_back_config(backend, monkeypatch, previous):
+    backend.save_credentials("test", "test-password")
+    if previous is not None:
+        config(backend, **previous)
+    original = backend.config_path.read_bytes() if previous is not None else None
+    command_mock(monkeypatch, backend, create_code=1)
+    with pytest.raises(desktop.DesktopError):
+        backend.set_schedule(True, "checkin")
+    assert (backend.config_path.read_bytes() if backend.config_path.exists() else None) == original
+    assert not list(backend.root.glob(".task-*"))
+
+
+def test_disable_deletes_only_current_task(backend, monkeypatch):
+    calls = command_mock(monkeypatch, backend)
+    backend.set_schedule(False)
+    assert ("schtasks.exe", ["/Delete", "/TN", desktop.TASK_NAME, "/F"]) in calls
+    assert json.loads(backend.config_path.read_text())["enabled"] is False
+
+
+def test_invalid_schedule_mode_rejected_before_credentials(backend, monkeypatch):
+    loader = Mock(side_effect=AssertionError("Unexpected credential read"))
+    monkeypatch.setattr(backend, "load_credentials", loader)
+    with pytest.raises(desktop.DesktopError):
+        backend.set_schedule(True, "invalid")
+    loader.assert_not_called()
+
+
+def test_system_command_uses_system32_list_without_shell(backend, monkeypatch):
+    monkeypatch.setattr(desktop.sys, "platform", "win32")
+    monkeypatch.setenv("SystemRoot", "/synthetic-windows")
+    runner = Mock(return_value=subprocess.CompletedProcess([], 0, "", ""))
+    monkeypatch.setattr(desktop.subprocess, "run", runner)
+    backend._system_command("schtasks.exe", ["/Query", "/TN", "safe & name"])
+    args, kwargs = runner.call_args
+    assert args[0] == ["/synthetic-windows/System32/schtasks.exe", "/Query", "/TN", "safe & name"]
+    assert not kwargs.get("shell", False)
+    assert kwargs["timeout"] == 30
+
+
+def test_formal_checkin_uses_same_runtime_lock(backend, monkeypatch):
+    submit = Mock(return_value=result())
+    monkeypatch.setattr(desktop, "run_checkin", submit)
+    with RuntimeLock():
+        with pytest.raises(RuntimeLockBusy):
+            backend.check_in("test", "test-password")
+    submit.assert_not_called()
+    assert backend.check_in("test", "test-password").code == CheckinStatus.SUCCESS
+    submit.assert_called_once()
+
+
+def test_readonly_safety_switch_blocks_submission(backend, monkeypatch):
+    monkeypatch.setenv("SWUDK_PROBE_ONLY", "1")
+    with pytest.raises(desktop.DesktopError):
+        backend.check_in("test", "test-password")
+    desktop.run_checkin.assert_not_called()
+
+
+def test_probe_only_calls_readonly_service(backend, monkeypatch):
+    probe = Mock(return_value=result("probe"))
+    monkeypatch.setattr(desktop, "run_probe", probe)
+    assert backend.probe("test", "test-password").mode == "probe"
+    desktop.run_checkin.assert_not_called()
+    probe.assert_called_once()
+
+
+def test_diagnosis_disables_token_cache_writes(backend, monkeypatch):
+    service = Mock()
+    service.diagnose.return_value = SimpleNamespace(
+        authentication=True, leave_policy=True, student_profile=True, dormitory_schema=True, checkin_api=True
+    )
+    monkeypatch.setattr(desktop, "CheckinService", Mock(return_value=service))
+    assert backend.diagnose("test", "test-password") is True
+    service.diagnose.assert_called_once_with("test", "test-password", read_token_cache=False, write_token_cache=False)
+    desktop.run_checkin.assert_not_called()
+
+
+def test_corrupt_status_preserves_successful_remote_outcome(backend, monkeypatch):
+    backend.root.mkdir()
+    (backend.root / "status.json").write_text("corrupt")
+    completed = result()
+    monkeypatch.setattr(desktop, "run_checkin", Mock(return_value=completed))
+    assert backend.check_in("test", "test-password") is completed
+    assert "签到成功" in backend.status_text()
+    assert json.loads((backend.root / "status.json").read_text())["successful"] is True
+
+
+@pytest.mark.parametrize(
+    "values",
+    [
+        {},
+        {"enabled": False, "mode": "checkin"},
+        {"enabled": "true", "mode": "probe"},
+        {"enabled": True, "mode": "invalid"},
+    ],
+)
+def test_inactive_scheduled_run_never_reads_credentials(backend, monkeypatch, values):
+    config(backend, **values)
+    loader = Mock(side_effect=AssertionError("Unexpected credential read"))
+    monkeypatch.setattr(backend, "load_credentials", loader)
+    assert backend.run_scheduled() == 1
+    loader.assert_not_called()
+
+
+@pytest.mark.parametrize("mode", ["probe", "checkin"])
+def test_scheduled_mode_routes_only_selected_operation(backend, monkeypatch, mode):
+    config(backend, enabled=True, mode=mode)
+    monkeypatch.setattr(backend, "load_credentials", Mock(return_value=("test", "synthetic-secret")))
+    selected = Mock(return_value=result(mode))
+    other = Mock(side_effect=AssertionError("Wrong operation"))
+    monkeypatch.setattr(backend, mode if mode == "probe" else "check_in", selected)
+    monkeypatch.setattr(backend, "check_in" if mode == "probe" else "probe", other)
+    assert backend.run_scheduled() == 0
+    selected.assert_called_once_with("test", "synthetic-secret")
+    other.assert_not_called()
+    text = (backend.root / "desktop-last-run.json").read_text()
+    assert "synthetic-secret" not in text
+    assert json.loads(text)["result"]["mode"] == mode
+
+
+def test_scheduled_failures_never_log_secrets(backend, monkeypatch, capsys, caplog):
+    config(backend, enabled=True, mode="probe")
+    monkeypatch.setattr(backend, "load_credentials", Mock(side_effect=ValueError("synthetic-secret")))
+    assert backend.run_scheduled() == 1
+    captured = capsys.readouterr()
+    assert "synthetic-secret" not in captured.out + captured.err + caplog.text
+
+
+def test_scheduled_record_write_failure_preserves_remote_outcome(backend, monkeypatch):
+    config(backend, enabled=True, mode="checkin")
+    monkeypatch.setattr(backend, "load_credentials", Mock(return_value=("test", "test-password")))
+    monkeypatch.setattr(backend, "check_in", Mock(return_value=result()))
+    monkeypatch.setattr(desktop, "_atomic_write", Mock(side_effect=OSError("disk unavailable")))
+    assert backend.run_scheduled() == 0
+
+
+def test_status_write_failure_keeps_success_and_warns(backend, monkeypatch):
+    completed = result()
+    monkeypatch.setattr(desktop, "run_checkin", Mock(return_value=completed))
+    monkeypatch.setattr(desktop, "record_run_status", Mock(side_effect=OSError("synthetic-secret")))
+    assert backend.check_in("test", "test-password") is completed
+    assert backend.last_warning
+    assert "synthetic-secret" not in backend.last_warning
+
+
+def test_schedule_requires_successful_saved_account_diagnosis(backend, monkeypatch):
+    backend.save_credentials("saved-user", "saved-password")
+    calls = command_mock(monkeypatch, backend)
+    diagnose = Mock(return_value=False)
+    monkeypatch.setattr(backend, "diagnose", diagnose)
+    with pytest.raises(desktop.DesktopError):
+        backend.set_schedule(True, "checkin")
+    diagnose.assert_called_once_with("saved-user", "saved-password")
+    assert not any(args[0] == "/Create" for _, args in calls)
+    assert not backend.config_path.exists()
+
+
+def test_enabled_schedule_prevents_credential_account_replacement(backend):
+    backend.save_credentials("original-user", "original-password")
+    config(backend, enabled=True, mode="checkin")
+    with pytest.raises(desktop.DesktopError):
+        backend.save_credentials("new-user", "new-password")
+    assert backend.load_credentials() == ("original-user", "original-password")
+
+
+@pytest.mark.parametrize("mode", [[], {}, False, 1])
+def test_malformed_schedule_mode_is_safe_error(backend, monkeypatch, mode):
+    command_mock(monkeypatch, backend)
+    config(backend, enabled=True, mode=mode)
+    with pytest.raises(desktop.DesktopError):
+        backend.schedule_mode()
+    assert backend.run_scheduled() == 1
+
+
+def test_missing_credentials_cannot_enable_schedule(backend, monkeypatch):
+    calls = command_mock(monkeypatch, backend)
+    with pytest.raises(desktop.DesktopError):
+        backend.set_schedule(True, "probe")
+    assert not calls
+
+
+def test_legacy_task_prevents_duplicate_registration(backend, monkeypatch):
+    backend.save_credentials("test", "test-password")
+    command_mock(monkeypatch, backend)
+    monkeypatch.setattr(backend, "_task_exists", Mock(return_value=True))
+    command = Mock(side_effect=AssertionError("No registration should happen"))
+    monkeypatch.setattr(backend, "_system_command", command)
+    with pytest.raises(desktop.DesktopError, match="旧版"):
+        backend.set_schedule(True, "checkin")
+    command.assert_not_called()
+
+
+def test_registration_verification_failure_restores_previous_config(backend, monkeypatch):
+    backend.save_credentials("test", "test-password")
+    config(backend, enabled=False)
+    previous = backend.config_path.read_bytes()
+    command_mock(monkeypatch, backend, exists=False)
+    with pytest.raises(desktop.DesktopError):
+        backend.set_schedule(True, "checkin")
+    assert backend.config_path.read_bytes() == previous
+
+
+def test_missing_scheduled_config_never_loads_credentials(backend, monkeypatch):
+    loader = Mock(side_effect=AssertionError("No credentials without opt-in"))
+    monkeypatch.setattr(backend, "load_credentials", loader)
+    assert backend.run_scheduled() == 1
+    loader.assert_not_called()
+
+
+def test_scheduled_formal_mode_respects_readonly_flag(backend, monkeypatch):
+    config(backend, enabled=True, mode="checkin")
+    monkeypatch.setattr(backend, "load_credentials", Mock(return_value=("test", "test-password")))
+    monkeypatch.setenv("SWUDK_PROBE_ONLY", "1")
+    assert backend.run_scheduled() == 1
+    desktop.run_checkin.assert_not_called()
+
+
+def test_nonfrozen_build_cannot_register_task(backend, monkeypatch):
+    monkeypatch.setattr(desktop.sys, "frozen", False, raising=False)
+    with pytest.raises(desktop.DesktopError, match="安装版"):
+        backend.set_schedule(True)
+    desktop.subprocess.run.assert_not_called()
+
+
+def test_status_with_corrupt_files_is_safe(backend):
+    backend.root.mkdir()
+    (backend.root / "status.json").write_text("corrupt-synthetic-secret")
+    (backend.root / "desktop-last-run.json").write_text("corrupt-synthetic-secret")
+    text = backend.status_text()
+    assert "损坏" in text
+    assert "定时结果不可读取" in text
+    assert "synthetic-secret" not in text

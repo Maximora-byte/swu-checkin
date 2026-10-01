@@ -51,3 +51,46 @@ def test_load_status_rejects_unexpected_fields(tmp_path):
 
     with pytest.raises(StatusStorageError):
         load_run_status(str(status_file))
+
+
+@pytest.mark.parametrize("previous", ["[]", "null", "42", '"text"', "true", "{broken", "{}"])
+def test_record_status_recovers_from_corrupt_or_wrong_shape_json(tmp_path, previous):
+    status_file = tmp_path / "status.json"
+    status_file.write_text(previous, encoding="utf-8")
+
+    record_run_status(str(status_file), CheckinStatus.SUCCESS)
+
+    status = load_run_status(str(status_file))
+    assert status is not None
+    assert status.successful
+    assert len(status.attempts) == 1
+    assert status.attempts[0].code == CheckinStatus.SUCCESS
+
+
+def test_record_status_discards_invalid_utf8_history(tmp_path):
+    status_file = tmp_path / "status.json"
+    status_file.write_bytes(b"\xff\xfe")
+    with pytest.raises(StatusStorageError):
+        load_run_status(str(status_file))
+
+    record_run_status(str(status_file), CheckinStatus.DATA_ERROR)
+
+    status = load_run_status(str(status_file))
+    assert status is not None
+    assert not status.successful
+    assert len(status.attempts) == 1
+
+
+def test_record_status_discards_unvalidated_history_fields(tmp_path):
+    status_file = tmp_path / "status.json"
+    record_run_status(str(status_file), CheckinStatus.DATA_ERROR)
+    payload = json.loads(status_file.read_text(encoding="utf-8"))
+    payload["attempts"][0]["message"] = "unexpected-private-data"
+    status_file.write_text(json.dumps(payload), encoding="utf-8")
+
+    record_run_status(str(status_file), CheckinStatus.SUCCESS)
+
+    status = load_run_status(str(status_file))
+    assert status is not None
+    assert len(status.attempts) == 1
+    assert "unexpected-private-data" not in status_file.read_text(encoding="utf-8")
