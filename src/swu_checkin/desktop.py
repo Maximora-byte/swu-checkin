@@ -8,7 +8,7 @@ import threading
 from collections.abc import Callable, Sequence
 from typing import Any
 
-from .desktop_errors import ERROR_MESSAGES, DesktopError
+from .desktop_errors import ERROR_MESSAGES, DesktopError, DesktopErrorCode
 from .models import CheckinResult
 
 LOCATION_WARNING = "本工具不测量真实 GPS；提交使用学校记录的固定寝室坐标，不代表您当前的位置。"
@@ -40,7 +40,7 @@ class DesktopController:
             try:
                 value = operation()
             except DesktopError as error:
-                self.events.put((False, ERROR_MESSAGES.get(error.code, SAFE_ERROR)))
+                self.events.put((False, error.code if isinstance(error.code, DesktopErrorCode) else SAFE_ERROR))
             except Exception:
                 # Exception strings may contain passwords, URLs, tokens, or server payloads.
                 self.events.put((False, SAFE_ERROR))
@@ -63,6 +63,8 @@ class DesktopController:
 
 
 def describe_result(value: object) -> str:
+    if isinstance(value, DesktopErrorCode):
+        return ERROR_MESSAGES[value]
     if isinstance(value, CheckinResult):
         operation = "只读检测" if value.mode == "probe" else "签到"
         return f"{operation}结果：{value.message}（尝试 {value.attempts} 次，用时 {value.duration_ms} 毫秒）"
@@ -279,6 +281,9 @@ class DesktopApp:
             self._sync_schedule()
             return
 
+        previous_known = self.schedule_state_known
+        previous_mode = self.current_schedule_mode
+
         def change() -> str:
             self.backend.set_schedule(enabled, mode=mode)
             self.current_schedule_mode = self.backend.schedule_mode()
@@ -292,8 +297,12 @@ class DesktopApp:
                 else "每日计划任务已关闭。"
             )
 
-        def changed(success: bool, _value: Any) -> None:
-            self.schedule_state_known = success
+        def changed(success: bool, value: Any) -> None:
+            if success:
+                self.schedule_state_known = True
+            else:
+                self.current_schedule_mode = previous_mode
+                self.schedule_state_known = False if value is DesktopErrorCode.TASK_QUERY_FAILED else previous_known
             self._sync_schedule()
 
         self.run("更新计划任务", change, changed)

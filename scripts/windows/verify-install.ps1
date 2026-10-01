@@ -11,6 +11,9 @@ if ($env:OS -ne 'Windows_NT' -or $env:GITHUB_ACTIONS -ne 'true' -or
     throw 'Installer smoke requires a disposable GitHub-hosted Windows runner.'
 }
 $Root = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
+$BuildPython = Join-Path $Root 'build\windows\venv\Scripts\python.exe'
+& $BuildPython (Join-Path $Root 'packaging\windows\task_scheduler_smoke.py')
+if ($LASTEXITCODE -ne 0) { throw 'Harmless Task Scheduler registration smoke failed.' }
 if ([string]::IsNullOrWhiteSpace($Installer)) {
     $Candidates = @(Get-ChildItem -LiteralPath (Join-Path $Root 'dist\windows') -Filter '*-win-x64-Setup.exe' -File)
     if ($Candidates.Count -ne 1) { throw 'Expected exactly one freshly built Windows installer.' }

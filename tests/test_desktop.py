@@ -257,7 +257,8 @@ def test_controller_exposes_only_reviewed_errors():
     event = controller.events.get(timeout=3)
     controller.events.put(event)
     controller.poll()
-    callback.assert_called_once_with(False, ERROR_MESSAGES[DesktopErrorCode.LEGACY_TASK_EXISTS])
+    callback.assert_called_once_with(False, DesktopErrorCode.LEGACY_TASK_EXISTS)
+    assert desktop.describe_result(callback.call_args.args[1]) == ERROR_MESSAGES[DesktopErrorCode.LEGACY_TASK_EXISTS]
 
 
 def test_manual_result_warns_if_local_record_failed(app):
@@ -305,9 +306,9 @@ def test_controller_never_renders_exception_text(typed):
     event = controller.events.get(timeout=3)
     controller.events.put(event)
     controller.poll()
-    expected = ERROR_MESSAGES[DesktopErrorCode.CONFIG_INVALID] if typed else desktop.SAFE_ERROR
+    expected = DesktopErrorCode.CONFIG_INVALID if typed else desktop.SAFE_ERROR
     callback.assert_called_once_with(False, expected)
-    assert secret not in callback.call_args.args[1]
+    assert secret not in desktop.describe_result(callback.call_args.args[1])
 
 
 @pytest.mark.parametrize("typed", [False, True])
@@ -352,6 +353,62 @@ def test_schedule_change_query_failure_marks_unknown(app):
     app.schedule.get.return_value = False
     app.change_schedule()
     changed = app.run.call_args.args[2]
-    changed(False, "无法确认计划任务状态")
+    changed(False, DesktopErrorCode.TASK_QUERY_FAILED)
     assert app.schedule_state_known is False
     app.schedule_status.set.assert_called_with("计划任务状态未知：无法确认计划任务状态")
+
+
+@pytest.mark.parametrize(
+    "code",
+    [
+        DesktopErrorCode.DIAGNOSIS_FAILED,
+        DesktopErrorCode.SAVED_CREDENTIALS_REQUIRED,
+        DesktopErrorCode.LEGACY_TASK_EXISTS,
+        DesktopErrorCode.MODE_REQUIRED,
+        DesktopErrorCode.FROZEN_REQUIRED,
+    ],
+)
+@pytest.mark.parametrize("previous_mode", [None, "probe", "checkin"])
+def test_known_schedule_failure_preserves_confirmed_state(app, code, previous_mode):
+    app.current_schedule_mode = previous_mode
+    app.schedule.get.return_value = False
+    app.change_schedule()
+    changed = app.run.call_args.args[2]
+    changed(False, code)
+    assert app.schedule_state_known is True
+    assert app.current_schedule_mode == previous_mode
+    app.schedule_toggle.configure.assert_called_with(state="normal")
+    assert desktop.describe_result(code) == ERROR_MESSAGES[code]
+
+
+def test_generic_schedule_failure_keeps_previous_state_and_redacts(app):
+    app.current_schedule_mode = "probe"
+    app.schedule.get.return_value = False
+    app.change_schedule()
+    change, changed = app.run.call_args.args[1:]
+    app.backend.set_schedule.side_effect = RuntimeError("token-secret https://private.invalid/?password=secret")
+    callback = Mock(side_effect=changed)
+    app.controller.start(change, callback)
+    event = app.controller.events.get(timeout=3)
+    app.controller.events.put(event)
+    app.controller.poll()
+    callback.assert_called_once_with(False, desktop.SAFE_ERROR)
+    assert app.schedule_state_known is True
+    assert app.current_schedule_mode == "probe"
+
+
+@pytest.mark.parametrize("code", list(DesktopErrorCode))
+def test_reviewed_error_messages_render_unchanged(code):
+    assert desktop.describe_result(code) == ERROR_MESSAGES[code]
+
+
+def test_controller_rejects_tampered_error_code():
+    error = desktop.DesktopError(DesktopErrorCode.CONFIG_INVALID)
+    error.code = "token-secret server-response"
+    controller = desktop.DesktopController()
+    callback = Mock()
+    controller.start(Mock(side_effect=error), callback)
+    event = controller.events.get(timeout=3)
+    controller.events.put(event)
+    controller.poll()
+    callback.assert_called_once_with(False, desktop.SAFE_ERROR)
