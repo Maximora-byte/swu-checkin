@@ -69,6 +69,7 @@ function Start-OwnedProcess([string]$Executable, [string[]]$Arguments = @()) {
     return $Process
 }
 function Wait-OwnedProcess([Diagnostics.Process]$Process, [int]$Seconds, [string]$Label) {
+    $Timer = [Diagnostics.Stopwatch]::StartNew()
     if (-not $Process.WaitForExit($Seconds * 1000)) {
         $Process.Kill($true)
         $Process.WaitForExit(10000) | Out-Null
@@ -76,6 +77,7 @@ function Wait-OwnedProcess([Diagnostics.Process]$Process, [int]$Seconds, [string
     }
     $Process.Refresh()
     if ($Process.ExitCode -ne 0) { throw "$Label failed with exit code $($Process.ExitCode)." }
+    Write-Host ("{0} passed in {1:N2} seconds." -f $Label, $Timer.Elapsed.TotalSeconds)
 }
 function Invoke-OwnedUninstall {
     if (Test-Path -LiteralPath $Uninstaller -PathType Leaf) {
@@ -95,7 +97,7 @@ try {
     Assert-NoDesktopTask
 
     $SelfTest = Start-OwnedProcess $App @('--self-test')
-    Wait-OwnedProcess $SelfTest 180 'Installed offline self-test'
+    Wait-OwnedProcess $SelfTest 180 'Installed offline self-test including definite-absent local task query'
 
     # No arguments is the real double-click entry point. No controls are clicked,
     # no credentials are populated and --scheduled is never executed.
@@ -114,8 +116,10 @@ try {
             Start-Sleep -Milliseconds 250
         }
         if (-not $WindowReady) { throw 'A responsive default application window was not observed.' }
-        # Allow asynchronous local-only initial state loading to settle before close.
-        Start-Sleep -Seconds 2
+        # The read-only task query has a 30-second subprocess bound. Wait past
+        # that boundary plus the GUI queue poll; closing sooner deliberately
+        # opens the busy-operation warning, which is not an app hang.
+        Start-Sleep -Seconds 32
         $Gui.Refresh()
         if ($Gui.HasExited -or -not $Gui.Responding) { throw 'GUI stopped responding after startup.' }
         if (-not $Gui.CloseMainWindow()) { throw 'GUI did not accept a normal window close request.' }

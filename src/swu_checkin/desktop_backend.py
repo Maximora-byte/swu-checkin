@@ -12,6 +12,7 @@ import sys
 import tempfile
 from datetime import UTC, datetime, timedelta, timezone
 from pathlib import Path, PureWindowsPath
+from uuid import uuid4
 from xml.etree import ElementTree as ET
 
 from . import formal_execution
@@ -372,6 +373,11 @@ class DesktopBackend:
         if sys.platform == "win32":
             protector = WindowsDpapiProtector()
             if protector.unprotect(protector.protect(b"synthetic-self-test")) != b"synthetic-self-test":
+                return 1
+            # Read-only integration check: a fresh random task name must be
+            # positively absent, not an access/service/query failure. No task
+            # is registered, modified, executed or removed by this check.
+            if self._task_exists("SWUCheckin-SelfTest-" + uuid4().hex):
                 return 1
         with tempfile.TemporaryDirectory(prefix="swu-offline-test-") as directory:
             with RuntimeLock(Path(directory) / "test.lock"):
