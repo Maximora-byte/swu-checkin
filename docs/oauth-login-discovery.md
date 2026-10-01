@@ -24,6 +24,7 @@ minimal IDM authorize bootstrap
 server-provided IDM login form
         ↓  form action + hidden inputs + codeRandom + captcha URL
 credentials + captcha POST
+        ↓  optional validated student-identity selection
         ↓  bounded, individually validated SWU redirects
 strict UAAAP ticket callback (including the observed 412 behavior)
         ↓
@@ -38,6 +39,8 @@ The current OAuth `state`, UAAAP `client_id`, UAAAP callback, CAS `service`, `or
 
 The CAS page currently advertises federation through a small `_goLogin` script which appends `federalEnable=true`. The client requires that exact instruction once; a missing or ambiguous instruction is an error.
 
+If IDM offers the supported student-identity selection page, `identity.py` prefers a postgraduate identity (研究生/硕士/博士), otherwise the first offered identity. The selection uses the already validated IDM login destination and discovered `goto`; it does not trust a new arbitrary form destination. Duplicate/invalid input names or a missing unique Login form fail closed. Program-owned `IDToken1`, `IDToken2`, `IDToken3` and `goto` cannot be overwritten by server-provided hidden inputs. This is a compatibility policy for the observed page, not a claim to support arbitrary future identity screens.
+
 ## Security boundary
 
 - Actual requests are HTTPS-only and certificate verification remains enabled.
@@ -50,7 +53,8 @@ The CAS page currently advertises federation through a small `_goLogin` script w
 - The client never requests an HTTP URL. IDM currently emits legacy `http://idm.swu.edu.cn/...` Locations and a legacy HTTP URL inside its Base64 `goto`. Only exact IDM host/path/default-port values are accepted; request targets are upgraded to HTTPS. The hidden `goto` is validated against the discovered authorize parameters and posted back as opaque server data, never fetched by the client.
 - Missing `state`, `Location`, login form, required hidden input, captcha URL or ticket fails closed. There is no guessed-URL fallback.
 - HTTP 412 is accepted only for the exact HTTPS UAAAP callback with one non-empty `ticket`.
-- HTTP 404 is accepted only for the exact HTTPS OF ticket landing shape. Other HTTP failures keep their normal error behavior.
+- HTTP 404 is accepted only for the exact HTTPS OF `/<ticket-landing>` path shape. A recognized service-return query/fragment is not a blanket exception for 404. Other HTTP failures keep their normal error behavior.
+- Business API calls and the token-exchange request also use `allow_redirects=False`; any 3xx is rejected rather than forwarding a token or form to another target.
 - Credentials, captcha text, OAuth state/code, tickets, tokens, callback URLs and hidden values are never printed. Debug output contains only fixed stage names, status codes, allowlisted hosts/paths and parameter names.
 
 ## Remaining fixed values
@@ -73,16 +77,26 @@ These values cannot currently be derived before starting the flow and remain del
 
 ## Troubleshooting a future SWU change
 
-1. Run the read-only probe (`swu-checkin-probe.service`); never use a real submission to diagnose login.
+1. Run `swu-checkin doctor` for fresh authentication without token-cache reads/writes. Then use `swu-checkin probe` with the same runtime user and cache-path environment as the formal CLI to compare its cache-backed path. The shipped `swu-checkin-probe.service` does not set the formal service’s `SWUDK_STATUS_FILE`; it checks connectivity and credentials, not necessarily the formal service’s cache. Neither submits a check-in; never use a real submission to diagnose login.
 2. Keep `SWUDK_DEBUG_CREDENTIALS=1` limited to safe stage diagnostics. It still does not reveal secret values.
-3. Identify the first rejected stage from its status/allowlisted host/path and parameter names.
+3. Identify the first available safe failure boundary: `stage=auth` or `stage=token_validation`, the fixed authentication classification, and any already emitted status/allowlisted host/path metadata. Not every rejected hop is exposed individually; do not add raw exception or response logging to obtain it.
 4. Capture only structural metadata: status code, host, path, parameter names, form/input names. Do not capture values or complete URLs.
 5. Update the narrow stage validator and add offline valid/invalid fixtures before changing production behavior.
 6. Never add a fallback to the old Base64 value, an unvalidated redirect or a guessed callback.
 
+## Authentication, cache and retry boundaries
+
+`get_info.py` exchanges the final ticket for a token; `service.py` then validates the returned student identity against the requested username before using or caching it. A cache hit is revalidated against the identity endpoint and does not recheck the current password. Invalid token rejection or identity mismatch at this initial boundary can delete/replace a cache entry in both formal and probe modes.
+
+After initial validation, formal execution permits one fresh-auth recovery only when a cache-backed session is explicitly rejected during the pre-submit business reads. HTTP 401/403 or top-level business `code` 401/403 is the recognized signal; schema, JSON, timeout and unknown business responses are not. Probe does not perform that later recovery. `doctor` and `setup` use fresh authentication and do not read or write TokenStore.
+
+Authentication has bounded captcha acquisition/OCR retries and can refetch/repost a captcha when the server explicitly rejects it. Complete authentication retries are owned by the service's outer policy: authentication network classifications can retry, while rejected credentials, final captcha failure and structural authentication failures stop. These authentication POSTs are separate from the at-most-one check-in submission POST per formal business call. No submit/readback error triggers reauthentication followed by a second check-in submission in that call.
+
+See [CLI reference](cli-reference.md) for outer attempts, result codes and output exceptions, and [security model](security.md) for storage, lock and readback boundaries.
+
 ## Verification expectations
 
-- Offline tests cover the valid discovery chain, form/hidden parsing, state and ticket callbacks.
+- Offline tests cover the valid discovery chain, form/hidden parsing, optional identity selection, state and ticket callbacks.
 - Attack tests cover HTTP downgrade, untrusted/lookalike hosts, userinfo, abnormal ports, missing Location/state/form/hidden inputs, malformed URLs/forms, duplicate critical parameters and invalid 412/404 responses.
 - Log tests assert that credentials and all OAuth/CAS secret values are absent.
-- A protected read-only live probe should succeed before deployment. It must not write the check-in status file or call the submission endpoint.
+- A protected read-only live probe should succeed before deployment. It must not write the formal check-in status file or call the submission endpoint. It may update the token cache at the initial authentication boundary; it is not a zero-local-write test. Offline tests and build smoke checks do not establish that the current school endpoints are available.

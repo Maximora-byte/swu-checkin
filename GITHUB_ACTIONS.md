@@ -2,7 +2,7 @@
 
 GitHub Actions 适合没有长期在线主机的用户，但 scheduled workflow **不保证准点**。公共 runner 可能延迟几分钟、几十分钟甚至更久；时间窗口严格时请使用 [systemd](DEPLOYMENT.md) 或 [Windows 计划任务](docs/windows.md)。
 
-本指南只适用于 [Maximora-byte/swu-checkin](https://github.com/Maximora-byte/swu-checkin) 的 `.github/workflows/checkin.yml`。不要复制其他 fork 的 workflow 片段，也不要把真实凭据写进 YAML。
+本指南只适用于 [Maximora-byte/swu-checkin](https://github.com/Maximora-byte/swu-checkin) 的 [`.github/workflows/checkin.yml`](.github/workflows/checkin.yml)。它会执行正式签到，与测试用的 `CI`、Python `Release`、`Windows desktop build` 是不同工作流；后面三者的触发与发布边界见 [开发与发布](docs/development.md)。不要复制其他 fork 的 workflow 片段，也不要把真实凭据写进 YAML。
 
 ## 工作方式
 
@@ -13,6 +13,8 @@ GitHub Actions 适合没有长期在线主机的用户，但 scheduled workflow 
 - CLI 输出 schema v1 JSON，仓库解析器严格校验后才判断成功；
 - 状态 1、2、5 视为正常终态，其他状态使当前账号 job 进入失败/通知路径；
 - 邮件配置完整时，异常结果可发送邮件。
+
+每个账号 job 使用独立 runner，最长运行 15 分钟，瞬时可重试错误最多尝试 3 次、按 8/16 秒等待。不是所有错误都会重试，也不会等待到时间窗口开放。此工作流不配置 systemd 的长期状态文件或 Telegram 日汇总；本机运行锁不能协调不同 runner、独立 workflow run 或另一台设备，请避免重复调度同一账号。
 
 ## 1. Fork 并启用 workflow
 
@@ -34,6 +36,8 @@ GitHub Actions 适合没有长期在线主机的用户，但 scheduled workflow 
 
 GitHub 页面不会回显 Secret 明文；workflow 只会把明确引用的 Secret 在 job 运行时注入环境变量。不要运行未经审阅的 fork 代码，也不要把值写到 Variables、workflow、Issue 或日志。
 
+这里的 Secret 名是 `SWU_USERNAME` / `SWU_PASSWORD`；workflow 将它们映射到 CLI 使用的 `SWUDK_USERNAME` / `SWUDK_PASSWORD`，不要把两组名称混用。
+
 ## 3. 首次手动验证
 
 在 **Actions → 自动签到 → Run workflow** 手动运行一次。打开对应账号 job，确认：
@@ -43,7 +47,7 @@ GitHub 页面不会回显 Secret 明文；workflow 只会把明确引用的 Secr
 - 状态码和 CLI exit code 一致；
 - 日志没有账号值、密码、token 或完整认证回调。
 
-手动运行会执行正式签到，不是 probe。若只想做只读验证，请先按 [快速上手](docs/quickstart.md) 在本地执行 `swu-checkin probe`。
+手动运行会执行正式签到，不是 probe。若只想做只读验证，请先按 [快速上手](docs/quickstart.md) 在本地执行 `swu-checkin probe`。云端提交不测量本人 GPS、不能验证本人在寝；请仅在本人符合学校签到条件时使用，不要把技术提交成功当作实际位置证明。
 
 ## 4. 多账号
 
@@ -105,24 +109,35 @@ cron 表示最早可调度时间，不是 SLA。排查“没有准时运行”�
 
 ## 7. 结果与 JSON
 
-workflow 执行：
+“执行签到” step 先保存 CLI 退出码，再解析 stdout 文件。以下展示同样的两阶段检查，必须在已配置凭据的 Actions Bash 环境中运行；它会正式提交签到，不是离线测试：
 
 ```bash
+set +e
 uv run --locked --no-dev swu-checkin --json > checkin_result.json
+exit_code=$?
+set -e
 uv run --locked --no-dev python -m swu_checkin.actions_result \
   checkin_result.json "$GITHUB_OUTPUT"
+status_code=$(uv run --locked --no-dev python -c \
+  'import json; print(json.load(open("checkin_result.json", encoding="utf-8"))["code"])')
+if [[ "$status_code" != "1" && "$status_code" != "2" && "$status_code" != "5" ]] || \
+  [[ "$exit_code" != "0" ]]; then
+  exit 1
+fi
 ```
 
-解析器检查：
+解析器只接受两个位置参数：`RESULT_JSON GITHUB_OUTPUT`，成功返回 0，参数或解析/写入失败返回 2；它不接收或检查 CLI exit code。它检查：
 
 - JSON 可完整解码；
 - `schema_version == 1`；
 - `mode == "checkin"`；
-- 必需字段、状态名称与 code 一致；
-- `attempts >= 1`、`duration_ms >= 0`；
-- CLI exit code 与业务终态一致。
+- 字段集合必须与 schema 完全一致，不能缺少或增加字段；
+- 固定状态名称、固定公开 message 与 code 一致，且 code 适用于 checkin；
+- `attempts` 是至少为 1 的整数，`duration_ms` 是非负整数，不能用布尔值代替整数。
 
-畸形输出、未知状态码或 schema 不匹配都会 fail closed。详细状态见 [CLI 参考](docs/cli-reference.md)。
+畸形输出、未知状态码或 schema 不匹配会进入 `OUTPUT_ERROR`；缺失账号或密码直接进入 `CONFIG_ERROR`。解析成功仅表示结构有效，不代表签到成功。状态与退出码的对应关系见 [CLI 参考](docs/cli-reference.md)。
+
+当前 workflow 的“执行签到” step 使用 `continue-on-error: true`，以便继续走通知与最终检查。该 step 要求状态 1/2/5 且 CLI exit code 为 0；但后续邮件条件和“最终状态检查”只读取状态码。极端情况下若 JSON 是成功状态而 CLI 非零退出，前面的 step 会失败，邮件可能不会发送、最终 job 仍可能显示成功。排查时必须同时查看该 step 的 outcome 和退出码，不能只看绿色 job；本文不把这个组合描述为完整的退出码一致性门禁。
 
 ## 8. 更新 fork
 

@@ -4,7 +4,7 @@
 [![Release](https://img.shields.io/github/v/release/Maximora-byte/swu-checkin)](https://github.com/Maximora-byte/swu-checkin/releases/latest)
 [![License](https://img.shields.io/github/license/Maximora-byte/swu-checkin)](LICENSE)
 
-西南大学钉钉查寝自动签到脚本，提供本地 CLI、Windows 计划任务、GitHub Actions 和受限 systemd timer 部署。
+西南大学钉钉查寝工具，提供 Python CLI、Windows 桌面预览版、Windows 脚本计划任务、GitHub Actions 和受限 systemd timer 部署。各入口共用认证与签到业务核心。
 
 > [!IMPORTANT]
 > 这是由 [Maximora-byte](https://github.com/Maximora-byte) 独立维护的非官方社区项目，源自 [Sorynthia/swu-checkin](https://github.com/Sorynthia/swu-checkin)。本仓库保留原项目署名与 MIT 许可证，但路线、发布和支持均由当前仓库独立负责；它不代表西南大学、钉钉或原上游作者。
@@ -16,13 +16,15 @@
 - **保守执行**：请假、宿舍、任务或响应结构无法安全确认时停止提交，不猜测数据。
 - **只读诊断**：`setup`、`doctor`、`status` 和 `probe` 不提交签到；`probe` 不写运行状态，也不对业务阶段失效的 cache 自动恢复。
 - **脱敏日志**：提交异常只记录固定分类；学校返回的未知业务码、响应正文和 message 不写入日志。
-- **并发保护**：正式 CLI 使用跨进程非阻塞锁，定时任务与手动运行不会同时提交。
+- **并发保护**：正式 CLI 与桌面签到共用跨进程非阻塞锁；同一锁域内的定时和手动运行不会同时提交。锁不协调不同机器或不同锁路径。
 - **跨平台部署**：支持 GitHub Actions、Windows Task Scheduler 与 systemd timer。
-- **可复现交付**：Python 3.13、`uv.lock`、Linux/Windows CI、wheel/sdist 安装验证和依赖审计。
+- **可追溯交付**：Python 3.13、`uv.lock`、Linux/Windows CI、wheel/sdist 安装验证和依赖审计。
 
 ## Windows desktop preview（开发构建）
 
-新增中文窗口、DPAPI 保存、只读检测、明确确认的手动签到，以及默认关闭的可选定时任务。提供 Windows x64 的独立应用与安装包构建流程；已在 Windows Server 2022 x64 完成安装与 GUI 冒烟测试；尚未完成干净 Windows 10/11 标准用户验收。当前为未签名开发构建，未正式发布。详见 [桌面版与构建指南](docs/windows-desktop.md)。
+桌面功能已通过 [PR #33](https://github.com/Maximora-byte/swu-checkin/pull/33) 合入 `main`：中文窗口、当前用户 DPAPI 保存、只读检测、确认后的手动签到，以及默认关闭的可选定时任务。Windows x64 安装包内置 Python 与运行所需资源，使用者无需另装 Python、uv 或 OCR 模型。
+
+当前桌面版仍是未签名开发构建，没有桌面版 Release。Windows Server 2022 x64 CI 已覆盖冻结自测、安装、GUI 关闭重开、卸载，以及独立无害计划任务的注册/查询/删除；尚未完成干净 Windows 10/11 标准用户验收。下载来源、使用步骤与限制见 [桌面版与构建指南](docs/windows-desktop.md)。
 
 本工具使用学校记录的寝室坐标，不测量实际 GPS，技术提交成功不证明人在寝。仅在本人确实在寝并符合学校规则时使用正式签到；自动模式必须单独授权，不满足条件时提前停用。
 
@@ -32,17 +34,17 @@
 | --- | --- | --- |
 | 先确认账号和接口是否可用 | [本地 CLI](docs/quickstart.md) | 最快；先 `setup` / `probe`，再决定是否正式运行 |
 | 长期在线 Linux 主机 | [systemd 部署](DEPLOYMENT.md) | 时间稳定、权限隔离、双次 timer、可选 Telegram 汇总 |
-| Windows 日常电脑 | [Windows 安装](docs/windows.md) | DPAPI 加密密码、固定计划任务、无需常驻进程 |
+| 想使用 Windows 中文窗口 | [桌面预览版](docs/windows-desktop.md) | 独立 EXE；默认不联网、不启用任务；当前未签名、未正式发布 |
+| 已使用 Windows Python 脚本部署 | [Windows 脚本指南](docs/windows.md) | 需要 uv/Python；安装诊断成功后会启用正式定时任务 |
 | 没有自己的服务器 | [GitHub Actions](GITHUB_ACTIONS.md) | 配置简单，但 cron 可能排队延迟，不保证准点 |
 
-## 五分钟本地验证
+## 当前源码的本地验证
 
 要求：Git、[uv](https://docs.astral.sh/uv/getting-started/installation/) 和可访问学校认证/业务接口的网络。
 
 ```bash
 git clone https://github.com/Maximora-byte/swu-checkin.git
 cd swu-checkin
-git checkout v1.1.5
 uv sync --locked --no-dev --python 3.13
 ```
 
@@ -59,10 +61,10 @@ uv run --locked --no-dev swu-checkin probe
 uv run --locked --no-dev swu-checkin run
 ```
 
-环境变量缺失时，CLI 会交互询问学号并使用无回显密码输入；`setup` 不保存密码。无人值守运行必须使用 GitHub Secrets、Windows DPAPI 或权限受限的 systemd 环境文件。
+`run` / `probe` / `doctor` 的环境凭据缺失时会交互询问；`setup` 总是交互输入。密码无回显，`setup` 不保存凭据。无人值守运行必须使用 GitHub Secrets、Windows DPAPI 或权限受限的 systemd 环境文件。
 
 > [!TIP]
-> 示例固定到已发布的 `v1.1.5`。部署前可在 [Releases](https://github.com/Maximora-byte/swu-checkin/releases) 查看最新稳定版本，并同时使用该版本的代码、文档和 `uv.lock`，不要混用不同 tag 的文件。
+> 上例检出当前默认分支，不等于安装已发布稳定版。需要稳定 Python 发布版时，请从 [Releases](https://github.com/Maximora-byte/swu-checkin/releases) 选择 tag，并同时使用该 tag 的代码、文档和 `uv.lock`。已发布的 [v1.1.5](https://github.com/Maximora-byte/swu-checkin/releases/tag/v1.1.5) 提供 wheel/sdist，不含 PR #33 的桌面功能；当前源码的版本字符串仍为 `1.1.5`，识别预览构建还需 commit 与 `BUILD-INFO.json`。
 
 ## 常用命令
 
@@ -72,8 +74,8 @@ swu-checkin doctor         # 7 项只读诊断，不读写 token cache
 swu-checkin probe          # 登录并读取请假/学生/宿舍/任务信息，不提交
 swu-checkin run            # 正式签到；有瞬时失败重试和运行锁
 swu-checkin status         # 只读本地状态文件，不发网络请求
-swu-checkin run --json     # stdout 仅输出 schema v1 JSON
-swu-checkin probe --json   # 只读 probe 的 schema v1 JSON
+swu-checkin run --json     # 完成业务执行时输出 schema v1 JSON
+swu-checkin probe --json   # probe 的 schema v1 JSON，不提交签到
 ```
 
 完整参数、环境变量、JSON 字段和退出语义见 [CLI 与状态码参考](docs/cli-reference.md)。
@@ -92,16 +94,16 @@ swu-checkin probe --json   # 只读 probe 的 schema v1 JSON
 
 状态 `4` 是 fail-closed 聚合状态：网络、JSON、schema 或学校服务异常无法安全区分时，都不会继续猜测或提交。排查步骤见 [故障排查](docs/troubleshooting.md)。
 
-常见 stderr 分类包括 `请求超时`、`连接异常`、`HTTP 503`、`业务码已返回` 和 `响应结构异常`。其中 `业务码已返回` 只表示响应含有非成功的 `code/status` 字段；项目有意不记录其原值，不能据此判断具体账号或学校端原因。
+常见诊断分类包括 `请求超时`、`连接异常`、`HTTP 503`、`业务码已返回` 和 `响应结构异常`。其中 `业务码已返回` 只表示被分类的响应含有 `code/status` 字段；项目有意不记录其原值，不能据此判断具体账号或学校端原因。JSON 模式把诊断转到 stderr；锁忙等业务前退出可能没有 JSON，完整契约见 CLI 参考。
 
 ## 安全边界
 
-- 凭据只能进入环境变量、GitHub Secrets、Windows DPAPI 或 root-only 环境文件；不得写入仓库、Issue、截图或日志。
+- 密码只通过交互输入或受控的环境变量、GitHub Secrets、Windows DPAPI、root-only 环境文件提供。旧 Windows 脚本的账号保存在本地配置 JSON；任何凭据都不得写入仓库、Issue、截图或日志。
 - 日志不输出账号值、密码、验证码、token、ticket、OAuth state/code、完整回调 URL、宿舍地址或坐标。
 - 项目使用学校接口返回的宿舍坐标并沿用现有提交字段，不测量用户实际 GPS，也不能证明本人在寝；不得将技术提交成功当作真实位置证明。不提供新增反检测或认证绕过功能。
-- `probe`、`doctor`、`setup` 和 `status` 不调用签到提交接口；只有显式 `run` 或无子命令兼容入口会进入正式流程。`probe` 会复用有效 cache，若 cache 在身份校验阶段明确失效，则可能 fresh-auth 并替换本地 cache。
-- POST 发生超时、连接中断或 5xx 等不明确结果时，不会通过重新登录再发第二次 POST。
-- cached session 只有在提交前只读阶段出现明确 401/403 时才会被清理并 fresh-auth 一次。
+- `probe`、`doctor`、`setup` 和 `status` 不调用签到提交接口；CLI `run`、无子命令兼容入口、桌面确认后的手动签到及已授权自动签到可进入正式流程。`probe` 会复用有效 cache，若 cache 在身份校验阶段明确失效，则可能 fresh-auth 并替换本地 cache。
+- 签到提交 POST 发生超时、连接中断或 5xx 等不明确结果时，不会通过重新登录再发第二次签到提交 POST。
+- 有效 cache 必须先通过账号身份校验；正式流程仅在提交前业务读取阶段明确 401/403 时清理并 fresh-auth 一次，不把任意网络错误当成 session 失效。
 
 详见 [安全模型](docs/security.md) 和 [OAuth 登录发现说明](docs/oauth-login-discovery.md)。
 
@@ -109,11 +111,13 @@ swu-checkin probe --json   # 只读 probe 的 schema v1 JSON
 
 - [快速上手](docs/quickstart.md)：安装、首次只读验证、正式运行和升级
 - [CLI 与状态码参考](docs/cli-reference.md)：命令、环境变量、JSON schema v1 和退出码
-- [Windows 使用指南](docs/windows.md)：DPAPI、计划任务、升级与卸载
+- [Windows 桌面预览版](docs/windows-desktop.md)：EXE、DPAPI、显式授权、构建与验收
+- [Windows 脚本指南](docs/windows.md)：旧式 Python 部署、计划任务及迁移
 - [服务器部署](DEPLOYMENT.md)：systemd、权限、timer、日志、升级与回滚
 - [GitHub Actions 指南](GITHUB_ACTIONS.md)：Secrets、多账号、通知和排队延迟
 - [故障排查](docs/troubleshooting.md)：状态 3/4、缓存 session、锁、Actions 和安全报告
 - [安全模型](docs/security.md)：认证、TokenStore、提交安全、日志与支持边界
+- [开发、CI 与发布](docs/development.md)：模块分工、离线验证、发布边界
 - [贡献指南](CONTRIBUTING.md) / [维护与归属](MAINTAINERS.md)
 
 ## 开发与质量门禁
@@ -127,7 +131,7 @@ uv run --locked mypy src/swu_checkin
 uv lock --check
 ```
 
-CI 还会验证 Windows PowerShell/DPAPI、跨进程运行锁、GitHub Actions 语法、systemd units、Unix 状态权限、wheel/sdist clean install 与锁定生产依赖漏洞。
+普通 CI 的 `quality` 汇总 Linux、Windows 与 Python 包三组门禁，包括 PowerShell/DPAPI、跨进程运行锁、Actions 语法、systemd units、Unix 状态权限、wheel/sdist 安装与锁定生产依赖审计。桌面安装包使用独立的路径过滤工作流；文档-only PR 不会自动重建 EXE。详见 [开发、CI 与发布](docs/development.md)。
 
 ## 支持、署名与许可证
 
