@@ -24,7 +24,7 @@
 
 请使用 Windows x64。PyInstaller 不支持从 Linux 跨平台生成 Windows 可执行文件。
 
-1. 从 [Python 官方站点](https://www.python.org/downloads/windows/) 安装 Python 3.13 x64，包含 Tcl/Tk；CI 固定为 3.13.7
+1. 从 [Python 官方站点](https://www.python.org/downloads/windows/) 安装 Python 3.13 x64，包含 Tcl/Tk；CI 固定为 3.13.15
 2. 安装 uv **0.12.15**，并确保 `uv` 与 `python` 在 PATH 中
 3. 安装 [Inno Setup 官方 6.7.3](https://github.com/jrsoftware/issrc/releases/tag/is-6_7_3)；CI 从该官方 release 下载并校验固定 SHA256 `9c73c3bae7ed48d44112a0f48e66742c00090bdb5bef71d9d3c056c66e97b732`
 4. 在此仓库执行：
