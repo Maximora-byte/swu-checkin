@@ -309,7 +309,7 @@ def test_token_exchange_rejects_redirect_without_following_or_reading_body(monke
     callback = Mock(url="https://of.swu.edu.cn/&ticket=synthetic")
     redirect = requests.Response()
     redirect.status_code = status_code
-    redirect.headers["Location"] = "http://outside.invalid/collect"
+    redirect.headers["Location"] = "http://outside.invalid/collect?token=redirect-secret"
     redirect.json = Mock(return_value={"data": "unexpected-token"})
     session.get.side_effect = [callback, redirect]
 
@@ -317,6 +317,9 @@ def test_token_exchange_rejects_redirect_without_following_or_reading_body(monke
         _get_token("synthetic-user", "synthetic-password", timeout=1)
 
     assert caught.value.reason is AuthFailureReason.TOKEN_EXCHANGE_FAILED
+    assert "redirect-secret" not in str(caught.value)
+    assert "outside.invalid" not in str(caught.value)
+    assert "synthetic" not in str(caught.value)
     assert session.get.call_count == 2
     exchange_call = session.get.call_args_list[-1]
     assert exchange_call.args[0] == "https://of.swu.edu.cn/gateway/fighter-middle/api/integrate/uaap/cas/exchange-token"

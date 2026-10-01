@@ -11,7 +11,12 @@ datas = [
 binaries = []
 hiddenimports = ["msvcrt", "tkinter", "tkinter.ttk", "tkinter.messagebox", "_tkinter"]
 for package in ("ddddocr", "onnxruntime", "cv2", "numpy", "tzdata", "certifi"):
-    package_data, package_binaries, package_imports = collect_all(package)
+    package_data, package_binaries, package_imports = collect_all(
+        package,
+        include_py_files=False,
+        filter_submodules=lambda name: not any(part in {"tests", "test", "__pycache__"} for part in name.split(".")),
+        exclude_datas=["**/tests/**", "**/test/**", "**/__pycache__/**"],
+    )
     datas += package_data
     binaries += package_binaries
     hiddenimports += package_imports

@@ -20,9 +20,9 @@
 - **跨平台部署**：支持 GitHub Actions、Windows Task Scheduler 与 systemd timer。
 - **可复现交付**：Python 3.13、`uv.lock`、Linux/Windows CI、wheel/sdist 安装验证和依赖审计。
 
-## Windows 桌面版（开发中）
+## Windows desktop preview（开发构建）
 
-新增中文窗口、DPAPI 保存、只读检测、明确确认的手动签到，以及默认关闭的可选定时任务。提供 Windows x64 的独立应用与安装包构建流程；本分支尚未完成真实 Windows 安装包验收，不能把源码或虚拟环境启动器当成已验证的 EXE。详见 [桌面版与构建指南](docs/windows-desktop.md)。
+新增中文窗口、DPAPI 保存、只读检测、明确确认的手动签到，以及默认关闭的可选定时任务。提供 Windows x64 的独立应用与安装包构建流程；已在 Windows Server 2022 x64 完成安装与 GUI 冒烟测试；尚未完成干净 Windows 10/11 标准用户验收。当前为未签名开发构建，未正式发布。详见 [桌面版与构建指南](docs/windows-desktop.md)。
 
 本工具使用学校记录的寝室坐标，不测量实际 GPS，技术提交成功不证明人在寝。仅在本人确实在寝并符合学校规则时使用正式签到；自动模式必须单独授权，不满足条件时提前停用。
 

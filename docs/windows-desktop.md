@@ -1,10 +1,10 @@
-# Windows 桌面版（源码与打包流程）
+# Windows desktop preview（开发构建）
 
-本页描述 `feat/windows-desktop` 的桌面实现与构建方法。仓库新增打包流程不代表已经生成、测试或发布了 Windows 安装包；必须在 Windows 上成功完成下面的构建和验收，才能交付 EXE。目前的构建产物没有代码签名。
+本页描述 `feat/windows-desktop` 的 Windows desktop preview / development build。已在 GitHub-hosted Windows Server 2022 x64 完成构建与安装冒烟测试，最新提交的验收结果见 [草稿 PR #33](https://github.com/Maximora-byte/swu-checkin/pull/33)。这不是正式发布、稳定版或 Windows 10/11 全面支持承诺。产物没有代码签名。
 
 ## 面向使用者
 
-正式构建后，分发文件为 `SWUCheckin-<版本>-win-x64-Setup.exe`。双击安装，然后从开始菜单打开 **SWU Checkin**；用户无需另装 Python、uv 或 OCR 模型。支持目标是 Windows 10/11 x64，其他架构未验收。
+开发构建的分发文件为 `SWUCheckin-<版本>-win-x64-Setup.exe`。双击安装，然后从开始菜单打开 **SWU Checkin**；用户无需另装 Python、uv 或 OCR 模型。支持目标是 Windows 10/11 x64，其他架构未验收。
 
 - 默认安装到 `%LOCALAPPDATA%\Programs\SWUCheckin`，仅当前用户可用，无需管理员权限
 - 默认打开图形窗口；安装程序不会登录账号、注册计划任务或自动启动程序
@@ -59,19 +59,23 @@
 
 [Windows desktop 工作流](../.github/workflows/windows-desktop.yml) 支持手动 `workflow_dispatch` 和相关文件变动的 `pull_request` 触发：Windows x64 构建，运行冻结 EXE 的 `--self-test`，再生成安装包、执行隔离安装/GUI/卸载冒烟测试，并上传保留 14 天的 Actions artifact。它不在普通 push 时自动触发、不发布 Release、没有账号 secret，也不会运行真实签到或计划任务。
 
-`--self-test` 使用合成数据检查运行时资源；构建在非零退出或 180 秒超时时失败。`scripts/windows/verify-install.ps1` 仅允许在一次性的 GitHub-hosted Windows runner 运行：先确认不存在本应用的进程、任务、安装注册与开始菜单快捷方式，再将安装包静默安装到独立的 `RUNNER_TEMP` 随机目录。启动应用时使用空的隔离 `LOCALAPPDATA`，验证已安装 EXE 的离线自测、无参数启动的主窗口出现且响应、正常关闭及卸载；最后检查应用文件、安装注册和本应用任务均不存在。它不会注册任务、填入账号、点击提交或执行 `--scheduled`，清理仅限本次创建的进程和目录。
+`--self-test` 使用合成数据检查运行时资源；构建在非零退出或 180 秒超时时失败。`scripts/windows/verify-install.ps1` 仅允许在一次性的 GitHub-hosted Windows runner 运行：先确认不存在本应用的进程、任务、安装注册与开始菜单快捷方式，再将安装包静默安装到独立的 `RUNNER_TEMP` 随机目录。启动应用时使用空的隔离 `LOCALAPPDATA`，验证已安装 EXE 的离线自测、无参数启动的主窗口出现且响应、正常关闭、再次打开、再次关闭及卸载；子进程 PATH 仅包含 Windows 系统目录，并移除 Python/虚拟环境变量；验证应用不依赖 PATH 中的 Python 或 uv。最后检查安装目录没有残留文件、本次进程全部退出、空配置目录未被写入、安装注册和本应用任务均不存在。它不会注册任务、填入账号、点击提交或执行 `--scheduled`，清理仅限本次创建的进程和目录。
 
-上述 CI 不替代普通用户设备上的完整升级、交互操作与计划任务验收，也不能证明校方接口、账号或打卡规则有效。
+上述 CI 使用构建机上的隔离空配置目录，不是全新 Windows 用户，也没有卸载 runner 原有的 Python/uv。它不替代下面的干净标准用户验收，也不能证明校方接口、账号或打卡规则有效。
 
-交付前需在干净 Windows 10/11 x64 标准用户环境验证：
+正式支持前仍需人工在没有 Python、uv 和开发环境的干净 Windows 10/11 x64 标准用户虚拟机验证（尚未执行）：
 
-1. 安装无需管理员权限，开始菜单双击打开 GUI，无控制台依赖
+1. 使用新的标准用户和默认安装路径；安装不触发 UAC 提权，开始菜单双击打开 GUI，无控制台依赖；关闭后重新打开，再正常关闭
 2. OCR/时区/TLS/Tk 资源加载成功，中文路径与含空格路径可用
 3. 默认没有已启用的定时任务；先验收只读任务，禁止以真实打卡作为构建测试
 4. 关闭/重开、重复点击、离线、认证失败与取消操作不会误触发提交
-5. 升级后路径与设置正确；卸载只删除 `SWUCheckin-Desktop`、不影响旧任务或其他任务，任务不存在时卸载仍可完成，用户设置默认保留
+5. 升级后路径与设置正确；卸载后确认应用进程、安装目录文件、快捷方式和卸载注册均消失，仅保留明确说明的 `%LOCALAPPDATA%\SWUCheckin` 配置；卸载只删除 `SWUCheckin-Desktop`、不影响旧任务或其他任务，任务不存在时卸载仍可完成，用户设置默认保留
 6. 未签名安装包可能触发 SmartScreen/安全软件提示；本项目不建议关闭系统防护或绕过安全警告，发布者应建立可信签名与分发渠道
 
 构建实现参考：[PyInstaller 使用文档](https://pyinstaller.org/en/v6.16.0/usage.html)、[Inno Setup 非管理员安装](https://jrsoftware.org/ishelp/topic_setup_privilegesrequired.htm)。
 
-新增 workflow 首次尚未进入默认分支时，GitHub 手动 dispatch 可能不可用；可在获得授权后创建 PR，由只读权限的 PR 构建生成 artifacts，或在本地 Windows 运行构建脚本。此代码交付未执行远程推送、创建 PR 或发布 Release。
+新增 workflow 首次尚未进入默认分支时，GitHub 手动 dispatch 可能不可用；可在获得授权后创建 PR，由只读权限的 PR 构建生成 artifacts，或在本地 Windows 运行构建脚本。当前工作保留在草稿 PR #33；未合并、未启用自动合并、未发布 Release。
+
+## 体积审查
+
+最初安装包约 138 MiB，主要来自 OpenCV、OCR ONNX 模型、ONNX Runtime 和 NumPy 的本机运行库。预览构建只剔除收集的数据目录中的 tests/test/__pycache__ 和可由冻结 Python 模块提供的重复 .py 源文件；不删模型、证书、时区、许可或未经证明无用的 DLL，不修改业务依赖。最终大小以该提交的 CI artifact 为准。

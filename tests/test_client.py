@@ -278,19 +278,22 @@ def test_client_transition_accepts_status_only_terminal_record():
 def test_business_redirects_are_rejected_without_following_or_parsing(status_code, operation):
     response = requests.Response()
     response.status_code = status_code
-    response.headers["Location"] = "http://outside.invalid/collect"
+    response.headers["Location"] = "http://outside.invalid/collect?token=redirect-secret"
     response.json = Mock(return_value={"code": 200})
     session = Mock()
     session.get.return_value = response
     session.post.return_value = response
     client = SwuClient("synthetic-token", session=session)
 
-    with pytest.raises(requests.HTTPError, match="Unexpected business API redirect"):
+    with pytest.raises(requests.HTTPError, match="Unexpected business API redirect") as caught:
         if operation == "submit_checkin_form":
             client.submit_checkin_form(form_id="synthetic-form", payload={"id": "synthetic-record"})
         else:
             getattr(client, operation)()
 
+    assert str(caught.value) == "Unexpected business API redirect"
+    assert "redirect-secret" not in str(caught.value)
+    assert "synthetic-token" not in str(caught.value)
     calls = session.get.call_args_list + session.post.call_args_list
     assert len(calls) == 1
     assert calls[0].kwargs["allow_redirects"] is False
@@ -298,7 +301,7 @@ def test_business_redirects_are_rejected_without_following_or_parsing(status_cod
     response.json.assert_not_called()
 
 
-@pytest.mark.parametrize("status_code", [302, 307, 308])
+@pytest.mark.parametrize("status_code", [301, 302, 307, 308])
 def test_real_session_never_sends_redirected_request(status_code):
     sent = []
 
@@ -307,7 +310,7 @@ def test_real_session_never_sends_redirected_request(status_code):
             sent.append(request)
             response = requests.Response()
             response.status_code = status_code
-            response.headers["Location"] = "http://outside.invalid/collect"
+            response.headers["Location"] = "http://outside.invalid/collect?token=redirect-secret"
             response.request = request
             response.url = request.url
             response._content = b"{}"

@@ -55,6 +55,11 @@ function Start-OwnedProcess([string]$Executable, [string[]]$Arguments = @()) {
     $StartInfo.UseShellExecute = $false
     $StartInfo.WorkingDirectory = $Sandbox
     $StartInfo.Environment['LOCALAPPDATA'] = $ProfileDir
+    # No interpreter/toolchain discovery: the installed bundle must stand alone.
+    $StartInfo.Environment['PATH'] = "$env:SystemRoot\System32;$env:SystemRoot"
+    foreach ($Name in @('PYTHONHOME', 'PYTHONPATH', 'VIRTUAL_ENV', 'UV_PROJECT_ENVIRONMENT')) {
+        $StartInfo.Environment.Remove($Name) | Out-Null
+    }
     foreach ($Name in @($StartInfo.Environment.Keys)) {
         if ($Name -like 'SWUDK_*') { $StartInfo.Environment.Remove($Name) | Out-Null }
     }
@@ -94,26 +99,28 @@ try {
 
     # No arguments is the real double-click entry point. No controls are clicked,
     # no credentials are populated and --scheduled is never executed.
-    $Gui = Start-OwnedProcess $App
-    $Deadline = [DateTime]::UtcNow.AddSeconds(60)
-    $WindowReady = $false
-    while ([DateTime]::UtcNow -lt $Deadline) {
-        $Gui.Refresh()
-        if ($Gui.HasExited) { throw 'The default GUI exited before presenting its window.' }
-        if ($Gui.MainWindowHandle -ne [IntPtr]::Zero -and $Gui.Responding -and
-            $Gui.MainWindowTitle -eq '西南大学寝室签到助手') {
-            $WindowReady = $true
-            break
+    foreach ($Launch in 1..2) {
+        $Gui = Start-OwnedProcess $App
+        $Deadline = [DateTime]::UtcNow.AddSeconds(60)
+        $WindowReady = $false
+        while ([DateTime]::UtcNow -lt $Deadline) {
+            $Gui.Refresh()
+            if ($Gui.HasExited) { throw 'The default GUI exited before presenting its window.' }
+            if ($Gui.MainWindowHandle -ne [IntPtr]::Zero -and $Gui.Responding -and
+                $Gui.MainWindowTitle -eq '西南大学寝室签到助手') {
+                $WindowReady = $true
+                break
+            }
+            Start-Sleep -Milliseconds 250
         }
-        Start-Sleep -Milliseconds 250
+        if (-not $WindowReady) { throw 'A responsive default application window was not observed.' }
+        # Allow asynchronous local-only initial state loading to settle before close.
+        Start-Sleep -Seconds 2
+        $Gui.Refresh()
+        if ($Gui.HasExited -or -not $Gui.Responding) { throw 'GUI stopped responding after startup.' }
+        if (-not $Gui.CloseMainWindow()) { throw 'GUI did not accept a normal window close request.' }
+        Wait-OwnedProcess $Gui 30 'Graceful GUI close'
     }
-    if (-not $WindowReady) { throw 'A responsive default application window was not observed.' }
-    # Allow asynchronous local-only initial state loading to settle before close.
-    Start-Sleep -Seconds 2
-    $Gui.Refresh()
-    if ($Gui.HasExited -or -not $Gui.Responding) { throw 'GUI stopped responding after startup.' }
-    if (-not $Gui.CloseMainWindow()) { throw 'GUI did not accept a normal window close request.' }
-    Wait-OwnedProcess $Gui 30 'Graceful GUI close'
     if (Test-Path -LiteralPath (Join-Path $ProfileDir 'SWUCheckin\desktop-credentials.dpapi')) {
         throw 'Smoke test unexpectedly created saved credentials.'
     }
@@ -125,9 +132,21 @@ try {
     }
     if (Test-Path -LiteralPath $App) { throw 'Application executable remained after uninstall.' }
     if (Test-Path -LiteralPath $Uninstaller) { throw 'Uninstaller remained after uninstall.' }
+    if (Test-Path -LiteralPath $InstallDir) {
+        if (@(Get-ChildItem -LiteralPath $InstallDir -Recurse -Force -File).Count -ne 0) {
+            throw 'Installed files remained after uninstall.'
+        }
+    }
+    if (@(Get-ChildItem -LiteralPath $ProfileDir -Recurse -Force -File).Count -ne 0) {
+        throw 'Default startup unexpectedly persisted user data.'
+    }
+    foreach ($Process in $OwnedProcesses) {
+        $Process.Refresh()
+        if (-not $Process.HasExited) { throw 'An owned application process remained after uninstall.' }
+    }
     Assert-NoDesktopTask
     Assert-NoInstallation
-    Write-Host 'Installer smoke passed: isolated install, offline self-test, responsive default GUI, graceful close, uninstall, no application task or registration left behind.'
+    Write-Host 'Installer smoke passed: isolated install, offline self-test, responsive default GUI, close/reopen/close without Python or uv on PATH, uninstall, no application task or registration left behind.'
 }
 finally {
     # Never find/kill processes by name: only handles created in this invocation.
