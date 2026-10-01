@@ -519,7 +519,8 @@ def test_task_query_requires_definite_success_marker(backend, monkeypatch, marke
     script = base64.b64decode(args[-1]).decode("utf-16-le")
     assert "$f.GetTask('SWUCheckin-Desktop')" in script
     assert "$f=$s.GetFolder('\\') } catch { exit 3 }" in script
-    assert "COMException" in script and "-2147024894" in script
+    assert "if ($e.HResult -eq -2147024894)" in script
+    assert "-is [Runtime.InteropServices.COMException]" not in script
     assert "/Create" not in script and "/Delete" not in script
 
 

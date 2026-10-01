@@ -217,17 +217,18 @@ class DesktopBackend:
     def _task_exists(self, name: str) -> bool:
         # schtasks exit 1 conflates missing tasks, access denial and service
         # failures. Query the exact root task via COM instead; only GetTask's
-        # explicit ERROR_FILE_NOT_FOUND is absence. Never parse localized text.
+        # explicit ERROR_FILE_NOT_FOUND is absence. .NET may map that HRESULT
+        # to FileNotFoundException rather than COMException. Never parse text.
         literal = name.replace("'", "''")
         script = (
             "$ErrorActionPreference='Stop'; "
             "try { $s=New-Object -ComObject Schedule.Service; $s.Connect(); "
             "$f=$s.GetFolder('\\') } catch { exit 3 }; "
-            "try { $null=$f.GetTask('" + literal + "'); "
-            "[Console]::Out.Write('SWU_TASK_EXISTS'); exit 0 } catch { "
+            "try { $null=$f.GetTask('" + literal + "') } catch { "
             "$e=$_.Exception; while ($null -ne $e) { "
-            "if ($e -is [Runtime.InteropServices.COMException] -and $e.HResult -eq -2147024894) { "
-            "[Console]::Out.Write('SWU_TASK_ABSENT'); exit 0 }; $e=$e.InnerException }; exit 3 }"
+            "if ($e.HResult -eq -2147024894) { "
+            "[Console]::Out.Write('SWU_TASK_ABSENT'); exit 0 }; $e=$e.InnerException }; exit 3 }; "
+            "[Console]::Out.Write('SWU_TASK_EXISTS'); exit 0"
         )
         try:
             result = self._system_command(
