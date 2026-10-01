@@ -412,3 +412,31 @@ def test_controller_rejects_tampered_error_code():
     controller.events.put(event)
     controller.poll()
     callback.assert_called_once_with(False, desktop.SAFE_ERROR)
+
+
+@pytest.mark.parametrize("code", [DesktopErrorCode.TASK_QUERY_FAILED, DesktopErrorCode.TASK_STATE_UNCERTAIN])
+def test_uncertain_schedule_completion_disables_without_claiming_state(app, code):
+    app.current_schedule_mode = "probe"
+    app.mode_controls = [Mock()]
+    app.schedule.get.return_value = False
+    app.change_schedule()
+    changed = app.run.call_args.args[2]
+    changed(False, code)
+    assert app.schedule_state_known is False
+    app.schedule_toggle.configure.assert_called_with(state="disabled")
+    app.mode_controls[0].configure.assert_called_with(state="disabled")
+    app.schedule.set.assert_not_called()
+    app.schedule_status.set.assert_called_with("计划任务状态未知：无法确认计划任务状态")
+
+
+@pytest.mark.parametrize(
+    "failure", [RuntimeError("token-secret"), desktop.DesktopError(DesktopErrorCode.CONFIG_INVALID)]
+)
+def test_post_backend_mutation_gui_verification_failure_is_uncertain(app, failure):
+    app.schedule.get.return_value = False
+    app.backend.schedule_mode.side_effect = failure
+    app.change_schedule()
+    with pytest.raises(desktop.DesktopError) as caught:
+        app.run.call_args.args[1]()
+    assert caught.value.code is DesktopErrorCode.TASK_STATE_UNCERTAIN
+    assert "secret" not in desktop.describe_result(caught.value.code)

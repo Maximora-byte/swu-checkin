@@ -277,13 +277,47 @@ class DesktopBackend:
     def schedule_enabled(self) -> bool:
         return self.schedule_mode() is not None
 
+    def _config_matches_task(self, exists: bool) -> bool:
+        try:
+            config = self._read_config()
+            if exists:
+                return config.get("enabled") is True and config.get("mode") in ("probe", "checkin")
+            return not config or config.get("enabled") is False
+        except Exception:
+            return False
+
     def set_schedule(self, enabled: bool, mode: str = "probe") -> None:
         if not enabled:
             if self._task_exists(TASK_NAME):
-                result = self._system_command("schtasks.exe", ["/Delete", "/TN", TASK_NAME, "/F"])
-                if result.returncode != 0:
-                    raise DesktopError(DesktopErrorCode.TASK_DISABLE_FAILED)
-            _atomic_write(self.config_path, b'{"schema_version":1,"enabled":false}')
+                previous_valid = self._config_matches_task(True)
+                # Once Delete is attempted, failures must be reconciled rather
+                # than interpreted as proof that the old state remains true.
+                try:
+                    result = self._system_command("schtasks.exe", ["/Delete", "/TN", TASK_NAME, "/F"])
+                    command_ok = result.returncode == 0
+                except Exception:
+                    command_ok = False
+                try:
+                    remains = self._task_exists(TASK_NAME)
+                except Exception:
+                    raise DesktopError(DesktopErrorCode.TASK_STATE_UNCERTAIN) from None
+                if remains:
+                    code = (
+                        DesktopErrorCode.TASK_DISABLE_FAILED
+                        if previous_valid
+                        else DesktopErrorCode.TASK_STATE_UNCERTAIN
+                    )
+                    raise DesktopError(code)
+                if not command_ok:
+                    # Absence is known, but the caller's previous enabled state
+                    # is no longer valid. Do not misreport a failed disable as enabled.
+                    raise DesktopError(DesktopErrorCode.TASK_STATE_UNCERTAIN)
+                try:
+                    _atomic_write(self.config_path, b'{"schema_version":1,"enabled":false}')
+                except Exception:
+                    raise DesktopError(DesktopErrorCode.TASK_STATE_UNCERTAIN) from None
+            else:
+                _atomic_write(self.config_path, b'{"schema_version":1,"enabled":false}')
             return
         if not isinstance(mode, str) or mode not in {"probe", "checkin"}:
             raise DesktopError(DesktopErrorCode.MODE_REQUIRED)
@@ -292,7 +326,8 @@ class DesktopBackend:
         credentials = self.load_credentials()
         if credentials is None:
             raise DesktopError(DesktopErrorCode.SAVED_CREDENTIALS_REQUIRED)
-        self._task_exists(TASK_NAME)  # Unknown current state must not permit overwrite.
+        previous_exists = self._task_exists(TASK_NAME)
+        previous_valid = self._config_matches_task(previous_exists)
         if self._task_exists(LEGACY_TASK_NAME):
             raise DesktopError(DesktopErrorCode.LEGACY_TASK_EXISTS)
         if not self.diagnose(*credentials):
@@ -308,22 +343,47 @@ class DesktopBackend:
         payload = json.dumps({"schema_version": 1, "enabled": True, "mode": mode}).encode("utf-8")
         self.root.mkdir(mode=0o700, parents=True, exist_ok=True)
         fd, filename = tempfile.mkstemp(suffix=".xml", prefix=".task-", dir=self.root)
+        mutation_attempted = False
+        query_attempted = False
+        final_exists: bool | None = None
         try:
             with os.fdopen(fd, "wb") as handle:
                 handle.write(task_xml(sys.executable, sid))
             _atomic_write(self.config_path, payload)
+            mutation_attempted = True
             result = self._system_command("schtasks.exe", ["/Create", "/TN", TASK_NAME, "/XML", filename, "/F"])
-            if result.returncode != 0 or not self._task_exists(TASK_NAME):
+            query_attempted = True
+            final_exists = self._task_exists(TASK_NAME)
+            if result.returncode != 0 or not final_exists:
                 raise DesktopError(DesktopErrorCode.TASK_CREATE_FAILED)
         except Exception:
-            if previous is not None:
-                _atomic_write(self.config_path, previous)
-            elif self.config_path.exists():
-                self.config_path.unlink()
+            try:
+                if previous is not None:
+                    _atomic_write(self.config_path, previous)
+                elif self.config_path.exists():
+                    self.config_path.unlink()
+            except Exception:
+                raise DesktopError(DesktopErrorCode.TASK_STATE_UNCERTAIN) from None
+            if mutation_attempted:
+                if not query_attempted:
+                    try:
+                        final_exists = self._task_exists(TASK_NAME)
+                    except Exception:
+                        final_exists = None
+                # Only a confirmed absent task with restored, previously valid
+                # inactive config permits the caller to retain its old state.
+                if final_exists is False and not previous_exists and previous_valid:
+                    raise DesktopError(DesktopErrorCode.TASK_CREATE_FAILED) from None
+                raise DesktopError(DesktopErrorCode.TASK_STATE_UNCERTAIN) from None
             raise
         finally:
-            if os.path.exists(filename):
-                os.unlink(filename)
+            try:
+                if os.path.exists(filename):
+                    os.unlink(filename)
+            except OSError:
+                if mutation_attempted:
+                    raise DesktopError(DesktopErrorCode.TASK_STATE_UNCERTAIN) from None
+                raise
 
     def run_scheduled(self) -> int:
         try:

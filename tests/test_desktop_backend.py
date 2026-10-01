@@ -61,15 +61,19 @@ def config(backend, **values):
 
 def command_mock(monkeypatch, backend, *, create_code=0, exists=True):
     calls = []
+    deleted = False
 
     def command(executable, args):
+        nonlocal deleted
         calls.append((executable, args))
         if executable == "whoami.exe":
             return SimpleNamespace(returncode=0, stdout='"TEST\\User","S-1-5-21-123"\n')
         if executable.endswith("powershell.exe"):
             script = base64.b64decode(args[-1]).decode("utf-16-le")
-            present = desktop.LEGACY_TASK_NAME not in script and exists
+            present = desktop.LEGACY_TASK_NAME not in script and exists and not deleted
             return SimpleNamespace(returncode=0, stdout="SWU_TASK_EXISTS" if present else "SWU_TASK_ABSENT", stderr="")
+        if args[0] == "/Delete":
+            deleted = True
         if args[0] == "/Create":
             xml_path = Path(args[args.index("/XML") + 1])
             ET.fromstring(xml_path.read_bytes())
@@ -583,3 +587,132 @@ def test_unknown_task_state_prevents_schedule_mutation(backend, monkeypatch, ope
         assert backend.config_path.read_bytes() == previous
     assert not any(args[0] in {"/Create", "/Delete"} for _, args in calls)
     assert not list(backend.root.glob(".task-*"))
+
+
+def mutation_case(backend, monkeypatch, *, enabled, final_exists, outcome):
+    backend.save_credentials("synthetic-user", "synthetic-password")
+    config(backend, enabled=not enabled, **({"mode": "probe"} if not enabled else {}))
+    command_mock(monkeypatch, backend)
+    answers = iter([not enabled, final_exists])
+    queries = []
+
+    def query(name):
+        queries.append(name)
+        if name == desktop.LEGACY_TASK_NAME:
+            return False
+        answer = next(answers)
+        if isinstance(answer, Exception):
+            raise answer
+        return answer
+
+    calls = []
+
+    def command(executable, args):
+        calls.append(args)
+        if executable == "whoami.exe":
+            return SimpleNamespace(returncode=0, stdout='"CI\\User","S-1-5-21-123"')
+        if isinstance(outcome, Exception):
+            raise outcome
+        return SimpleNamespace(returncode=outcome, stdout="raw-token-secret", stderr="private-path")
+
+    monkeypatch.setattr(backend, "_task_exists", query)
+    monkeypatch.setattr(backend, "_system_command", command)
+    return calls, queries
+
+
+@pytest.mark.parametrize("outcome", [1, OSError("private-path token-secret"), subprocess.TimeoutExpired("secret", 30)])
+def test_failed_create_confirmed_absent_is_known_failure(backend, monkeypatch, outcome):
+    calls, queries = mutation_case(backend, monkeypatch, enabled=True, final_exists=False, outcome=outcome)
+    previous = backend.config_path.read_bytes()
+    with pytest.raises(desktop.DesktopError) as caught:
+        backend.set_schedule(True, "probe")
+    assert caught.value.code is desktop.DesktopErrorCode.TASK_CREATE_FAILED
+    assert backend.config_path.read_bytes() == previous
+    assert sum(args[0] == "/Create" for args in calls) == 1
+    assert queries.count(desktop.TASK_NAME) == 2
+
+
+@pytest.mark.parametrize("outcome", [1, OSError("token-secret"), subprocess.TimeoutExpired("secret", 30)])
+def test_failed_create_that_exists_is_uncertain(backend, monkeypatch, outcome):
+    calls, queries = mutation_case(backend, monkeypatch, enabled=True, final_exists=True, outcome=outcome)
+    with pytest.raises(desktop.DesktopError) as caught:
+        backend.set_schedule(True, "probe")
+    assert caught.value.code is desktop.DesktopErrorCode.TASK_STATE_UNCERTAIN
+    assert "secret" not in str(caught.value)
+    assert sum(args[0] == "/Create" for args in calls) == 1
+    assert queries.count(desktop.TASK_NAME) == 2
+    assert not any(args[0] == "/Delete" for args in calls)
+
+
+@pytest.mark.parametrize("enabled", [True, False])
+def test_post_mutation_query_failure_is_uncertain(backend, monkeypatch, enabled):
+    calls, queries = mutation_case(
+        backend,
+        monkeypatch,
+        enabled=enabled,
+        final_exists=desktop.DesktopError(desktop.DesktopErrorCode.TASK_QUERY_FAILED),
+        outcome=0,
+    )
+    with pytest.raises(desktop.DesktopError) as caught:
+        backend.set_schedule(enabled, "probe")
+    assert caught.value.code is desktop.DesktopErrorCode.TASK_STATE_UNCERTAIN
+    assert sum(args[0] in {"/Create", "/Delete"} for args in calls) == 1
+    assert queries.count(desktop.TASK_NAME) == 2
+
+
+def test_create_rollback_failure_is_uncertain(backend, monkeypatch):
+    calls, _queries = mutation_case(backend, monkeypatch, enabled=True, final_exists=False, outcome=1)
+    original = desktop._atomic_write
+    writes = 0
+
+    def writer(path, data):
+        nonlocal writes
+        writes += 1
+        if writes == 2:
+            raise OSError("private-path token-secret")
+        original(path, data)
+
+    monkeypatch.setattr(desktop, "_atomic_write", writer)
+    with pytest.raises(desktop.DesktopError) as caught:
+        backend.set_schedule(True, "probe")
+    assert caught.value.code is desktop.DesktopErrorCode.TASK_STATE_UNCERTAIN
+    assert sum(args[0] == "/Create" for args in calls) == 1
+
+
+@pytest.mark.parametrize("outcome", [1, OSError("private-secret"), subprocess.TimeoutExpired("secret", 30)])
+def test_failed_delete_confirmed_present_keeps_known_enabled_state(backend, monkeypatch, outcome):
+    calls, queries = mutation_case(backend, monkeypatch, enabled=False, final_exists=True, outcome=outcome)
+    previous = backend.config_path.read_bytes()
+    with pytest.raises(desktop.DesktopError) as caught:
+        backend.set_schedule(False)
+    assert caught.value.code is desktop.DesktopErrorCode.TASK_DISABLE_FAILED
+    assert backend.config_path.read_bytes() == previous
+    assert sum(args[0] == "/Delete" for args in calls) == 1
+    assert queries.count(desktop.TASK_NAME) == 2
+
+
+@pytest.mark.parametrize("outcome", [1, subprocess.TimeoutExpired("secret", 30)])
+def test_failed_delete_that_is_absent_is_uncertain(backend, monkeypatch, outcome):
+    calls, _queries = mutation_case(backend, monkeypatch, enabled=False, final_exists=False, outcome=outcome)
+    with pytest.raises(desktop.DesktopError) as caught:
+        backend.set_schedule(False)
+    assert caught.value.code is desktop.DesktopErrorCode.TASK_STATE_UNCERTAIN
+    assert sum(args[0] == "/Delete" for args in calls) == 1
+
+
+def test_successful_delete_config_write_failure_is_uncertain(backend, monkeypatch):
+    mutation_case(backend, monkeypatch, enabled=False, final_exists=False, outcome=0)
+    monkeypatch.setattr(desktop, "_atomic_write", Mock(side_effect=OSError("private-secret")))
+    with pytest.raises(desktop.DesktopError) as caught:
+        backend.set_schedule(False)
+    assert caught.value.code is desktop.DesktopErrorCode.TASK_STATE_UNCERTAIN
+
+
+@pytest.mark.parametrize("enabled", [True, False])
+def test_post_mutation_failure_with_invalid_prior_config_is_uncertain(backend, monkeypatch, enabled):
+    mutation_case(backend, monkeypatch, enabled=enabled, final_exists=not enabled, outcome=1)
+    backend.config_path.write_text("invalid-private-secret")
+    with pytest.raises(desktop.DesktopError) as caught:
+        backend.set_schedule(enabled, "probe")
+    assert caught.value.code is desktop.DesktopErrorCode.TASK_STATE_UNCERTAIN
+    assert "secret" not in str(caught.value)

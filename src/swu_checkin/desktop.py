@@ -286,11 +286,17 @@ class DesktopApp:
 
         def change() -> str:
             self.backend.set_schedule(enabled, mode=mode)
-            self.current_schedule_mode = self.backend.schedule_mode()
-            if enabled and self.current_schedule_mode != mode:
-                raise RuntimeError("schedule verification failed")
-            if not enabled and self.current_schedule_mode is not None:
-                raise RuntimeError("schedule removal verification failed")
+            try:
+                confirmed_mode = self.backend.schedule_mode()
+            except DesktopError as error:
+                if error.code is DesktopErrorCode.TASK_QUERY_FAILED:
+                    raise
+                raise DesktopError(DesktopErrorCode.TASK_STATE_UNCERTAIN) from None
+            except Exception:
+                raise DesktopError(DesktopErrorCode.TASK_STATE_UNCERTAIN) from None
+            if (enabled and confirmed_mode != mode) or (not enabled and confirmed_mode is not None):
+                raise DesktopError(DesktopErrorCode.TASK_STATE_UNCERTAIN)
+            self.current_schedule_mode = confirmed_mode
             return (
                 "每日计划任务已启用：" + ("只读检测" if mode == "probe" else "自动签到（会提交）")
                 if enabled
@@ -302,7 +308,11 @@ class DesktopApp:
                 self.schedule_state_known = True
             else:
                 self.current_schedule_mode = previous_mode
-                self.schedule_state_known = False if value is DesktopErrorCode.TASK_QUERY_FAILED else previous_known
+                self.schedule_state_known = (
+                    False
+                    if value in (DesktopErrorCode.TASK_QUERY_FAILED, DesktopErrorCode.TASK_STATE_UNCERTAIN)
+                    else previous_known
+                )
             self._sync_schedule()
 
         self.run("更新计划任务", change, changed)
