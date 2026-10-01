@@ -54,7 +54,7 @@ sudo env UV_PYTHON_INSTALL_DIR=/opt/swu-checkin-python \
 
 ## 2. 安装稳定 release
 
-以下以已发布的 Python/CLI `v1.1.5` 为例。升级时替换为确认过的新稳定 tag，不要仅凭 `main` 中的版本号判断发布内容。Windows desktop preview 合入 `main` 不代表发布了新 tag 或桌面安装包，见 [开发与发布](docs/development.md)。
+以下保留已发布的 Python/CLI `v1.1.5` 作为安装示例。当前源码以 `v2.0.0` 为发布目标；部署新版本前先在 [Releases](https://github.com/Maximora-byte/swu-checkin/releases) 确认发布及 CI 证据，再将 `release_tag` 替换为所选 tag，并使用该 tag 的完整代码、文档、锁文件与 units。不要仅凭 `main` 中的版本号判断发布状态；变化与已知限制见 [v2.0.0 发布说明](docs/releases/v2.0.0.md)。
 
 ```bash
 release_tag=v1.1.5
