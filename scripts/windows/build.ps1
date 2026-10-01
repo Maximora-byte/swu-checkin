@@ -51,6 +51,28 @@ try {
     Assert-Exit 'Pinned build tool installation'
     & uv pip check --python $BuildPython
     Assert-Exit 'Build environment dependency check'
+    # Read-only diagnostic: print classifications only, never COM output, user
+    # paths or exception strings. The frozen self-test below is still required.
+    $QueryCheck = @'
+import time
+from uuid import uuid4
+from swu_checkin.desktop_backend import DesktopBackend
+backend = DesktopBackend()
+original = backend._system_command
+def checked(executable, arguments):
+    start = time.monotonic()
+    result = original(executable, arguments)
+    marker = result.stdout.strip()
+    category = marker if marker in {"SWU_TASK_EXISTS", "SWU_TASK_ABSENT"} else "UNKNOWN"
+    print(f"Local query: exit={result.returncode}, result={category}, stderr_present={bool(result.stderr)}, progress_xml={result.stderr.startswith('#< CLIXML')}, elapsed={time.monotonic()-start:.2f}s")
+    return result
+backend._system_command = checked
+assert backend._task_exists("SWUCheckin-SelfTest-" + uuid4().hex) is False
+print("Local task query: definite absence verified; no task created")
+'@
+    & $BuildPython -c $QueryCheck
+    Assert-Exit 'Read-only native task query'
+
     if (Test-Path -LiteralPath $Metadata) { Remove-Item -LiteralPath $Metadata -Recurse -Force }
     & $BuildPython packaging/windows/build_metadata.py metadata $Root $Metadata
     Assert-Exit 'Build provenance generation'
