@@ -7,6 +7,7 @@ on:
       - "tests/**"
       - "packaging/windows/**"
       - "scripts/windows/build.ps1"
+      - "scripts/windows/verify-install.ps1"
       - "pyproject.toml"
       - "uv.lock"
       - ".github/workflows/windows-desktop.yml"
@@ -40,11 +41,23 @@ jobs:
 
       - name: Install pinned Inno Setup compiler
         run: |
-          choco install innosetup --version=6.4.3 --allow-downgrade --yes --no-progress
-          if ($LASTEXITCODE -ne 0) { throw 'Inno Setup installation failed.' }
+          $Installer = Join-Path $env:RUNNER_TEMP 'innosetup-6.7.3.exe'
+          $CompilerDir = Join-Path $env:RUNNER_TEMP 'InnoSetup'
+          Invoke-WebRequest -Uri 'https://github.com/jrsoftware/issrc/releases/download/is-6_7_3/innosetup-6.7.3.exe' -OutFile $Installer
+          $Expected = '9c73c3bae7ed48d44112a0f48e66742c00090bdb5bef71d9d3c056c66e97b732'
+          if ((Get-FileHash -LiteralPath $Installer -Algorithm SHA256).Hash.ToLowerInvariant() -ne $Expected) {
+            throw 'Official Inno Setup installer SHA256 mismatch.'
+          }
+          $Process = Start-Process -FilePath $Installer -ArgumentList '/VERYSILENT', '/NORESTART', '/SUPPRESSMSGBOXES', "/DIR=`"$CompilerDir`"" -PassThru
+          if (-not $Process.WaitForExit(180000)) { $Process.Kill(); throw 'Inno Setup installation timed out.' }
+          $Process.Refresh()
+          if ($Process.ExitCode -ne 0) { throw 'Inno Setup installation failed.' }
 
       - name: Build and run offline frozen self-test
-        run: ./scripts/windows/build.ps1
+        run: ./scripts/windows/build.ps1 -Iscc (Join-Path $env:RUNNER_TEMP 'InnoSetup\ISCC.exe')
+
+      - name: Verify isolated installation, GUI and uninstall
+        run: ./scripts/windows/verify-install.ps1
 
       - name: Upload unsigned installer, onedir bundle and checksums
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2

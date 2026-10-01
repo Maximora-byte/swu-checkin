@@ -26,7 +26,7 @@
 
 1. 从 [Python 官方站点](https://www.python.org/downloads/windows/) 安装 Python 3.13 x64，包含 Tcl/Tk；CI 固定为 3.13.7
 2. 安装 uv **0.12.15**，并确保 `uv` 与 `python` 在 PATH 中
-3. 安装 [Inno Setup](https://jrsoftware.org/isinfo.php) **6.4.3**
+3. 安装 [Inno Setup 官方 6.7.3](https://github.com/jrsoftware/issrc/releases/tag/is-6_7_3)；CI 从该官方 release 下载并校验固定 SHA256 `9c73c3bae7ed48d44112a0f48e66742c00090bdb5bef71d9d3c056c66e97b732`
 4. 在此仓库执行：
 
 ```powershell
@@ -57,9 +57,11 @@
 
 ## CI 与离线冒烟测试
 
-[Windows desktop 工作流](../.github/workflows/windows-desktop.yml) 支持手动 `workflow_dispatch` 和相关文件变动的 `pull_request` 触发：Windows x64 构建，运行冻结 EXE 的 `--self-test`，再生成安装包并上传保留 14 天的 Actions artifact。它不在普通 push 时自动触发、不发布 Release、没有账号 secret，也不会运行真实签到或计划任务。
+[Windows desktop 工作流](../.github/workflows/windows-desktop.yml) 支持手动 `workflow_dispatch` 和相关文件变动的 `pull_request` 触发：Windows x64 构建，运行冻结 EXE 的 `--self-test`，再生成安装包、执行隔离安装/GUI/卸载冒烟测试，并上传保留 14 天的 Actions artifact。它不在普通 push 时自动触发、不发布 Release、没有账号 secret，也不会运行真实签到或计划任务。
 
-`--self-test` 使用合成数据检查运行时资源；构建在非零退出或 180 秒超时时失败。离线自测不能代替真实 Windows 安装/升级/卸载与任务计划验收，也不能证明校方接口、账号或打卡规则有效。
+`--self-test` 使用合成数据检查运行时资源；构建在非零退出或 180 秒超时时失败。`scripts/windows/verify-install.ps1` 仅允许在一次性的 GitHub-hosted Windows runner 运行：先确认不存在本应用的进程、任务、安装注册与开始菜单快捷方式，再将安装包静默安装到独立的 `RUNNER_TEMP` 随机目录。启动应用时使用空的隔离 `LOCALAPPDATA`，验证已安装 EXE 的离线自测、无参数启动的主窗口出现且响应、正常关闭及卸载；最后检查应用文件、安装注册和本应用任务均不存在。它不会注册任务、填入账号、点击提交或执行 `--scheduled`，清理仅限本次创建的进程和目录。
+
+上述 CI 不替代普通用户设备上的完整升级、交互操作与计划任务验收，也不能证明校方接口、账号或打卡规则有效。
 
 交付前需在干净 Windows 10/11 x64 标准用户环境验证：
 

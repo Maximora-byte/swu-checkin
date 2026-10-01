@@ -29,9 +29,9 @@ try {
     Assert-Exit 'Python resolution'
     & $PythonPath -c 'import struct, sys, tkinter; assert sys.version_info[:2] == (3, 13); assert struct.calcsize("P") == 8; tkinter.Tcl()'
     Assert-Exit 'Python 3.13 x64 / Tcl check'
-    if (-not (Test-Path -LiteralPath $Iscc -PathType Leaf)) { throw 'Install Inno Setup 6.4.3, or pass -Iscc with its ISCC.exe path.' }
+    if (-not (Test-Path -LiteralPath $Iscc -PathType Leaf)) { throw 'Install Inno Setup 6.7.3, or pass -Iscc with its ISCC.exe path.' }
     $InnoVersion = (Get-Item -LiteralPath $Iscc).VersionInfo.FileVersion
-    if ($InnoVersion -notmatch '^6\.4\.3(?:[.\s]|$)') { throw "Expected Inno Setup 6.4.3; found $InnoVersion." }
+    if ($InnoVersion -notmatch '^6\.7\.3(?:[.\s]|$)') { throw "Expected Inno Setup 6.7.3; found $InnoVersion." }
     $Epoch = (& git log -1 --format=%ct)
     Assert-Exit 'Source timestamp lookup'
     $env:SOURCE_DATE_EPOCH = $Epoch
