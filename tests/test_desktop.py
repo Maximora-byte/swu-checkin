@@ -182,7 +182,9 @@ def test_busy_cannot_submit_or_close(app):
     app.close()
     app.run.assert_not_called()
     app.root.destroy.assert_not_called()
-    app.dialogs.showwarning.assert_called_once()
+    app.dialogs.showwarning.assert_called_once_with(
+        "操作进行中", "请等待当前操作结束后再关闭，以免无法确认操作结果。", parent=app.root
+    )
 
 
 def test_idle_window_closes(app):
@@ -440,3 +442,35 @@ def test_post_backend_mutation_gui_verification_failure_is_uncertain(app, failur
         app.run.call_args.args[1]()
     assert caught.value.code is DesktopErrorCode.TASK_STATE_UNCERTAIN
     assert "secret" not in desktop.describe_result(caught.value.code)
+
+
+@pytest.mark.parametrize("fails", [False, True])
+def test_busy_close_then_operation_completion_allows_close(app, fails):
+    entered, release = threading.Event(), threading.Event()
+
+    def operation():
+        entered.set()
+        assert release.wait(3)
+        if fails:
+            raise RuntimeError("server-response token-secret password-secret")
+        return "完成"
+
+    callback = Mock()
+    assert app.controller.start(operation, callback)
+    try:
+        assert entered.wait(3)
+        app.close()
+        app.root.destroy.assert_not_called()
+        app.dialogs.showwarning.assert_called_once_with(
+            "操作进行中", "请等待当前操作结束后再关闭，以免无法确认操作结果。", parent=app.root
+        )
+    finally:
+        release.set()
+    event = app.controller.events.get(timeout=3)
+    app.controller.events.put(event)
+    assert app.controller.poll()
+    assert app.controller.busy is False
+    callback.assert_called_once_with(not fails, desktop.SAFE_ERROR if fails else "完成")
+    app.close()
+    app.root.destroy.assert_called_once_with()
+    assert app.dialogs.showwarning.call_count == 1

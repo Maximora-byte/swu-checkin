@@ -453,6 +453,8 @@ def test_frozen_task_xml_uses_installed_executable(backend, monkeypatch):
     assert "synthetic-password" not in ET.tostring(captured[0], encoding="unicode")
     assert captured[0].findtext(".//t:UserId", namespaces=ns) == "S-1-5-21-123"
     assert captured[0].findtext(".//t:StartWhenAvailable", namespaces=ns) == "false"
+    assert captured[0].findtext(".//t:LogonType", namespaces=ns) == "InteractiveToken"
+    assert captured[0].findtext(".//t:RunLevel", namespaces=ns) == "LeastPrivilege"
     boundaries = [node.text for node in captured[0].findall(".//t:StartBoundary", ns)]
     assert [value[11:] for value in boundaries] == ["21:15:00+08:00", "21:45:00+08:00"]
 
