@@ -221,7 +221,7 @@ class DesktopBackend:
         # to FileNotFoundException rather than COMException. Never parse text.
         literal = name.replace("'", "''")
         script = (
-            "$ErrorActionPreference='Stop'; "
+            "$ErrorActionPreference='Stop'; $ProgressPreference='SilentlyContinue'; "
             "try { $s=New-Object -ComObject Schedule.Service; $s.Connect(); "
             "$f=$s.GetFolder('\\') } catch { exit 3 }; "
             "try { $null=$f.GetTask('" + literal + "') } catch { "

@@ -57,6 +57,7 @@ try {
 import time
 from uuid import uuid4
 from swu_checkin.desktop_backend import DesktopBackend
+from swu_checkin.desktop_errors import DesktopError
 backend = DesktopBackend()
 original = backend._system_command
 def checked(executable, arguments):
@@ -67,7 +68,13 @@ def checked(executable, arguments):
     print(f"Local query: exit={result.returncode}, result={category}, stderr_present={bool(result.stderr)}, progress_xml={result.stderr.startswith('#< CLIXML')}, elapsed={time.monotonic()-start:.2f}s")
     return result
 backend._system_command = checked
-assert backend._task_exists("SWUCheckin-SelfTest-" + uuid4().hex) is False
+try:
+    absent = backend._task_exists("SWUCheckin-SelfTest-" + uuid4().hex) is False
+except DesktopError:
+    print("Local task query: TASK_QUERY_FAILED")
+    raise SystemExit(1) from None
+if not absent:
+    raise SystemExit("Local task query: unexpected existing random task")
 print("Local task query: definite absence verified; no task created")
 '@
     & $BuildPython -c $QueryCheck
