@@ -1,6 +1,8 @@
 """Only mocked registration tests; real smoke is explicitly CI-only."""
 
+import base64
 import importlib.util
+import json
 from datetime import UTC, datetime
 from pathlib import Path
 from types import SimpleNamespace
@@ -53,6 +55,26 @@ def test_task_smoke_only_creates_and_cleans_its_random_name(monkeypatch, tmp_pat
         calls.append((executable, args))
         if executable == "whoami.exe":
             return SimpleNamespace(returncode=0, stdout='"CI\\User","S-1-5-21-123"')
+        if executable.endswith("powershell.exe"):
+            script = base64.b64decode(args[-1]).decode("utf-16-le")
+            name = helper.re.search(r"GetTask\('(SWUCheckin-CI-[0-9a-f]{32})'\)", script).group(1)
+            command_path = str(tmp_path / "system" / "System32" / "cmd.exe")
+            return SimpleNamespace(
+                returncode=0,
+                stderr="",
+                stdout=json.dumps(
+                    {
+                        "Name": name,
+                        "Command": command_path,
+                        "Arguments": "/d /c exit 0",
+                        "WorkingDirectory": str(Path(command_path).parent),
+                        "UserId": "S-1-5-21-123",
+                        "RunLevel": 0,
+                        "LogonType": 3,
+                        "StartWhenAvailable": False,
+                    }
+                ),
+            )
         name = args[args.index("/TN") + 1]
         assert helper.re.fullmatch(r"SWUCheckin-CI-[0-9a-f]{32}", name)
         assert name not in {"SWUCheckin-Desktop", "SWUCheckin-Daily"}

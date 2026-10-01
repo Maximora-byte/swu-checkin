@@ -1,7 +1,9 @@
 """Harmless task registration smoke, only on disposable GitHub Windows runners."""
 
+import base64
 import csv
 import io
+import json
 import os
 import re
 import sys
@@ -82,11 +84,44 @@ def run_smoke() -> None:
             created = backend._system_command("schtasks.exe", ["/Create", "/TN", name, "/XML", str(path), "/F"])
             if created.returncode or not backend._task_exists(name):
                 raise RuntimeError("Harmless task registration failed")
-            print("Harmless task stage: query registered XML")
-            exported = backend._system_command("schtasks.exe", ["/Query", "/TN", name, "/XML"])
-            if exported.returncode:
-                raise RuntimeError("Harmless task export failed")
-            validate_xml(ET.fromstring(exported.stdout), command, sid, now)
+            print("Harmless task stage: verify registered COM properties")
+            # Task Scheduler normalizes XML by omitting default-valued fields
+            # such as LeastPrivilege. Verify effective API properties instead.
+            script = (
+                "$ErrorActionPreference='Stop'; $ProgressPreference='SilentlyContinue'; "
+                "try { $s=New-Object -ComObject Schedule.Service; $s.Connect(); "
+                "$t=$s.GetFolder('\\').GetTask('" + name + "'); $d=$t.Definition; "
+                "$a=$d.Actions.Item(1); $p=@{Name=$t.Name; Command=$a.Path; Arguments=$a.Arguments; "
+                "WorkingDirectory=$a.WorkingDirectory; UserId=$d.Principal.UserId; "
+                "RunLevel=[int]$d.Principal.RunLevel; LogonType=[int]$d.Principal.LogonType; "
+                "StartWhenAvailable=[bool]$d.Settings.StartWhenAvailable}; "
+                "[Console]::Out.Write((ConvertTo-Json -InputObject $p -Compress)); exit 0 } catch { exit 3 }"
+            )
+            properties = backend._system_command(
+                r"WindowsPowerShell\v1.0\powershell.exe",
+                [
+                    "-NoLogo",
+                    "-NoProfile",
+                    "-NonInteractive",
+                    "-EncodedCommand",
+                    base64.b64encode(script.encode("utf-16-le")).decode("ascii"),
+                ],
+            )
+            if properties.returncode or properties.stderr.strip():
+                raise RuntimeError("Harmless task property query failed")
+            values = json.loads(properties.stdout)
+            expected = {
+                "Name": name,
+                "Command": command,
+                "Arguments": "/d /c exit 0",
+                "WorkingDirectory": str(Path(command).parent),
+                "UserId": sid,
+                "RunLevel": 0,
+                "LogonType": 3,
+                "StartWhenAvailable": False,
+            }
+            if not isinstance(values, dict) or values != expected:
+                raise RuntimeError("Harmless task effective property verification failed")
             print("Harmless task stage: delete")
             deleted = backend._system_command("schtasks.exe", ["/Delete", "/TN", name, "/F"])
             if deleted.returncode or backend._task_exists(name):
