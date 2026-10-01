@@ -8,7 +8,7 @@ import threading
 from collections.abc import Callable, Sequence
 from typing import Any
 
-from .desktop_backend import DesktopError
+from .desktop_errors import ERROR_MESSAGES, DesktopError
 from .models import CheckinResult
 
 LOCATION_WARNING = "本工具不测量真实 GPS；提交使用学校记录的固定寝室坐标，不代表您当前的位置。"
@@ -40,7 +40,7 @@ class DesktopController:
             try:
                 value = operation()
             except DesktopError as error:
-                self.events.put((False, str(error)))
+                self.events.put((False, ERROR_MESSAGES.get(error.code, SAFE_ERROR)))
             except Exception:
                 # Exception strings may contain passwords, URLs, tokens, or server payloads.
                 self.events.put((False, SAFE_ERROR))
@@ -315,7 +315,10 @@ def main(argv: Sequence[str] | None = None) -> int:
             try:
                 from tkinter import messagebox
 
-                messagebox.showerror("无法启动签到助手", str(error) if isinstance(error, DesktopError) else SAFE_ERROR)
+                messagebox.showerror(
+                    "无法启动签到助手",
+                    ERROR_MESSAGES.get(error.code, SAFE_ERROR) if isinstance(error, DesktopError) else SAFE_ERROR,
+                )
             except Exception:
                 pass
         return 1

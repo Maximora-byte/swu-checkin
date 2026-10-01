@@ -10,6 +10,7 @@ from unittest.mock import Mock
 import pytest
 
 from swu_checkin import desktop
+from swu_checkin.desktop_errors import ERROR_MESSAGES, DesktopErrorCode
 from swu_checkin.models import CheckinResult
 from swu_checkin.status import CheckinStatus
 
@@ -249,11 +250,11 @@ def test_safe_result_rendering():
 def test_controller_exposes_only_reviewed_errors():
     controller = desktop.DesktopController()
     callback = Mock()
-    controller.start(Mock(side_effect=desktop.DesktopError("请先停用旧任务。")), callback)
+    controller.start(Mock(side_effect=desktop.DesktopError(DesktopErrorCode.LEGACY_TASK_EXISTS)), callback)
     event = controller.events.get(timeout=3)
     controller.events.put(event)
     controller.poll()
-    callback.assert_called_once_with(False, "请先停用旧任务。")
+    callback.assert_called_once_with(False, ERROR_MESSAGES[DesktopErrorCode.LEGACY_TASK_EXISTS])
 
 
 def test_manual_result_warns_if_local_record_failed(app):
@@ -278,3 +279,49 @@ def test_active_schedule_mode_cannot_look_like_another_mode(app):
     app._sync_schedule()
     app.schedule_mode.set.assert_called_once_with("checkin")
     control.configure.assert_called_once_with(state="disabled")
+
+
+@pytest.mark.parametrize(
+    "secret",
+    ["server response raw", "https://host.invalid/?token=secret", "password-secret", r"C:\Users\private\token"],
+)
+def test_desktop_error_rejects_external_text(secret):
+    with pytest.raises(TypeError, match="DesktopError requires a DesktopErrorCode") as caught:
+        desktop.DesktopError(secret)
+    assert secret not in str(caught.value)
+
+
+@pytest.mark.parametrize("typed", [False, True])
+def test_controller_never_renders_exception_text(typed):
+    secret = "server-body https://host.invalid/?token=secret password-secret"
+    error = desktop.DesktopError(DesktopErrorCode.CONFIG_INVALID) if typed else RuntimeError(secret)
+    error.args = (secret,)
+    controller = desktop.DesktopController()
+    callback = Mock()
+    controller.start(Mock(side_effect=error), callback)
+    event = controller.events.get(timeout=3)
+    controller.events.put(event)
+    controller.poll()
+    expected = ERROR_MESSAGES[DesktopErrorCode.CONFIG_INVALID] if typed else desktop.SAFE_ERROR
+    callback.assert_called_once_with(False, expected)
+    assert secret not in callback.call_args.args[1]
+
+
+@pytest.mark.parametrize("typed", [False, True])
+def test_startup_dialog_uses_fixed_error_only(monkeypatch, backend, typed):
+    secret = "raw response https://host.invalid/?token=secret password-secret"
+    error = desktop.DesktopError(DesktopErrorCode.WINDOWS_REQUIRED) if typed else RuntimeError(secret)
+    error.args = (secret,)
+    monkeypatch.setattr(sys.modules["swu_checkin.desktop_backend"].DesktopBackend, "side_effect", error)
+    tk = types.ModuleType("tkinter")
+    tk.messagebox = Mock()
+    monkeypatch.setitem(sys.modules, "tkinter", tk)
+    assert desktop.main([]) == 1
+    expected = ERROR_MESSAGES[DesktopErrorCode.WINDOWS_REQUIRED] if typed else desktop.SAFE_ERROR
+    tk.messagebox.showerror.assert_called_once_with("无法启动签到助手", expected)
+
+
+def test_error_message_vocabulary_is_complete_and_immutable():
+    assert set(ERROR_MESSAGES) == set(DesktopErrorCode)
+    with pytest.raises(TypeError):
+        ERROR_MESSAGES[DesktopErrorCode.WINDOWS_REQUIRED] = "external"

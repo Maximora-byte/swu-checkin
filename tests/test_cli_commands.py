@@ -194,7 +194,7 @@ def test_subcommand_json_keeps_schema_v1(monkeypatch, capsys, command, mode):
 
 @pytest.mark.parametrize("command", ["setup", "doctor", "status", "probe"])
 def test_non_formal_commands_never_construct_runtime_lock(monkeypatch, tmp_path, command):
-    monkeypatch.setattr(cli, "RuntimeLock", lambda: pytest.fail(f"{command} must remain unlocked"))
+    monkeypatch.setattr(cli.formal_execution, "RuntimeLock", lambda: pytest.fail(f"{command} must remain unlocked"))
     monkeypatch.setattr(cli, "_setup", lambda: 0)
     monkeypatch.setattr(cli, "_doctor", lambda: 0)
     monkeypatch.setattr(cli, "_status", lambda _path: 0)
@@ -214,7 +214,9 @@ def test_probe_only_environment_keeps_legacy_path_unlocked(monkeypatch):
     monkeypatch.setenv("SWUDK_PROBE_ONLY", "1")
     monkeypatch.setenv("SWUDK_USERNAME", "student")
     monkeypatch.setenv("SWUDK_PASSWORD", "password")
-    monkeypatch.setattr(cli, "RuntimeLock", lambda: pytest.fail("SWUDK_PROBE_ONLY path must remain unlocked"))
+    monkeypatch.setattr(
+        cli.formal_execution, "RuntimeLock", lambda: pytest.fail("SWUDK_PROBE_ONLY path must remain unlocked")
+    )
     monkeypatch.setattr(
         cli,
         "run_probe",

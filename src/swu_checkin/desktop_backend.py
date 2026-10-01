@@ -10,9 +10,11 @@ import subprocess
 import sys
 import tempfile
 from datetime import UTC, datetime, timedelta, timezone
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 from xml.etree import ElementTree as ET
 
+from . import formal_execution
+from .desktop_errors import DesktopError, DesktopErrorCode
 from .models import CheckinResult
 from .runtime_lock import RuntimeLock
 from .service import CheckinService, run_checkin, run_probe
@@ -25,14 +27,10 @@ LEGACY_TASK_NAME = "SWUCheckin-Daily"
 TASK_NS = "http://schemas.microsoft.com/windows/2004/02/mit/task"
 
 
-class DesktopError(RuntimeError):
-    """Reviewed desktop error safe to show without exception details."""
-
-
 def app_root() -> Path:
     value = os.getenv("LOCALAPPDATA", "").strip()
     if sys.platform != "win32" or not value or not Path(value).is_absolute():
-        raise DesktopError("桌面版需要 Windows 10/11 和有效的本地用户目录。")
+        raise DesktopError(DesktopErrorCode.WINDOWS_REQUIRED)
     return Path(value) / "SWUCheckin"
 
 
@@ -53,7 +51,7 @@ def _atomic_write(path: Path, data: bytes) -> None:
 def task_xml(executable: str, sid: str, now: datetime | None = None) -> str:
     """A per-user non-elevated task; paths are XML escaped, never shell interpolated."""
     if not executable or not sid:
-        raise DesktopError("计划任务缺少程序路径或用户身份。")
+        raise DesktopError(DesktopErrorCode.TASK_IDENTITY_MISSING)
     ET.register_namespace("", TASK_NS)
 
     def element(parent: ET.Element, name: str, text: str | None = None) -> ET.Element:
@@ -95,7 +93,7 @@ def task_xml(executable: str, sid: str, now: datetime | None = None) -> str:
     execution = element(actions, "Exec")
     element(execution, "Command", executable)
     element(execution, "Arguments", "--scheduled")
-    element(execution, "WorkingDirectory", str(Path(executable).parent))
+    element(execution, "WorkingDirectory", str(PureWindowsPath(executable).parent))
     return ET.tostring(root, encoding="unicode", xml_declaration=True)
 
 
@@ -114,14 +112,14 @@ class DesktopBackend:
 
     def save_credentials(self, username: str, password: str) -> None:
         if not username.strip() or not password:
-            raise DesktopError("账号和密码不能为空。")
+            raise DesktopError(DesktopErrorCode.CREDENTIALS_EMPTY)
         if self._read_config().get("enabled") is True:
-            raise DesktopError("请先关闭定时任务，再修改已保存账号，修改后重新检测并启用。")
+            raise DesktopError(DesktopErrorCode.SCHEDULE_ACTIVE)
         data = json.dumps({"schema_version": 1, "username": username.strip(), "password": password}).encode("utf-8")
         try:
             _atomic_write(self.credential_path, WindowsDpapiProtector().protect(data))
         except Exception:
-            raise DesktopError("无法安全保存凭据；请检查本地用户目录与 Windows DPAPI。") from None
+            raise DesktopError(DesktopErrorCode.CREDENTIAL_SAVE_FAILED) from None
 
     def load_credentials(self) -> tuple[str, str] | None:
         try:
@@ -139,7 +137,7 @@ class DesktopBackend:
                 raise ValueError
             return username, password
         except Exception:
-            raise DesktopError("保存的凭据无法解密或已损坏，请在此 Windows 用户下重新保存。") from None
+            raise DesktopError(DesktopErrorCode.CREDENTIAL_LOAD_FAILED) from None
 
     def _options(self) -> dict:
         return {"token_store": TokenStore(self.root / "auth-token-cache")}
@@ -163,9 +161,10 @@ class DesktopBackend:
 
     def check_in(self, username: str, password: str) -> CheckinResult:
         if os.getenv("SWUDK_PROBE_ONLY") == "1":
-            raise DesktopError("只读安全开关已启用，不能正式签到。")
+            raise DesktopError(DesktopErrorCode.READONLY_ENABLED)
+
         # The same OS lock and default path as cli.main; direct GUI calls cannot bypass it.
-        with RuntimeLock():
+        def execute() -> CheckinResult:
             result = run_checkin(username, password, 10, **self._options())
             self.last_warning = ""
             try:
@@ -174,6 +173,8 @@ class DesktopBackend:
                 # The remote outcome is preserved even when local disk/state is damaged.
                 self.last_warning = "签到结果已返回，但本地状态未能保存。请查看本次结果，勿盲目重复提交。"
             return result
+
+        return formal_execution.execute_formal_checkin_with_lock(execute)
 
     def status_text(self) -> str:
         lines = []
@@ -200,7 +201,7 @@ class DesktopBackend:
 
     def _system_command(self, executable: str, arguments: list[str]) -> subprocess.CompletedProcess[str]:
         if sys.platform != "win32":
-            raise DesktopError("计划任务仅支持 Windows。")
+            raise DesktopError(DesktopErrorCode.TASK_WINDOWS_REQUIRED)
         root = os.environ.get("SystemRoot", r"C:\Windows")
         return subprocess.run(
             [str(Path(root) / "System32" / executable), *arguments],
@@ -220,11 +221,11 @@ class DesktopBackend:
         except FileNotFoundError:
             return {}
         except Exception:
-            raise DesktopError("定时配置已损坏，请重新设置。") from None
+            raise DesktopError(DesktopErrorCode.CONFIG_DAMAGED) from None
         if not isinstance(payload, dict) or (
             type(payload.get("schema_version")) is not int or payload.get("schema_version") != 1
         ):
-            raise DesktopError("定时配置格式无效，请重新设置。")
+            raise DesktopError(DesktopErrorCode.CONFIG_INVALID)
         return payload
 
     def schedule_mode(self) -> str | None:
@@ -235,7 +236,7 @@ class DesktopBackend:
         if config.get("enabled") is not True:
             return None
         if not isinstance(mode, str) or mode not in {"probe", "checkin"}:
-            raise DesktopError("定时模式无效，请关闭后重新设置。")
+            raise DesktopError(DesktopErrorCode.SCHEDULE_MODE_INVALID)
         return mode
 
     def schedule_enabled(self) -> bool:
@@ -246,29 +247,27 @@ class DesktopBackend:
             if self._task_exists(TASK_NAME):
                 result = self._system_command("schtasks.exe", ["/Delete", "/TN", TASK_NAME, "/F"])
                 if result.returncode != 0:
-                    raise DesktopError("无法停用计划任务，请在 Windows 任务计划程序检查。")
+                    raise DesktopError(DesktopErrorCode.TASK_DISABLE_FAILED)
             _atomic_write(self.config_path, b'{"schema_version":1,"enabled":false}')
             return
         if not isinstance(mode, str) or mode not in {"probe", "checkin"}:
-            raise DesktopError("请选择有效的定时模式。")
+            raise DesktopError(DesktopErrorCode.MODE_REQUIRED)
         if not getattr(sys, "frozen", False):
-            raise DesktopError("请使用安装版启用定时任务，开发目录可能移动。")
+            raise DesktopError(DesktopErrorCode.FROZEN_REQUIRED)
         credentials = self.load_credentials()
         if credentials is None:
-            raise DesktopError("启用定时前请先保存并检测账号。")
+            raise DesktopError(DesktopErrorCode.SAVED_CREDENTIALS_REQUIRED)
         if not self.diagnose(*credentials):
-            raise DesktopError("保存账号的只读检测未通过，未启用计划任务。")
+            raise DesktopError(DesktopErrorCode.DIAGNOSIS_FAILED)
         if self._task_exists(LEGACY_TASK_NAME):
-            raise DesktopError(
-                "发现旧版 SWUCheckin-Daily 任务，请先在任务计划程序删除旧任务登记（保留账号配置），避免两套定时同时运行。"
-            )
+            raise DesktopError(DesktopErrorCode.LEGACY_TASK_EXISTS)
         identity = self._system_command("whoami.exe", ["/user", "/fo", "csv", "/nh"])
         try:
             sid = next(csv.reader(io.StringIO(identity.stdout)))[1]
             if identity.returncode or not sid.startswith("S-1-"):
                 raise ValueError
         except (IndexError, StopIteration, ValueError):
-            raise DesktopError("无法确认 Windows 用户身份。") from None
+            raise DesktopError(DesktopErrorCode.USER_IDENTITY_FAILED) from None
         previous = self.config_path.read_bytes() if self.config_path.exists() else None
         payload = json.dumps({"schema_version": 1, "enabled": True, "mode": mode}).encode("utf-8")
         self.root.mkdir(mode=0o700, parents=True, exist_ok=True)
@@ -279,7 +278,7 @@ class DesktopBackend:
             _atomic_write(self.config_path, payload)
             result = self._system_command("schtasks.exe", ["/Create", "/TN", TASK_NAME, "/XML", filename, "/F"])
             if result.returncode != 0 or not self._task_exists(TASK_NAME):
-                raise DesktopError("计划任务创建失败，请检查当前用户的任务计划权限。")
+                raise DesktopError(DesktopErrorCode.TASK_CREATE_FAILED)
         except Exception:
             if previous is not None:
                 _atomic_write(self.config_path, previous)

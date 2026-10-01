@@ -3,7 +3,7 @@
 import json
 import subprocess
 from datetime import UTC, datetime
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 from types import SimpleNamespace
 from unittest.mock import Mock
 from xml.etree import ElementTree as ET
@@ -153,7 +153,7 @@ def test_task_xml_escapes_paths_and_has_beijing_daily_triggers():
     ns = {"t": desktop.TASK_NS}
     assert xml.findtext(".//t:Command", namespaces=ns) == executable
     assert xml.findtext(".//t:Arguments", namespaces=ns) == "--scheduled"
-    assert xml.findtext(".//t:WorkingDirectory", namespaces=ns) == str(Path(executable).parent)
+    assert xml.findtext(".//t:WorkingDirectory", namespaces=ns) == str(PureWindowsPath(executable).parent)
     assert xml.findtext(".//t:LogonType", namespaces=ns) == "InteractiveToken"
     assert xml.findtext(".//t:RunLevel", namespaces=ns) == "LeastPrivilege"
     assert [node.text for node in xml.findall(".//t:StartBoundary", ns)] == [
@@ -419,3 +419,80 @@ def test_status_with_corrupt_files_is_safe(backend):
     assert "损坏" in text
     assert "定时结果不可读取" in text
     assert "synthetic-secret" not in text
+
+
+def test_frozen_task_xml_uses_installed_executable(backend, monkeypatch):
+    backend.save_credentials("synthetic-user", "synthetic-password")
+    command_mock(monkeypatch, backend)
+    monkeypatch.setattr(desktop.sys, "executable", r"C:\Program Files\SWUCheckin\SWUCheckin.exe")
+    original = backend._system_command
+    captured = []
+
+    def capture(executable, args):
+        if args[0] == "/Create":
+            captured.append(ET.fromstring(Path(args[args.index("/XML") + 1]).read_text(encoding="utf-16")))
+        return original(executable, args)
+
+    monkeypatch.setattr(backend, "_system_command", capture)
+    backend.set_schedule(True, "probe")
+    assert len(captured) == 1
+    ns = {"t": desktop.TASK_NS}
+    assert captured[0].findtext(".//t:Command", namespaces=ns) == r"C:\Program Files\SWUCheckin\SWUCheckin.exe"
+    assert captured[0].findtext(".//t:Arguments", namespaces=ns) == "--scheduled"
+    assert captured[0].findtext(".//t:WorkingDirectory", namespaces=ns) == r"C:\Program Files\SWUCheckin"
+    assert "synthetic-password" not in ET.tostring(captured[0], encoding="unicode")
+
+
+@pytest.mark.parametrize("entrypoint", ["cli", "gui", "scheduled"])
+def test_formal_entrypoints_share_one_lock_owner(backend, monkeypatch, entrypoint):
+    from swu_checkin import cli, formal_execution
+
+    wrapper = Mock(wraps=formal_execution.execute_formal_checkin_with_lock)
+    monkeypatch.setattr(formal_execution, "execute_formal_checkin_with_lock", wrapper)
+    lock_factory = Mock(wraps=RuntimeLock)
+    monkeypatch.setattr(formal_execution, "RuntimeLock", lock_factory)
+
+    def submit(*args, **kwargs):
+        contender = RuntimeLock()
+        assert contender.acquire() is False
+        return result()
+
+    monkeypatch.setattr(cli, "run_checkin", submit)
+    monkeypatch.setattr(desktop, "run_checkin", submit)
+    monkeypatch.setenv("SWUDK_USERNAME", "synthetic-user")
+    monkeypatch.setenv("SWUDK_PASSWORD", "synthetic-password")
+    monkeypatch.delenv("SWUDK_STATUS_FILE", raising=False)
+    if entrypoint == "cli":
+        assert cli.main(["run"]) == 0
+    elif entrypoint == "gui":
+        assert backend.check_in("synthetic-user", "synthetic-password").code == CheckinStatus.SUCCESS
+    else:
+        config(backend, enabled=True, mode="checkin")
+        monkeypatch.setattr(backend, "load_credentials", lambda: ("synthetic-user", "synthetic-password"))
+        assert backend.run_scheduled() == 0
+    wrapper.assert_called_once()
+    lock_factory.assert_called_once_with()
+    with RuntimeLock():
+        pass
+
+
+@pytest.mark.parametrize("entrypoint", ["cli", "gui", "scheduled"])
+def test_readonly_entrypoints_never_use_formal_wrapper(backend, monkeypatch, entrypoint):
+    from swu_checkin import cli, formal_execution
+
+    wrapper = Mock(side_effect=AssertionError("Probe must not acquire formal lock"))
+    monkeypatch.setattr(formal_execution, "execute_formal_checkin_with_lock", wrapper)
+    monkeypatch.setattr(cli, "run_probe", lambda *args, **kwargs: result("probe"))
+    monkeypatch.setattr(desktop, "run_probe", lambda *args, **kwargs: result("probe"))
+    monkeypatch.setenv("SWUDK_USERNAME", "synthetic-user")
+    monkeypatch.setenv("SWUDK_PASSWORD", "synthetic-password")
+    with RuntimeLock():
+        if entrypoint == "cli":
+            assert cli.main(["probe"]) == 0
+        elif entrypoint == "gui":
+            assert backend.probe("synthetic-user", "synthetic-password").mode == "probe"
+        else:
+            config(backend, enabled=True, mode="probe")
+            monkeypatch.setattr(backend, "load_credentials", lambda: ("synthetic-user", "synthetic-password"))
+            assert backend.run_scheduled() == 0
+    wrapper.assert_not_called()
