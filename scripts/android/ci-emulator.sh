@@ -23,7 +23,15 @@ printf 'api=%s\nabi=x86_64\nacceleration=%s\n' "$api" "$accel" > android/evidenc
   -no-boot-anim -no-snapshot -gpu swiftshader_indirect -accel "$accel" \
   > android/evidence/emulator.log 2>&1 &
 emulator_pid=$!
-trap 'adb emu kill >/dev/null 2>&1 || true; kill "$emulator_pid" 2>/dev/null || true' EXIT
+cleanup() {
+  # Disposable emulator only, with no credentials or school responses. Preserve
+  # startup/crash evidence even if instrumentation never reaches the first test.
+  adb logcat -d -b crash > android/evidence/android-crash.log 2>&1 || true
+  adb logcat -d -s AndroidRuntime:E python.stderr:E > android/evidence/runtime-errors.log 2>&1 || true
+  adb emu kill >/dev/null 2>&1 || true
+  kill "$emulator_pid" 2>/dev/null || true
+}
+trap cleanup EXIT
 ready=false
 for _ in $(seq 1 180); do
   if [[ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" == 1 ]]; then
