@@ -73,6 +73,8 @@ uv run --locked swu-checkin status --help
 
 ### Windows 检查
 
+工作流 shell 分支的离线回归需要 Git for Windows 的 Bash；测试从当前 `git.exe` 所在安装目录选择 `bin/bash.exe`，避免 Windows 把 `bash` 解析为 WSL 启动器而丢失模拟环境变量。Windows CI 同样执行这组回归。
+
 基础 PowerShell 脚本检查（可在已安装 PowerShell 7 的 Linux 上运行）：
 
 ```powershell

@@ -117,9 +117,18 @@ print("Local task query: definite absence verified; no task created")
     if (-not (Test-Path -LiteralPath $Installer -PathType Leaf)) { throw 'Installer was not produced.' }
     Copy-Item -LiteralPath (Join-Path $Metadata 'BUILD-INFO.json') -Destination $Dist
     Copy-Item -LiteralPath (Join-Path $Metadata 'TOOLCHAIN.txt') -Destination $Dist
+    # The portable ZIP wraps the very same tested onedir app. It adds standalone
+    # instructions/provenance and its own payload manifest without changing the
+    # installer input, storage location, permissions, or executable behavior.
+    $Portable = Join-Path $Dist "SWUCheckin-$Version-win-x64-Portable.zip"
+    & $BuildPython packaging/windows/portable.py (Join-Path $Dist 'SWUCheckin') $Portable
+    Assert-Exit 'Portable ZIP packaging'
+    $PortableHash = (Get-FileHash -LiteralPath $Portable -Algorithm SHA256).Hash.ToLowerInvariant()
+    [IO.File]::WriteAllText("$Portable.sha256", "$PortableHash  $([IO.Path]::GetFileName($Portable))`n", [Text.UTF8Encoding]::new($false))
     & $BuildPython packaging/windows/build_metadata.py manifest $Dist (Join-Path $Dist 'SHA256SUMS.txt')
     Assert-Exit 'Distribution checksum manifest'
     Write-Host "Built and offline-smoke-tested: $Installer"
+    Write-Host "Packaged for separate extracted-ZIP smoke: $Portable"
     Write-Host 'The installer is unsigned. No installation, account request, task registration or release was performed.'
 }
 finally {

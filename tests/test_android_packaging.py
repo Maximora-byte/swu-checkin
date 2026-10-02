@@ -116,7 +116,7 @@ def successful_instrumentation_report(verifier):
                 "INSTRUMENTATION_STATUS_CODE: 0",
             ]
         )
-    return "\n".join(records) + "\nOK (3 tests)\nINSTRUMENTATION_CODE: -1\n"
+    return "\n".join(records) + f"\nOK ({len(verifier.EXPECTED_TESTS)} tests)\nINSTRUMENTATION_CODE: -1\n"
 
 
 @pytest.mark.parametrize(
@@ -139,7 +139,7 @@ def test_instrumentation_report_fails_closed(report):
 
 def test_instrumentation_report_accepts_all_tests():
     verifier = load_script("instrumentation_verifier", "scripts/android/verify_instrumentation.py")
-    assert verifier.verify(successful_instrumentation_report(verifier)) == 3
+    assert verifier.verify(successful_instrumentation_report(verifier)) == len(verifier.EXPECTED_TESTS)
 
 
 def test_instrumentation_report_rejects_wrong_identity_or_skipped_test():

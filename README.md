@@ -28,6 +28,10 @@
 
 本工具使用学校记录的寝室坐标，不测量实际 GPS，技术提交成功不证明人在寝。仅在本人确实在寝并符合学校规则时使用正式签到；自动模式必须单独授权，不满足条件时提前停用。
 
+### Windows 免安装 ZIP
+
+已有 v2.0.0 的完整 onedir ZIP 可全部解压后运行 `SWUCheckin/SWUCheckin.exe`。新的构建同时生成明确命名的 `*-win-x64-Portable.zip`，内附中文使用说明、来源信息及校验清单；无需安装程序、Python、uv 或管理员权限。免安装只涵盖程序文件，DPAPI 账号数据仍保存在当前用户目录，不承诺跨电脑迁移。下载、升级和计划任务路径注意事项见 [免安装版指南](docs/windows-portable.md)。新构建先提供 Actions 预览 artifact，实际 Release 资产以发布页为准。
+
 ## macOS desktop preview
 
 新增 macOS 15 手动桌面预览：启动不联网、不读取账号；可显式使用系统钥匙串保存/读取/清除账号，token 仅在内存。分别构建 Apple Silicon 与 Intel `.app`，不启用后台任务。产物为 ad-hoc 签名、未 Developer ID 签名/公证的预览；以各架构成功 CI artifact 为准，尚未完成真实 Mac 干净用户验收。见 [macOS 指南与构建边界](docs/macos-desktop.md)。
@@ -117,6 +121,7 @@ swu-checkin probe --json   # probe 的 schema v1 JSON，不提交签到
 - [快速上手](docs/quickstart.md)：安装、首次只读验证、正式运行和升级
 - [CLI 与状态码参考](docs/cli-reference.md)：命令、环境变量、JSON schema v1 和退出码
 - [Windows 桌面预览版](docs/windows-desktop.md)：EXE、DPAPI、显式授权、构建与验收
+- [Windows 免安装版](docs/windows-portable.md)：ZIP 解压运行、数据边界、移动与升级
 - [Windows 脚本指南](docs/windows.md)：旧式 Python 部署、计划任务及迁移
 - [服务器部署](DEPLOYMENT.md)：systemd、权限、timer、日志、升级与回滚
 - [GitHub Actions 指南](GITHUB_ACTIONS.md)：Secrets、多账号、通知和排队延迟

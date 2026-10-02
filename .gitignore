@@ -51,3 +51,4 @@ android/.gradle/
 android/local.properties
 *.jks
 *.keystore
+.local-tools/

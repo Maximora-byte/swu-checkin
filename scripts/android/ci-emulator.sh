@@ -1,45 +1,44 @@
 #!/usr/bin/env bash
-# Disposable GitHub runner only; no school account, no system security changes.
+# Disposable GitHub-hosted runner only; no school account or persistent host changes.
 set -euo pipefail
 api="${1:?Android API required}"
+page_size="${2:-4096}"
 # Recent cmdline-tools and emulator releases disagree on defaults: explicitly
 # give both tools the same disposable AVD root.
 export ANDROID_USER_HOME="${RUNNER_TEMP:?GitHub runner required}/swu-android-user"
 export ANDROID_EMULATOR_HOME="$ANDROID_USER_HOME"
 export ANDROID_AVD_HOME="$ANDROID_USER_HOME/avd"
 mkdir -p "$ANDROID_AVD_HOME"
-case "$api" in
-  24) image="system-images;android-24;default;x86_64" ;;
-  35) image="system-images;android-35;google_apis;x86_64" ;;
+case "$api:$page_size" in
+  24:4096) image="system-images;android-24;default;x86_64" ;;
+  35:4096) image="system-images;android-35;google_apis;x86_64" ;;
+  35:16384) image="system-images;android-35;google_apis_ps16k;x86_64" ;;
   *) echo 'Unsupported feasibility API' >&2; exit 1 ;;
 esac
 "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "$image" emulator platform-tools </dev/null
 printf 'no\n' | "$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager" create avd -n swu-feasibility --force -k "$image" -p "$ANDROID_AVD_HOME/swu-feasibility.avd"
-# Off by default, and never enabled by pull_request. The caller must approve
-# this specific manual run before setting the workflow input. Access is scoped
-# to the current user and this disposable VM, not world-writable permissions.
-if [[ "${SWU_KVM_REQUESTED:-false}" == true ]]; then
-  [[ -c /dev/kvm && ! -L /dev/kvm ]]
-  sudo chown "$(id -u):$(id -g)" /dev/kvm
-  sudo chmod 0600 /dev/kvm
-  [[ -r /dev/kvm && -w /dev/kvm ]]
-fi
-accel=off
-if [[ -r /dev/kvm && -w /dev/kvm ]]; then accel=on; fi
+# Recent x86_64 Android guests are unreliable under pure software emulation.
+# Grant only this already-administrative test user access inside the disposable
+# GitHub VM. Refuse self-hosted machines and never use world-writable modes.
+[[ "${RUNNER_ENVIRONMENT:-}" == github-hosted ]]
+[[ -c /dev/kvm && ! -L /dev/kvm ]]
+sudo chown "$(id -u):$(id -g)" /dev/kvm
+sudo chmod 0600 /dev/kvm
+[[ -r /dev/kvm && -w /dev/kvm ]]
+accel=on
 mkdir -p android/evidence
-printf 'api=%s\nabi=x86_64\nacceleration=%s\nmanual_kvm_requested=%s\n' \
-  "$api" "$accel" "${SWU_KVM_REQUESTED:-false}" > android/evidence/emulator.txt
-if [[ "${SWU_KVM_REQUESTED:-false}" == true ]]; then
-  stat -c 'kvm_mode=%a kvm_uid=%u kvm_gid=%g' /dev/kvm >> android/evidence/emulator.txt
-fi
+printf 'api=%s\nabi=x86_64\nacceleration=%s\nexpected_page_size=%s\n' \
+  "$api" "$accel" "$page_size" > android/evidence/emulator.txt
+stat -c 'kvm_mode=%a kvm_uid=%u kvm_gid=%g' /dev/kvm >> android/evidence/emulator.txt
 "$ANDROID_HOME/emulator/emulator" -avd swu-feasibility -no-window -no-audio \
-  -no-boot-anim -no-snapshot -gpu swiftshader_indirect -accel "$accel" \
+  -no-boot-anim -no-snapshot -no-metrics -gpu swiftshader_indirect -accel "$accel" \
   > android/evidence/emulator.log 2>&1 &
 emulator_pid=$!
 cleanup() {
   # Disposable emulator only, with no credentials or school responses. Preserve
   # startup/crash evidence even if instrumentation never reaches the first test.
   adb logcat -d -b crash > android/evidence/android-crash.log 2>&1 || true
+  adb logcat -d -b all -v threadtime > android/evidence/system-logcat.txt 2>&1 || true
   adb logcat -d -s AndroidRuntime:E python.stderr:E > android/evidence/runtime-errors.log 2>&1 || true
   adb emu kill >/dev/null 2>&1 || true
   kill "$emulator_pid" 2>/dev/null || true
@@ -63,6 +62,10 @@ if ! adb shell getconf PAGE_SIZE >> android/evidence/emulator.txt 2>/dev/null; t
   adb shell cat /proc/self/smaps 2>/dev/null \
     | awk '!found && /KernelPageSize:/ {print $2 * 1024; found=1} END {if (!found) exit 1}' \
     >> android/evidence/emulator.txt || echo 'page_size=not_reported' >> android/evidence/emulator.txt
+fi
+if [[ "$api" == 35 ]]; then
+  actual_page_size="$(adb shell getconf PAGE_SIZE | tr -d '\r')"
+  [[ "$actual_page_size" == "$page_size" ]] || { echo 'Device page size does not match test matrix'; exit 1; }
 fi
 # These exact APKs were downloaded from the package job, not rebuilt here.
 [[ "$(git rev-parse HEAD)" == "$(cat android/evidence/commit.txt)" ]]

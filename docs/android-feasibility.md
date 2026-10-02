@@ -35,21 +35,45 @@ cd android
 ./gradlew :app:connectedDebugAndroidTest
 ```
 
-Gradle wrapper 与 distribution 都校验固定 SHA256。SDK 路径放本地 `android/local.properties` 或 `ANDROID_HOME`，不得提交。工作流使用 GitHub runner 已安装的官方工具和已有 SDK 许可，不自动接受新条款。PR 默认软件模拟，不修改 KVM 权限；手动工作流的 `enable_kvm` 默认为 false。只有当前一次测试的权限变更已获批准时才能选择 true，它只给一次性 runner 的当前用户 `/dev/kvm` 的 0600 访问权限，作业结束销毁 VM，绝不修改用户电脑或持久服务器。
+Gradle wrapper 与 distribution 都校验固定 SHA256。SDK 路径放本地 `android/local.properties` 或 `ANDROID_HOME`，不得提交。工作流使用 GitHub runner 已安装的官方工具和已有 SDK 许可，不自动接受新条款。较新的 x86_64 Android 在纯软件模拟下可能发生系统 watchdog/进程崩溃；CI 要求硬件加速，限定 GitHub-hosted 一次性 VM，只给当前测试用户 `/dev/kvm` 的 0600 访问权限。拒绝在自托管机器上修改设备权限，不开放世界可写权限，不修改用户电脑的虚拟化设置。
 
-[`android-feasibility.yml`](../.github/workflows/android-feasibility.yml) 分别构建双 ABI debug APK、运行 Android lint、检查 APK 中的 Python/ABI，并在 API24/35 x86_64 模拟器执行真实 embedded Python instrumentation。测试公共 HTTPS 需网络，失败不会被改写为通过。模拟器安装的是 package job 的同一 APK/test APK，先核对源 commit 与两个 APK 的 SHA256，不独立重建。证据 artifact 包含源 commit、APK SHA256、instrumentation 原始结果、模拟器版本与页大小；debug APK 使用临时 debug 签名，不是生产签名、Release 或自动发布。
+[`android-feasibility.yml`](../.github/workflows/android-feasibility.yml) 分别构建双 ABI debug APK、运行 Android lint、检查 APK 中的 Python/ABI，并在 API24/4 KB、API35/4 KB、API35/16 KB x86_64 模拟器执行真实 embedded Python instrumentation。API35 的实际页大小必须匹配矩阵，否则失败。每次安装状态执行四项测试，包括实际按钮点击和 Activity 重建；首次安装、同版本覆盖安装、清数据共三轮。测试公共 HTTPS 需网络，失败不会被改写为通过。模拟器安装的是 package job 的同一 APK/test APK，先核对源 commit 与两个 APK 的 SHA256，不独立重建。证据包含源码、APK hash、原始测试结果、真实界面、完整一次性模拟器系统日志；debug APK 使用临时 debug 签名，不是生产签名、Release 或自动发布。
+
+### Windows 本机构建与明确设备验收
+
+官方 JDK 17、Android SDK 可以独立放在项目的 `.local-tools/` 下（已忽略，不提交下载文件）。将 JDK 放在 `.local-tools/jdk17*/jdk-*`，SDK 放在 `.local-tools/android-sdk`；Python 3.13 需可执行。当前终端加载：
+
+```powershell
+. ./scripts/android/env.ps1
+# 如需要使用已有下载代理，可传 -DownloadProxy http://127.0.0.1:7897
+./android/gradlew.bat -p android --no-daemon :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug
+emulator -accel-check
+adb devices
+```
+
+创建并启动 Google 官方 API35 普通/`google_apis_ps16k` 镜像后，使用明确的 adb serial 测试。`verify_device.py` 不选取列表中的第一台设备；API、ABI、真实页大小必须匹配，证据目录必须是新目录，避免旧的成功报告掩盖本次失败：
+
+```powershell
+python scripts/android/verify_device.py --adb "$env:ANDROID_HOME/platform-tools/adb.exe" `
+  --serial emulator-5556 --api 35 --abi x86_64 --page-size 16384 `
+  --apk android/app/build/outputs/apk/debug/app-debug.apk `
+  --test-apk android/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk `
+  --evidence-dir .local-tools/evidence/api35-16k-run1 --system-logs
+```
+
+系统日志开关仅允许一次性模拟器。脚本只卸载/清除这个不含账号的可行性应用，不清除整个设备；同版本覆盖安装不代表跨版本升级迁移。普通镜像应使用 `--page-size 4096`，真实 arm64 手机应使用 `--abi arm64-v8a` 并填入实测页大小。
 
 ## 完成门槛与待验证项
 
 必须区分本机 Python 单元测试、APK 构建、Android 模拟器、真实设备四类证据。PR 中记录实际 commit、run 与结果；没有执行的项目保持“未验证”。
 
 - [ ] 双 ABI APK 构建与 lint 通过，APK 中确有 Python 3.13 且无桌面 OCR 依赖
-- [ ] API24 和 API35 模拟器：核心 import、tzdata、app-private 读写、统一运行锁、验证证书的 HTTPS
+- [ ] API24/4 KB、API35/4 KB 和 API35/16 KB 模拟器：核心 import、tzdata、app-private 读写、统一运行锁、验证证书的 HTTPS、按钮点击及页面重建
 - [ ] arm64 真机：以上全部检查；记录 Android 版本、ABI、页大小，不记录序列号/个人信息
 - [ ] 真机 16 KB 页大小兼容性（若支持范围内），模拟器不能替代对应真机结果
 - [ ] Android 跨进程锁与进程被杀后的释放（已加入 debug-only 私有第二进程测试；等待实际结果）
 - [ ] 同版本覆盖安装与清除数据后的重新启动（已加入模拟器测试）；跨版本升级迁移仍待后续验证
 
-当前执行工作区没有 Android SDK、adb、emulator、`/dev/kvm` 或已连接真机；本机 Android 检查不可执行，交由上述 CI 验证可执行部分。**实机门槛未过前，不进入完整账号/签到 UI，也不宣称首版完成。**
+Windows 可通过项目内工具链执行上述构建和模拟器验收。没有连接的真机时，arm64/16 KB 真机项目仍标为未验证；**实机门槛未过前，不进入完整账号/签到 UI，也不宣称首版完成。**
 
 后续分层为验证码/AndroidKeystore 安全适配器，再接中文只读诊断、任务“待签/已签”与明确确认的手动签到。需覆盖取消、双击、旋转、切后台、断网、进程死亡、升级与清数据；只读路径永不提交，提交超时不盲目重发，结果须以服务端回读确认。任何真实学校账号测试须另行授权；不把真实签到用作验收。

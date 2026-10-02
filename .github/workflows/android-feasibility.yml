@@ -8,12 +8,6 @@ on:
       - 'scripts/android/**'
       - '.github/workflows/android-feasibility.yml'
   workflow_dispatch:
-    inputs:
-      enable_kvm:
-        description: 'Temporarily grant this disposable runner KVM access (requires approval)'
-        required: true
-        type: boolean
-        default: false
 
 permissions:
   contents: read
@@ -62,7 +56,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        api: [24, 35]
+        include:
+          - api: 24
+            page_size: 4096
+          - api: 35
+            page_size: 4096
+          - api: 35
+            page_size: 16384
     runs-on: ubuntu-24.04
     timeout-minutes: 40
     steps:
@@ -80,13 +80,13 @@ jobs:
       - name: Verify on emulator without credentials or school requests
         env:
           ANDROID_API: ${{ matrix.api }}
-          SWU_KVM_REQUESTED: ${{ github.event_name == 'workflow_dispatch' && inputs.enable_kvm }}
-        run: scripts/android/ci-emulator.sh "$ANDROID_API"
+          ANDROID_PAGE_SIZE: ${{ matrix.page_size }}
+        run: scripts/android/ci-emulator.sh "$ANDROID_API" "$ANDROID_PAGE_SIZE"
       - name: Upload actual emulator evidence, including failures
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: android-runtime-api${{ matrix.api }}-${{ github.sha }}
+          name: android-runtime-api${{ matrix.api }}-pages${{ matrix.page_size }}-${{ github.sha }}
           path: |
             android/evidence/
           if-no-files-found: warn
