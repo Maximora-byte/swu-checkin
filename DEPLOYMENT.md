@@ -1,6 +1,6 @@
 # Linux systemd 部署
 
-macOS 手动桌面预览请参见 [macOS 指南](docs/macos-desktop.md)；不使用本文的 systemd timer。
+macOS 手动桌面预览请参见 [macOS 指南](docs/macos-desktop.md)，Android 手动客户端请参见 [Android 指南](docs/android-client.md)；这些前端不使用本文的 systemd timer。
 
 本文适用于可信的长期在线 Linux 主机。项目是一次性任务，不需要常驻 Web 服务；systemd timer 在北京时间 21:15、21:45 调度，第二次运行会识别已签到状态。units 设置 `AccuracySec=30s`，不承诺精确到秒；电脑关机、网络异常或学校服务不可用仍可能导致漏签。
 
@@ -56,10 +56,10 @@ sudo env UV_PYTHON_INSTALL_DIR=/opt/swu-checkin-python \
 
 ## 2. 安装稳定 release
 
-以下保留已发布的 Python/CLI `v1.1.5` 作为安装示例。当前源码以 `v2.0.0` 为发布目标；部署新版本前先在 [Releases](https://github.com/Maximora-byte/swu-checkin/releases) 确认发布及 CI 证据，再将 `release_tag` 替换为所选 tag，并使用该 tag 的完整代码、文档、锁文件与 units。不要仅凭 `main` 中的版本号判断发布状态；变化与已知限制见 [v2.0.0 发布说明](docs/releases/v2.0.0.md)。
+以下使用已发布的 [`v2.0.0`](https://github.com/Maximora-byte/swu-checkin/releases/tag/v2.0.0) 作为安装示例。当前 `main` 仍声明版本 `2.0.0`，但包含该 tag 之后的修复和新前端；它与已发布资产不是同一 revision。部署后续版本前先在 [Releases](https://github.com/Maximora-byte/swu-checkin/releases) 确认 tag、CI 与资产，再将 `release_tag` 替换为所选 tag，并使用该 tag 的完整代码、文档、锁文件与 units。新增能力与发布门槛见 [发布准备评估](docs/releases/release-readiness.md)；不要仅凭版本号判断发布状态。
 
 ```bash
-release_tag=v1.1.5
+release_tag=v2.0.0
 release_dir="/opt/swu-checkin-releases/$release_tag"
 
 sudo git clone --branch "$release_tag" --depth 1 \

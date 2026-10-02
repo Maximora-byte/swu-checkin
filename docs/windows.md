@@ -2,6 +2,8 @@
 
 本页介绍 `scripts/windows/install.ps1` 的脚本部署，**不是**独立 EXE 安装包。想双击中文窗口的用户请看 [Windows 桌面预览版](windows-desktop.md)。两种方式共用业务核心，但凭据格式、安装器和任务不同，不能混用。
 
+本文以当前 `main` 为准。已发布 Python 稳定版为 [v2.0.0](https://github.com/Maximora-byte/swu-checkin/releases/tag/v2.0.0)；当前源码版本字符串仍为 `2.0.0`，但不是该 tag 的同一份代码。安装时选择一致的 tag/commit，发布差异见 [发布评估](releases/release-readiness.md)。
+
 | 项目 | 本页脚本部署 | 桌面预览版 |
 | --- | --- | --- |
 | 程序 | uv 管理的 Python 3.13 非 editable 环境 | 内置运行时的 `SWUCheckin.exe` |
@@ -26,10 +28,10 @@
 从[权威仓库 Releases](https://github.com/Maximora-byte/swu-checkin/releases) 选择 Python 稳定 tag，并使用同一 tag 的代码、文档与 `uv.lock`。在仓库根目录运行：
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\windows\install.ps1
+.\scripts\windows\install.ps1
 ```
 
-该参数仅用于此进程，不应修改设备的全局执行策略；若设备管理策略禁止脚本，应遵守策略。
+仅在设备当前策略允许执行脚本时运行。若脚本被系统或组织策略阻止，请遵守管理规则并核实来源；不要修改执行策略或绕过保护来完成安装。
 
 安装器会：
 
@@ -87,7 +89,7 @@ Get-ScheduledTask -TaskName "SWUCheckin-Daily"
 确认没有需要保留的桌面版数据后：
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File "$env:LOCALAPPDATA\SWUCheckin\uninstall.ps1"
+& "$env:LOCALAPPDATA\SWUCheckin\uninstall.ps1"
 ```
 
 脚本卸载器删除 `SWUCheckin-Daily` 和整个 `%LOCALAPPDATA%\SWUCheckin`，不会卸载系统已有的 uv、Python，也不会删除 `SWUCheckin-Desktop` 或其他任务。若两种方式曾共存，先按上面的迁移警告处理，避免删数据后留下桌面任务。

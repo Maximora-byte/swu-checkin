@@ -6,6 +6,8 @@
 - [CLI 与状态码参考](cli-reference.md)：命令、环境变量、JSON 和退出码
 - [Windows 桌面版与构建指南](windows-desktop.md)：中文 GUI、默认关闭的定时模式、独立安装包构建与验收边界
 - [macOS 桌面预览](macos-desktop.md)：手动窗口、可选钥匙串、分架构构建与未公证限制
+- [Android 手动客户端](android-client.md)：人工验证码、加密保存、只读查询与确认后的单次签到
+- [Android 运行环境验收](android-feasibility.md)：工具链、模拟器、真机、历史与当前证据
 - [Windows 免安装版](windows-portable.md)：ZIP 解压运行、DPAPI 数据边界、升级与任务路径
 - [Windows 脚本部署](windows.md)：与桌面版区分、DPAPI、计划任务、迁移和卸载
 - [Linux systemd 部署](../DEPLOYMENT.md)：专用用户、timer、通知、升级与回滚
@@ -17,14 +19,13 @@
 - [安全模型](security.md)：凭据、TokenStore、提交安全与日志边界
 - [OAuth 登录发现](oauth-login-discovery.md)：可信主机、redirect 与回调校验
 - [维护与项目归属](../MAINTAINERS.md)
-- [v2.0.0 发布说明](releases/v2.0.0.md)：版本变化、交付目标、升级与已知限制
+- [v2.0.0 发布说明](releases/v2.0.0.md)：已发布资产、升级与该版本限制
+- [新版本发布评估](releases/release-readiness.md)：当前源码变化、平台验证和发布待办
 - [开发、CI 与发布](development.md)：代码结构、离线测试、质量门禁与不同产物
 - [贡献指南](../CONTRIBUTING.md)
 
-当前源码版本为 `2.0.0`，包含桌面预览功能；源码 checkout、Python 分发包、Windows 安装包与桌面 CI artifact 是不同交付物。实际发布状态以本仓库 [Releases](https://github.com/Maximora-byte/swu-checkin/releases) 为准。桌面版仍未签名、尚未完成干净 Windows 10/11 标准用户验收，支持与验收限制见对应指南。
+截至 2026-10-02，最新已发布版本为 [v2.0.0](https://github.com/Maximora-byte/swu-checkin/releases/tag/v2.0.0)，包含 Python 分发包和 Windows 桌面预览资产。当前 `main` 仍使用 Python 版本号 `2.0.0`，但已加入尚未随新 Release 交付的 macOS、Android 和 Windows Portable 功能。源码 checkout、发布资产和 CI artifact 应分别核对来源。
+
+Windows 仍未签名且缺少干净 Windows 10/11 标准用户验收；macOS 为未公证预览；Android 为调试签名手动预览，真实学校账号及 16 KB 真机未验证。具体使用和支持范围见各平台指南；新版发布条件集中在发布评估中。
 
 所有文档均以所在 commit/tag 的代码为准。部署时不要把不同版本的 README、`uv.lock`、Windows 脚本或 systemd unit 混合使用。
-
-## Android 移植验证
-
-Android 目前仅有独立的[可行性验证工程](android-feasibility.md)，用于 Python 3.13 打包及运行环境验证；没有学校登录/签到 UI，不是已发布的手机客户端。完整 UI 需等待模拟器与真实设备门槛。

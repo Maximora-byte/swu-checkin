@@ -28,7 +28,7 @@
 - 提交信息使用清晰的中文或英文描述
 - 添加必要的注释和文档
 - 不得加入定位伪造、反检测、凭据收集或降低 OAuth/CAS 安全校验的改动
-- 凭据不得进入仓库、日志或未受保护的文件；既有 GitHub Secrets、root-only 环境文件、Windows DPAPI 与受限 token cache 必须保持各自安全边界，详见 [安全说明](docs/security.md)
+- 凭据不得进入仓库、日志或未受保护的文件；既有 GitHub Secrets、root-only 环境文件、Windows DPAPI、macOS Keychain、Android Keystore 与受限 token cache 必须保持各自安全边界，详见 [安全说明](docs/security.md)
 
 ### Pull Request 要求
 
@@ -38,7 +38,9 @@
 - 更新相关文档
 - 新增或修改用户行为时，同步检查 [文档中心](docs/README.md)、README、部署指南和故障排查；示例命令必须与当前 CLI 一致
 - 桌面功能、凭据存储、计划任务或正式执行入口变更，还需覆盖默认关闭、重复点击、关闭/取消、跨进程锁、只读与正式模式隔离，并更新 [桌面版指南](docs/windows-desktop.md)
+- macOS 或 Android 前端变更，还需检查对应平台生命周期、手工操作与安全存储；更新 [macOS 指南](docs/macos-desktop.md)或 [Android 指南](docs/android-client.md)。模拟接口、模拟器、原生 CI 与真实学校账号验证必须分别记录
 - 文档中的相对链接必须指向仓库内存在的文件；不得在教程中加入真实账号、token、地址、坐标或原始 API 响应
+- 新增分发格式须检查项目 MIT LICENSE、依赖许可/notice 和构建来源是否随实际产物交付；源码仓库有 LICENSE 不等于安装包已经携带许可，功能测试也不能替代这项检查
 - 保持提交历史清晰
 
 ## 开发环境
@@ -58,7 +60,9 @@ uv lock --check
 
 这些测试使用合成数据或模拟接口，不需要真实学校账号。`probe` / `doctor` / `setup` 会访问学校服务，`run` 或无参数 CLI 会正式签到，不能拿它们代替离线测试。
 
-普通 CI 包括 `linux-quality`、`windows-quality`、`package-quality`，由 `quality` 汇总三个结果；另有 actionlint、systemd 单元校验、Unix DAC 权限测试、Windows PowerShell/DPAPI、跨进程锁、wheel/sdist 安装 smoke 和生产依赖漏洞审计。Windows desktop 构建是独立的路径过滤工作流，不属于 `quality` 的依赖；纯文档 PR 不触发该构建，但仍运行普通 CI。请不要通过删除或跳过安全测试使 PR 通过，也不要把没执行的平台检查记作通过。
+普通 CI 包括 `linux-quality`、`windows-quality`、`package-quality`，由 `quality` 汇总三个结果；另有 actionlint、systemd 单元校验、Unix DAC 权限测试、Windows PowerShell/DPAPI、跨进程锁、wheel/sdist 安装 smoke 和生产依赖漏洞审计。Windows desktop、macOS desktop preview 与 Android feasibility 是独立的路径过滤工作流，不属于 `quality` 的依赖；是否触发以各 workflow 的实际路径规则为准。纯文档 PR 仍运行普通 CI，不能用普通 CI 的绿色结果替代平台构建。请不要通过删除或跳过安全测试使 PR 通过，也不要把没执行的平台检查记作通过。
+
+当前已发布版本与 `main` 的新增功能、发布前门槛见 [发布准备评估](docs/releases/release-readiness.md)。已发布 tag 和资产不可用不同代码重新打包覆盖；文档更新或版本号相同不表示新的安装包已经发布。
 
 ## 行为准则
 

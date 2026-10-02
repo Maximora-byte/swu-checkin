@@ -1,6 +1,6 @@
 # CLI 与状态码参考
 
-本文描述当前源码中的 CLI、结果与安全边界。Windows 图形应用另见 [桌面版指南](windows-desktop.md)；稳定 tag 应使用该 tag 自带文档，不能将开发分支的新行为视为旧发行版已经提供。
+本文描述当前 `main` 中的 Python CLI、结果与安全边界。图形应用另见 [Windows 桌面](windows-desktop.md)、[macOS 桌面](macos-desktop.md) 和 [Android 手动客户端](android-client.md)；它们不提供同一套 CLI 参数。稳定 tag 应使用该 tag 自带文档，不能将当前源码版本字符串 `2.0.0` 或开发分支的新行为视为已发布 v2.0.0 已经提供。版本差异见 [发布评估](releases/release-readiness.md)。
 
 ## 命令
 
@@ -73,6 +73,8 @@ swu-checkin probe --json
 
 因此，退出 `0` 不一定代表本次完成签到。调用方应区分上述本地 no-op 与业务结果；一旦存在结果，就完整解析并校验精确字段、schema、mode、status、code、message 与类型，不能用 `tail -1` 或正文正则猜测成功。中断或交互输入失败也不能假定存在 JSON。
 
+GitHub Actions 当前实现还同时要求执行 step 的 `outcome=success`、CLI 退出码为 `0`，且经过结构校验的业务码为 `1`、`2` 或 `5`。成功 JSON 配合非零退出码仍是执行失败，会走异常通知与最终失败分支；这个判定修复来自已合并的 [PR #42](https://github.com/Maximora-byte/swu-checkin/pull/42)，不属于旧 v2.0.0 tag。完整触发和通知规则见 [Actions 指南](../GITHUB_ACTIONS.md)。
+
 ## 状态码与进程退出码
 
 | code | status | 固定 message | 正式 run 退出码 | probe 退出码 |
@@ -119,7 +121,7 @@ swu-checkin probe --json
 
 默认 TokenStore 路径依次为：`SWUDK_STATUS_FILE` 同目录的 `auth-token-cache`；Windows 的 `%LOCALAPPDATA%\SWUCheckin\auth-token-cache`；POSIX 的 `$XDG_CACHE_HOME/swu-checkin/auth-token-cache` 或 `~/.cache/swu-checkin/auth-token-cache`。Windows 未设置 `LOCALAPPDATA` 且无状态路径覆盖时，TokenStore 不会改用临时目录。一个 cache 文件保存一个账号对应的记录，不是多账号凭据库。
 
-桌面后端显式使用 `%LOCALAPPDATA%\SWUCheckin` 下的 cache 和状态文件，不采用 CLI 的 `SWUDK_STATUS_FILE`；桌面业务重试使用服务默认值，不读取 CLI 的最大次数/延时变量。定时任务与环境细节见 [桌面版指南](windows-desktop.md)。`swu-checkin-notify` 的参数和专用环境变量见 [服务器部署](../DEPLOYMENT.md)。
+Windows 桌面后端显式使用 `%LOCALAPPDATA%\SWUCheckin` 下的 DPAPI cache 和状态文件，不采用 CLI 的 `SWUDK_STATUS_FILE`；macOS 桌面 token 仅在进程内存，正式状态位于 `~/Library/Application Support/SWUCheckin/status.json`，也不使用该覆盖。两种桌面业务重试使用服务默认值，不读取 CLI 的最大次数/延时变量；macOS 不支持定时任务。Android 不使用桌面文件 cache、CLI 状态路径或这些环境变量，业务边界见 [Android 指南](android-client.md)。Windows 定时任务与环境细节见 [桌面版指南](windows-desktop.md)。`swu-checkin-notify` 的参数和专用环境变量见 [服务器部署](../DEPLOYMENT.md)。
 
 ## 运行锁与本地状态
 

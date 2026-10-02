@@ -2,6 +2,8 @@
 
 先记录版本/tag 或 commit SHA、平台、运行方式、北京时间、业务状态码、进程退出码和安全 `stage`。不要记录账号值、密码、token、验证码、ticket、完整回调 URL、宿舍地址、坐标或原始 API body。
 
+本文以当前 `main` 为准。当前 Python 版本字符串仍为 `2.0.0`，不代表它与已发布 v2.0.0 的代码相同；报错时同时核对 tag/commit 与资产来源。Windows 免安装 ZIP、macOS 和 Android 新预览的交付状态见 [发布评估](releases/release-readiness.md)。
+
 ## 基础检查顺序
 
 在已经安装命令的环境执行；源码环境可在命令前加 `uv run --locked --no-dev`：
@@ -101,7 +103,7 @@ JSON 中 `code` 与进程退出码是不同概念；code 2 的英文名称为 `a
 
 ## status 没有状态或与本次结果不同
 
-普通本地 CLI run 默认不记录状态；设置 `SWUDK_STATUS_FILE` 后才记录。`status --file PATH` 优先于环境变量；无两者时查询 `/var/lib/swu-checkin/status.json`。桌面正式结果在 `%LOCALAPPDATA%\SWUCheckin\status.json`，不采用 CLI 的状态路径覆盖。
+普通本地 CLI run 默认不记录状态；设置 `SWUDK_STATUS_FILE` 后才记录。`status --file PATH` 优先于环境变量；无两者时查询 `/var/lib/swu-checkin/status.json`。Windows 桌面正式结果在 `%LOCALAPPDATA%\SWUCheckin\status.json`，macOS 桌面则在 `~/Library/Application Support/SWUCheckin/status.json`，均不采用 CLI 的状态路径覆盖。Android 客户端不写这两种桌面状态文件，需在客户端重新查询学校端结果。
 
 `status` 只读文件，不发网络请求。文件按上海日期保存最近最多 10 条正式调用，内部重试不是独立记录；聚合“成功”表示保存的这些记录中曾出现成功终态，不一定是最近一次。缺失文件退出 `0`，损坏/不可读退出 `1`；日期会原样显示，不会自动过滤或刷新旧日期。
 
@@ -110,6 +112,8 @@ JSON 中 `code` 与进程退出码是不同概念；code 2 的英文名称为 `a
 ## GitHub Actions 延迟
 
 GitHub cron 不保证准点。先查看 workflow 的实际开始时间，不要把排队延迟当成脚本未触发；仓库现有 workflow 的手动触发也会执行正式签到，并没有 probe 模式；具体触发与通知规则见 [GitHub Actions 指南](../GITHUB_ACTIONS.md)。严格时间窗口应选择合适的常在线运行环境，任何部署仍受网络和学校服务影响。
+
+当前 workflow 已修复“成功业务 JSON 配合非零退出码仍显示正常”的判定边界。只有执行 step 成功、CLI 退出 `0` 且结构校验后的正式业务码为 `1`、`2` 或 `5`，才跳过异常通知并让最终检查通过。任何一项不成立，均按异常处理；邮件缺少配置或发送失败不会改写签到的失败结论。旧 v2.0.0 tag 未包含 [PR #42](https://github.com/Maximora-byte/swu-checkin/pull/42)，升级 fork 时应同步完整 workflow 与源码，而不是只拷贝 JSON 解析器。
 
 ## Windows 任务：Desktop 与旧版 Daily
 
@@ -150,3 +154,15 @@ Issue 至少包含版本或 commit SHA、系统与 Python 版本、部署方式�
 - token 仅在窗口进程内存；正式结果位于 `~/Library/Application Support/SWUCheckin/status.json`
 - 没有后台任务、开机自启或自动签到；`--scheduled` 不受支持
 - 未签名身份/未公证警告不应通过关闭系统保护绕过；具体系统与架构、CI artifact、官方安全链接见 [macOS 桌面指南](macos-desktop.md)
+
+## Android 手动预览
+
+- 仅支持 Android 7.0 / API 24 及以上的 arm64-v8a、x86_64；32 位设备没有当前 APK 对应的原生运行库
+- 当前包是调试签名预览，人工输入验证码；界面包含账号信息和验证码时禁止截图是设计保护，不应以关闭该保护排障
+- 应用启动不联网、不自动读取保存账号。需要显式输入，或点击“读取已保存账号”后查询；查询与只读诊断不会提交签到
+- 验证码超时、取消或切到后台后，请重新发起操作获取新的挑战，不复用旧图或旧输入。软键盘遮住按钮时向下滚动；当前修复会为键盘留出空间
+- 保存账号由设备 Android Keystore 保护；卸载、应用数据清除、密钥丢失或密文损坏后不能保证恢复。不要复制密文到另一设备，也不要因读取失败转为明文保存
+- 只有待签到状态可进入正式确认；必须确认本人在寝且符合规则。提交后结果未知时先查询学校状态，不连续重发
+- 已有本机 63 项与云端 63 项自动验收，但学校业务使用合成响应；真实学校账号、实际签到和 16 KB 物理手机仍未验收。通过 16 KB 模拟器及原生对齐检查不能证明 16 KB 真机已经验证
+
+安装、验证码与保存/清除操作见 [Android 客户端指南](android-client.md)。反馈时仅提供 Android 版本、设备型号、应用构建来源、操作步骤和固定错误提示；不要公开账号界面、验证码、学校响应或设备完整日志。
