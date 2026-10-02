@@ -59,7 +59,13 @@ def accept(args: argparse.Namespace) -> None:
     (evidence / "apk-checksums.json").write_text(json.dumps(checksums, indent=2), encoding="utf-8")
     results = {}
     try:
-        installed = adb("shell", "pm", "path", APP_ID).stdout.strip()
+        # Android's pm path exits 1 when the package is absent on a fresh AVD.
+        package = adb("shell", "pm", "path", APP_ID, check=False)
+        if package.returncode not in (0, 1):
+            package.check_returncode()
+        installed = package.stdout.strip()
+        if package.returncode == 1 and (installed or package.stderr.strip()):
+            package.check_returncode()
         if installed:
             adb("uninstall", APP_ID)
         adb("install", str(args.apk.resolve()), timeout=180)
