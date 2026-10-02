@@ -33,6 +33,19 @@ Python Release、Windows Actions artifact、源码 checkout 是不同交付物�
 
 业务修改优先落在共享服务与模型层，不应在 GUI、Actions 或计划任务中复制一套弱化校验的签到实现。正式提交使用学校返回的宿舍信息；程序不测量真实 GPS，不证明本人在寝。不得新增位置伪造、反检测、认证绕过或敏感日志，安全约束见 [安全模型](security.md)。
 
+### 手工验证码前端接入
+
+共享认证入口 `authenticate_token(username, password, timeout, *, captcha_provider=None)` 支持可选的同步回调 `Callable[[bytes], str | None]`；兼容入口 `get_token` 接受相同的关键字参数，失败仍返回空字符串。可用 `functools.partial(authenticate_token, captcha_provider=callback)` 作为现有 `CheckinService(token_provider=...)` 的认证函数，不应在前端复制 OAuth/CAS 流程。
+
+- 回调只收到当前验证码图片的原始 bytes；图片由核心通过当前登录的同一个 `requests.Session` 获取，回调不接收账号、密码、cookie 或认证 URL
+- 回调返回至少 3 位 ASCII 字母/数字答案；返回 `None` 表示取消。空值、无效答案、空图片与回调异常（包括 UI 超时）均以 `CAPTCHA_FAILED` 终止本次认证，不提交登录、不回退到 OCR，也不触发服务层完整登录重试
+- 回调在认证调用线程同步执行。前端必须在工作线程调用认证，并自行限制等待用户输入的时间、处理关闭/取消与释放图片；网络 `timeout` 不会中断同步 UI 回调
+- 仅服务端明确拒绝验证码才重新获取图片并调用回调；仍使用原登录会话和服务端发现的表单，最多提交 3 次。网络错误、账号密码拒绝、无 ticket 或不可信跳转不会在此循环中重新提示。服务层既有网络重试策略不变，新完整尝试必须重新发现登录流程和获取图片
+- 回调不改变可信 HTTPS 主机、跳转、state、ticket、响应结构或正式签到权限边界。图片和答案不得写入日志、磁盘或诊断报告
+- 未提供回调时 CLI/Windows desktop 仍使用既有 OCR 和有限重试。`ddddocr`、Pillow 及其 ONNX 依赖仅在使用 OCR 时导入；生产依赖声明和锁文件未变，手工前端需自行配置其平台打包依赖
+
+这些是前端接入接口，并非 Android UI、后台签到或新发布渠道；新增前端还必须独立验证 UI 取消、重复触发、凭据存储与平台生命周期。
+
 ## 3. 本地开发与离线业务检查
 
 从仓库根目录运行。CI 使用 uv **0.12.15** 和 Python **3.13**；桌面构建脚本会强制检查 uv 版本。安装 Python/依赖可能联网，但下面的测试不应登录学校账号或提交签到。
