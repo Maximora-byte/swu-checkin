@@ -11,6 +11,7 @@
 - 本地 CLI 通过环境变量或 `input()` / `getpass()` 获取凭据，不保存密码；`setup` 始终交互输入
 - GitHub Actions 使用 Repository Secrets
 - Windows 安装脚本和桌面版分别使用当前用户、当前机器绑定的 DPAPI 密文；不得将密文复制到其他账号/机器后期待可用
+- macOS 桌面仅在显式保存时使用系统文件型钥匙串；读取/清除也由按钮触发，token 仅在进程内存，失败不回退明文文件。完整边界见 [macOS 指南](macos-desktop.md)
 - systemd 使用 `/etc/swu-checkin/credentials.env`，要求 `0600 root:root`
 - 凭据、验证码、token、ticket、OAuth state/code 不得进入 Git、Issue、PR、截图或日志
 

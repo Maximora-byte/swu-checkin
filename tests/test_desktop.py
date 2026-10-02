@@ -17,6 +17,7 @@ from swu_checkin.status import CheckinStatus
 
 @pytest.fixture
 def backend(monkeypatch):
+    monkeypatch.setattr(desktop.sys, "platform", "win32")
     instance = Mock()
     instance.self_test.return_value = 0
     instance.run_scheduled.return_value = 0
