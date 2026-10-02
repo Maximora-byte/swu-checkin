@@ -12,6 +12,7 @@ from xml.etree import ElementTree as ET
 import pytest
 
 from swu_checkin import desktop_backend as desktop
+from swu_checkin import desktop_operations as operations
 from swu_checkin.models import CheckinResult
 from swu_checkin.runtime_lock import RuntimeLock, RuntimeLockBusy
 from swu_checkin.status import CheckinStatus
@@ -35,9 +36,9 @@ class FakeProtector:
 def offline(monkeypatch, tmp_path):
     monkeypatch.setattr(desktop, "WindowsDpapiProtector", FakeProtector)
     monkeypatch.setattr(desktop.subprocess, "run", Mock(side_effect=AssertionError("Unexpected subprocess")))
-    monkeypatch.setattr(desktop, "run_checkin", Mock(side_effect=AssertionError("Unexpected submission")))
-    monkeypatch.setattr(desktop, "run_probe", Mock(side_effect=AssertionError("Unexpected network")))
-    monkeypatch.setattr(desktop, "CheckinService", Mock(side_effect=AssertionError("Unexpected network")))
+    monkeypatch.setattr(operations, "run_checkin", Mock(side_effect=AssertionError("Unexpected submission")))
+    monkeypatch.setattr(operations, "run_probe", Mock(side_effect=AssertionError("Unexpected network")))
+    monkeypatch.setattr(operations, "CheckinService", Mock(side_effect=AssertionError("Unexpected network")))
     monkeypatch.setenv("SWUDK_LOCK_FILE", str(tmp_path / "shared-cli.lock"))
     monkeypatch.delenv("SWUDK_PROBE_ONLY", raising=False)
 
@@ -236,7 +237,7 @@ def test_system_command_uses_system32_list_without_shell(backend, monkeypatch):
 
 def test_formal_checkin_uses_same_runtime_lock(backend, monkeypatch):
     submit = Mock(return_value=result())
-    monkeypatch.setattr(desktop, "run_checkin", submit)
+    monkeypatch.setattr(operations, "run_checkin", submit)
     with RuntimeLock():
         with pytest.raises(RuntimeLockBusy):
             backend.check_in("test", "test-password")
@@ -249,14 +250,14 @@ def test_readonly_safety_switch_blocks_submission(backend, monkeypatch):
     monkeypatch.setenv("SWUDK_PROBE_ONLY", "1")
     with pytest.raises(desktop.DesktopError):
         backend.check_in("test", "test-password")
-    desktop.run_checkin.assert_not_called()
+    operations.run_checkin.assert_not_called()
 
 
 def test_probe_only_calls_readonly_service(backend, monkeypatch):
     probe = Mock(return_value=result("probe"))
-    monkeypatch.setattr(desktop, "run_probe", probe)
+    monkeypatch.setattr(operations, "run_probe", probe)
     assert backend.probe("test", "test-password").mode == "probe"
-    desktop.run_checkin.assert_not_called()
+    operations.run_checkin.assert_not_called()
     probe.assert_called_once()
 
 
@@ -265,17 +266,17 @@ def test_diagnosis_disables_token_cache_writes(backend, monkeypatch):
     service.diagnose.return_value = SimpleNamespace(
         authentication=True, leave_policy=True, student_profile=True, dormitory_schema=True, checkin_api=True
     )
-    monkeypatch.setattr(desktop, "CheckinService", Mock(return_value=service))
+    monkeypatch.setattr(operations, "CheckinService", Mock(return_value=service))
     assert backend.diagnose("test", "test-password") is True
     service.diagnose.assert_called_once_with("test", "test-password", read_token_cache=False, write_token_cache=False)
-    desktop.run_checkin.assert_not_called()
+    operations.run_checkin.assert_not_called()
 
 
 def test_corrupt_status_preserves_successful_remote_outcome(backend, monkeypatch):
     backend.root.mkdir()
     (backend.root / "status.json").write_text("corrupt")
     completed = result()
-    monkeypatch.setattr(desktop, "run_checkin", Mock(return_value=completed))
+    monkeypatch.setattr(operations, "run_checkin", Mock(return_value=completed))
     assert backend.check_in("test", "test-password") is completed
     assert "签到成功" in backend.status_text()
     assert json.loads((backend.root / "status.json").read_text())["successful"] is True
@@ -332,8 +333,8 @@ def test_scheduled_record_write_failure_preserves_remote_outcome(backend, monkey
 
 def test_status_write_failure_keeps_success_and_warns(backend, monkeypatch):
     completed = result()
-    monkeypatch.setattr(desktop, "run_checkin", Mock(return_value=completed))
-    monkeypatch.setattr(desktop, "record_run_status", Mock(side_effect=OSError("synthetic-secret")))
+    monkeypatch.setattr(operations, "run_checkin", Mock(return_value=completed))
+    monkeypatch.setattr(operations, "record_run_status", Mock(side_effect=OSError("synthetic-secret")))
     assert backend.check_in("test", "test-password") is completed
     assert backend.last_warning
     assert "synthetic-secret" not in backend.last_warning
@@ -408,7 +409,7 @@ def test_scheduled_formal_mode_respects_readonly_flag(backend, monkeypatch):
     monkeypatch.setattr(backend, "load_credentials", Mock(return_value=("test", "test-password")))
     monkeypatch.setenv("SWUDK_PROBE_ONLY", "1")
     assert backend.run_scheduled() == 1
-    desktop.run_checkin.assert_not_called()
+    operations.run_checkin.assert_not_called()
 
 
 def test_nonfrozen_build_cannot_register_task(backend, monkeypatch):
@@ -474,7 +475,7 @@ def test_formal_entrypoints_share_one_lock_owner(backend, monkeypatch, entrypoin
         return result()
 
     monkeypatch.setattr(cli, "run_checkin", submit)
-    monkeypatch.setattr(desktop, "run_checkin", submit)
+    monkeypatch.setattr(operations, "run_checkin", submit)
     monkeypatch.setenv("SWUDK_USERNAME", "synthetic-user")
     monkeypatch.setenv("SWUDK_PASSWORD", "synthetic-password")
     monkeypatch.delenv("SWUDK_STATUS_FILE", raising=False)
@@ -499,7 +500,7 @@ def test_readonly_entrypoints_never_use_formal_wrapper(backend, monkeypatch, ent
     wrapper = Mock(side_effect=AssertionError("Probe must not acquire formal lock"))
     monkeypatch.setattr(formal_execution, "execute_formal_checkin_with_lock", wrapper)
     monkeypatch.setattr(cli, "run_probe", lambda *args, **kwargs: result("probe"))
-    monkeypatch.setattr(desktop, "run_probe", lambda *args, **kwargs: result("probe"))
+    monkeypatch.setattr(operations, "run_probe", lambda *args, **kwargs: result("probe"))
     monkeypatch.setenv("SWUDK_USERNAME", "synthetic-user")
     monkeypatch.setenv("SWUDK_PASSWORD", "synthetic-password")
     with RuntimeLock():

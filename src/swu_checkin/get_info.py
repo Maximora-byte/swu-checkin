@@ -1,16 +1,17 @@
 import os
 import re
 import time
+from collections.abc import Callable
+from importlib import import_module
 from io import BytesIO
+from types import ModuleType
 
 # The check-in client does not use ONNX Runtime telemetry. Disable it before
 # importing ddddocr so restricted service users do not trigger device-ID
 # persistence warnings during OCR initialization.
 os.environ["ORT_DISABLE_TELEMETRY"] = "1"
 
-import ddddocr
 import requests
-from PIL import Image
 
 from .auth import AuthError, AuthFailureReason
 from .client import SwuClient
@@ -38,6 +39,19 @@ _CREDENTIAL_REJECTION_MARKERS = (
     "密码错误",
 )
 _CAPTCHA_REJECTION_MARKERS = ("验证码错误", "验证码不正确", "validateCode")
+
+# A provider receives only the current image, never credentials, cookies, URLs,
+# or a Session. Returning None cancels the current authentication attempt.
+type CaptchaProvider = Callable[[bytes], str | None]
+
+
+def __getattr__(name: str) -> ModuleType:
+    """Keep legacy OCR monkeypatch targets available without eager imports."""
+    if name == "ddddocr":
+        return import_module("ddddocr")
+    if name == "Image":
+        return import_module("PIL.Image")
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 # ===== 辅助函数 =====
@@ -116,6 +130,41 @@ def validate_login_result_text(html: str) -> None:
         raise AuthError(AuthFailureReason.CAPTCHA_FAILED)
 
 
+def _fetch_captcha(session: requests.Session, captcha_url: str, timeout: int) -> bytes:
+    """Fetch the challenge on the login session without following redirects."""
+    response = session.get(captcha_url, timeout=timeout, allow_redirects=False)
+    try:
+        response.raise_for_status()
+    except requests.exceptions.HTTPError:
+        if response.status_code in {408, 425, 429} or 500 <= response.status_code <= 599:
+            raise
+        raise OAuthDiscoveryError("验证码端点未返回成功响应") from None
+    if response.status_code != 200:
+        raise OAuthDiscoveryError("验证码端点未返回成功响应")
+    return response.content
+
+
+def _provide_captcha(
+    session: requests.Session,
+    captcha_url: str,
+    timeout: int,
+    provider: CaptchaProvider,
+) -> str:
+    """Request one answer; cancellation/failure must not fall back to OCR."""
+    image = _fetch_captcha(session, captcha_url, timeout)
+    if not image:
+        raise AuthError(AuthFailureReason.CAPTCHA_FAILED)
+    try:
+        result = provider(image)
+    except Exception:
+        # UI cancellation/timeouts and provider errors are terminal. Do not
+        # expose their messages or let them trigger a full network retry.
+        raise AuthError(AuthFailureReason.CAPTCHA_FAILED) from None
+    if not isinstance(result, str) or len(result) < 3 or not result.isascii() or not result.isalnum():
+        raise AuthError(AuthFailureReason.CAPTCHA_FAILED)
+    return result
+
+
 def recognize_captcha(
     session: requests.Session,
     captcha_url: str,
@@ -136,20 +185,16 @@ def recognize_captcha(
     Raises:
         AuthError: 网络失败或多次尝试后仍无法识别
     """
+    # Optional front ends can import and authenticate through the core without
+    # installing native OCR packages. Default CLI/desktop behavior stays OCR.
+    import ddddocr
+    from PIL import Image
+
     ocr = ddddocr.DdddOcr(show_ad=False, use_gpu=False)
 
     for attempt in range(1, max_attempts + 1):
         try:
-            response = session.get(captcha_url, timeout=timeout, allow_redirects=False)
-            try:
-                response.raise_for_status()
-            except requests.exceptions.HTTPError:
-                if response.status_code in {408, 425, 429} or 500 <= response.status_code <= 599:
-                    raise
-                raise OAuthDiscoveryError("验证码端点未返回成功响应") from None
-            if response.status_code != 200:
-                raise OAuthDiscoveryError("验证码端点未返回成功响应")
-            img = Image.open(BytesIO(response.content))
+            img = Image.open(BytesIO(_fetch_captcha(session, captcha_url, timeout)))
             result = ocr.classification(img)
 
             # 验证码基本验证：应该是4位数字或字母
@@ -174,7 +219,13 @@ def recognize_captcha(
 
 
 # ===== 主要登录流程 =====
-def get_token(username: str, password: str, timeout: int = 10) -> str:
+def get_token(
+    username: str,
+    password: str,
+    timeout: int = 10,
+    *,
+    captcha_provider: CaptchaProvider | None = None,
+) -> str:
     """
     执行完整登录流程，获取 fighter-auth-token
 
@@ -192,18 +243,40 @@ def get_token(username: str, password: str, timeout: int = 10) -> str:
         成功返回 token；失败保持历史兼容并返回空字符串
     """
     try:
-        return authenticate_token(username, password, timeout)
+        if captcha_provider is None:
+            return authenticate_token(username, password, timeout)
+        return authenticate_token(username, password, timeout, captcha_provider=captcha_provider)
     except AuthError:
         return ""
 
 
-def authenticate_token(username: str, password: str, timeout: int = 10) -> str:
-    """Authenticate with classified failures for internal service orchestration."""
+def authenticate_token(
+    username: str,
+    password: str,
+    timeout: int = 10,
+    *,
+    captcha_provider: CaptchaProvider | None = None,
+) -> str:
+    """Authenticate with classified failures and an optional image-only provider.
 
-    return _get_token(username, password, timeout)
+    A synchronous provider runs on the caller's thread and must bound its own
+    UI wait, returning None on cancellation. The HTTP timeout remains unchanged.
+    Provider failures are terminal; only explicit server captcha rejection asks
+    for a fresh image. Omit the provider to retain the default OCR behavior.
+    """
+    if captcha_provider is None:
+        return _get_token(username, password, timeout)
+    return _get_token(username, password, timeout, captcha_provider=captcha_provider)
 
 
-def _get_token(username: str, password: str, timeout: int, max_login_attempts: int = 3) -> str:
+def _get_token(
+    username: str,
+    password: str,
+    timeout: int,
+    max_login_attempts: int = 3,
+    *,
+    captcha_provider: CaptchaProvider | None = None,
+) -> str:
     """
     内部登录实现；完整认证重试由 CheckinService 负责。
 
@@ -232,8 +305,11 @@ def _get_token(username: str, password: str, timeout: int, max_login_attempts: i
         if max_login_attempts < 1:
             raise AuthError(AuthFailureReason.CAPTCHA_FAILED)
         for captcha_submit_attempt in range(1, max_login_attempts + 1):
-            # 步骤 3: OCR 识别验证码（图片获取与 OCR 自身带有限重试）
-            captcha = recognize_captcha(session, flow.captcha_url, timeout, max_attempts=3)
+            # 步骤 3: 同一会话中获取验证码；默认 OCR 保留既有有限重试。
+            if captcha_provider is None:
+                captcha = recognize_captcha(session, flow.captcha_url, timeout, max_attempts=3)
+            else:
+                captcha = _provide_captcha(session, flow.captcha_url, timeout, captcha_provider)
             debug_print("验证码已识别")
 
             # 步骤 4: 提交服务端提供的登录表单，并逐跳验证 Redirect

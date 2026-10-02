@@ -1,5 +1,7 @@
 # Linux systemd 部署
 
+macOS 手动桌面预览请参见 [macOS 指南](docs/macos-desktop.md)；不使用本文的 systemd timer。
+
 本文适用于可信的长期在线 Linux 主机。项目是一次性任务，不需要常驻 Web 服务；systemd timer 在北京时间 21:15、21:45 调度，第二次运行会识别已签到状态。units 设置 `AccuracySec=30s`，不承诺精确到秒；电脑关机、网络异常或学校服务不可用仍可能导致漏签。
 
 > [!IMPORTANT]

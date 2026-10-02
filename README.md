@@ -4,7 +4,7 @@
 [![Release](https://img.shields.io/github/v/release/Maximora-byte/swu-checkin)](https://github.com/Maximora-byte/swu-checkin/releases/latest)
 [![License](https://img.shields.io/github/license/Maximora-byte/swu-checkin)](LICENSE)
 
-西南大学钉钉查寝工具，提供 Python CLI、Windows 桌面预览版、Windows 脚本计划任务、GitHub Actions 和受限 systemd timer 部署。各入口共用认证与签到业务核心。
+西南大学钉钉查寝工具，提供 Python CLI、Windows / macOS 桌面预览版、Windows 脚本计划任务、GitHub Actions 和受限 systemd timer 部署。各入口共用认证与签到业务核心。
 
 > [!IMPORTANT]
 > 这是由 [Maximora-byte](https://github.com/Maximora-byte) 独立维护的非官方社区项目，源自 [Sorynthia/swu-checkin](https://github.com/Sorynthia/swu-checkin)。本仓库保留原项目署名与 MIT 许可证，但路线、发布和支持均由当前仓库独立负责；它不代表西南大学、钉钉或原上游作者。
@@ -32,6 +32,10 @@
 
 已有 v2.0.0 的完整 onedir ZIP 可全部解压后运行 `SWUCheckin/SWUCheckin.exe`。新的构建同时生成明确命名的 `*-win-x64-Portable.zip`，内附中文使用说明、来源信息及校验清单；无需安装程序、Python、uv 或管理员权限。免安装只涵盖程序文件，DPAPI 账号数据仍保存在当前用户目录，不承诺跨电脑迁移。下载、升级和计划任务路径注意事项见 [免安装版指南](docs/windows-portable.md)。新构建先提供 Actions 预览 artifact，实际 Release 资产以发布页为准。
 
+## macOS desktop preview
+
+新增 macOS 15 手动桌面预览：启动不联网、不读取账号；可显式使用系统钥匙串保存/读取/清除账号，token 仅在内存。分别构建 Apple Silicon 与 Intel `.app`，不启用后台任务。产物为 ad-hoc 签名、未 Developer ID 签名/公证的预览；以各架构成功 CI artifact 为准，尚未完成真实 Mac 干净用户验收。见 [macOS 指南与构建边界](docs/macos-desktop.md)。
+
 ## 选择运行方式
 
 | 场景 | 推荐方式 | 特点 |
@@ -39,6 +43,7 @@
 | 先确认账号和接口是否可用 | [本地 CLI](docs/quickstart.md) | 最快；先 `setup` / `probe`，再决定是否正式运行 |
 | 长期在线 Linux 主机 | [systemd 部署](DEPLOYMENT.md) | 时间稳定、权限隔离、双次 timer、可选 Telegram 汇总 |
 | 想使用 Windows 中文窗口 | [桌面预览版](docs/windows-desktop.md) | 独立 EXE；默认不联网、不启用任务；未签名，下载以 Releases 资产为准 |
+| 想使用 macOS 中文窗口 | [macOS 手动预览](docs/macos-desktop.md) | 原生分架构 .app；可选钥匙串、内存 token；无后台任务、未公证 |
 | 已使用 Windows Python 脚本部署 | [Windows 脚本指南](docs/windows.md) | 需要 uv/Python；安装诊断成功后会启用正式定时任务 |
 | 没有自己的服务器 | [GitHub Actions](GITHUB_ACTIONS.md) | 配置简单，但 cron 可能排队延迟，不保证准点 |
 
