@@ -4,7 +4,7 @@ Android 客户端已经接入仓库原有认证与签到核心。打开应用不
 
 ## 安装与使用
 
-最低 Android 7.0 / API24，只支持 `arm64-v8a` 和 `x86_64` 的 64 位设备。截至 2026-10-02，Android 尚无公开 Release 资产；最新 v2.0.0 不包含本客户端。当前准备 **0.1.1-preview / versionCode=3**：正式包名 `io.github.maximorabyte.swucheckin`，release 变体不允许调试，使用仓库外受保护的持久签名。它仍是预览，不代表真实学校账号或全部设备已经验收。
+最低 Android 7.0 / API24，只支持 `arm64-v8a` 和 `x86_64` 的 64 位设备。截至 2026-10-03，Android 尚无公开 Release 资产；最新 v2.0.0 不包含本客户端。当前准备 **0.1.1-preview / versionCode=3**：正式包名 `io.github.maximorabyte.swucheckin`，release 变体不允许调试，使用仓库外受保护的持久签名。它仍是预览，不代表真实学校账号或全部设备已经验收。
 
 云端 [Android 工作流](https://github.com/Maximora-byte/swu-checkin/actions/workflows/android-feasibility.yml)继续提供保留 14 天的 debug 验证 artifact。`app-debug.apk` 使用旧 `.feasibility` 包名与临时 debug 证书，版本带 `-debug`；测试 APK 只供开发验收，日常使用不用安装。持久签名候选来自 `android/app/build/outputs/apk/release/app-release.apk`，有独立的证书、来源与验收报告，不由 CI debug artifact 自动发布。核对具体包的 SHA256、内嵌来源、签名指纹与实际测试；不要混用不同运行的包。
 
@@ -53,11 +53,25 @@ Windows 本机准备好官方工具链后，在仓库根目录执行：
 
 首次创建 RSA-4096 PKCS12，后续复用同一密钥；不允许缺失一半的密钥/密码记录时悄悄换钥。默认位于 `%LOCALAPPDATA%\SWUCheckin\ReleaseSigning\Android`：`preview.p12` 存储加密私钥，密码由当前 Windows 用户 DPAPI 保护，专用目录 ACL 限制当前用户和 SYSTEM。脚本通过进程环境暂时传递密码，结束后清理环境；不向日志、Git 或 PR 暴露秘密。公钥证书可公开，当前持久证书 SHA256 为 `77ad72b44323fa7917470442e21fb258b5b8bc8a367e87c83ba6fa22d08f811a`；实际 APK 必须再次匹配这一指纹。
 
-公开 APK 前，维护者应完成密钥的受保护备份与保管方案；不要只把 DPAPI 密文复制到另一电脑后假定可解密，不要把私钥、明文密码或解密脚本作为 Release 资产。本轮没有验证异机恢复，也未配置发行密钥到 CI。持久证书使后续同包名更新有连续身份，但最终跨版本更新仍须独立验收；丢失密钥不能通过换一个签名继续覆盖原应用。见 [Android 官方签名说明](https://developer.android.com/studio/publish/app-signing)和 [Microsoft DPAPI](https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.protecteddata?view=windowsdesktop-9.0)。
+公开 APK 前，维护者应完成密钥的受保护备份与保管方案；不要只把 DPAPI 密文复制到另一电脑后假定可解密，不要把私钥、明文密码或解密脚本作为 Release 资产。本轮已在仓库外建立受限 ACL 的本机备份，并从备份恢复密码/密钥实际签名，匹配同一公开证书。这只证明同电脑、同 Windows 用户恢复；离机副本保管和异机恢复尚未验证，公开 APK 前仍须完成。发行密钥没有配置到 CI。持久证书使后续同包名更新有连续身份，但最终跨版本更新仍须独立验收；丢失密钥不能通过换一个签名继续覆盖原应用。见 [Android 官方签名说明](https://developer.android.com/studio/publish/app-signing)和 [Microsoft DPAPI](https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.protecteddata?view=windowsdesktop-9.0)。
 
 ### 0.1.1-preview 候选验证状态
 
-持久密钥、签名构建与验收脚本已经准备；最终候选正在按固定源码重建，APK 哈希、三组模拟器结果和发布预检尚待报告。未将首次构建或旧 debug 的通过数记为最终候选通过。发行构建要求干净工作区，内嵌 `assets/BUILD-INFO.json` 记录精确 commit/tree、项目与 Android 版本、锁文件摘要；验证器反查所选源码，拒绝不一致。`verify_signed_apk.py` 还检查非 debuggable、实际许可、证书、全部 ELF LOAD 与 16 KB ZIP 对齐；signed 构建和 debug CI 核对 Maven runtime 依赖集。`verify_release_device.py` 执行上述 20 项/行，并将 instrumentation 非零退出视为失败，不因打印 OK 忽略。尚未公开发布 APK。
+本轮候选来源为 PR #45 的精确 merge-test commit `cf1b69eb3c9d31b17e8ce79fc4aaa406dbf93fc6`，源码树 `9c4c7c9928d4aa71aa7512683d38950fdb0e204d`；后续文档补充不改写此 APK 的内嵌来源。非调试生产 APK 与同持久证书测试包已在下列环境完成验收：
+
+| 模拟器 | 实际页大小 | 首装 / 覆盖 / 清数据共享测试 | 合成账号保存 / 覆盖后解密 | 合计 |
+| --- | ---: | --- | --- | ---: |
+| 官方 API24 / x86_64 | 4096 | 6 / 6 / 6 passed | 1 / 1 passed | 20 |
+| 官方 API35 / x86_64 | 4096 | 6 / 6 / 6 passed | 1 / 1 passed | 20 |
+| 官方 API35 / x86_64 | 16384 | 6 / 6 / 6 passed | 1 / 1 passed | 20 |
+
+本机生产验收共 **60 项通过**，未使用真实学校账号。API35/16 KB 首次尝试的清数据阶段遇到 `system_server` 输入法服务 `AdditionalSubtypeUtils` 空指针崩溃，应用收到 `DeadSystemException`，该次仍记失败；保留原报告后，系统恢复，同一 APK 从首次安装完整重跑 20 项通过。此前云端旧源码的 ART JIT 崩溃也保留，不把一次重跑当作所有设备稳定的证明。
+
+- 生产应用 SHA256：`c13751d0aa406b3fa516b54abe851c3167f9c64572d7b2066dbbb67e14e55937`
+- 对应测试包 SHA256：`838f6b188e9e3acee60e847089404a8e2221a14e1e6d21482f8aa99a37642153`
+- 公开证书 SHA256：`77ad72b44323fa7917470442e21fb258b5b8bc8a367e87c83ba6fa22d08f811a`
+
+逐行测试身份、原报告摘要及字节哈希见 [验收清单](releases/v2.1.0-acceptance.json)。同源 [发布预检 37031347112](https://github.com/Maximora-byte/swu-checkin/actions/runs/37031347112) 的三组 debug 验证另为 63 项通过；debug 和生产包分别记录，不累计冒充同一 APK 的测试数。发行构建要求干净工作区，内嵌 `assets/BUILD-INFO.json` 记录精确 commit/tree、项目与 Android 版本、锁文件摘要；验证器反查所选源码，拒绝不一致。`verify_signed_apk.py` 还检查非 debuggable、实际许可、证书、全部 ELF LOAD 与 16 KB ZIP 对齐；signed 构建和 debug CI 核对 Maven runtime 依赖集。`verify_release_device.py` 执行上述 20 项/行，并将 instrumentation 非零退出视为失败，不因打印 OK 忽略。尚未公开发布 APK。
 
 ### 2026-10-02 功能版验收记录
 

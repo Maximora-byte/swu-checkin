@@ -141,7 +141,7 @@ uv run --locked python scripts/release/verify_artifacts.py \
 
 [`verify_artifacts.py`](../scripts/release/verify_artifacts.py) 拒绝危险归档路径和已列出的私密文件/目录，分别安装 wheel 与 sdist，执行 `--help`、`status --help` 并核对项目/分发包版本。干净安装通过 `uv pip install` 解析分发包依赖，可能联网；这项检查证明包可安装，不等同于部署时按 `uv.lock` 安装，也不是完整敏感内容扫描。
 
-归档路径现在独立解析 POSIX/Windows 语义，拒绝绝对路径、盘符/UNC、反斜杠、ADS、控制字符、遍历、Windows 尾随点/空格别名及重复路径；wheel 符号链接和 sdist 链接/特殊文件也会失败。Windows 本机 `/absolute/path` 既有缺陷已经修复；本轮发布定向回归 70 项通过。之前 31 passed / 1 failed 保留为历史记录，不能将新结果倒写成旧包已经通过。
+归档路径现在独立解析 POSIX/Windows 语义，拒绝绝对路径、盘符/UNC、反斜杠、ADS、控制字符、遍历、Windows 尾随点/空格别名及重复路径；wheel 符号链接和 sdist 链接/特殊文件也会失败。Windows 本机 `/absolute/path` 既有缺陷已经修复；初期发布定向回归 70 项通过；最终 [CI 37031346637](https://github.com/Maximora-byte/swu-checkin/actions/runs/37031346637) 为 1218 passed / 1 skipped。之前 31 passed / 1 failed 保留为历史记录，不能将新结果倒写成旧包已经通过。
 
 [`release.yml`](../.github/workflows/release.yml) 支持路径过滤 PR、手动 `workflow_dispatch` 和 `v*` tag push。PR/手动运行只生成可审核材料，tag 才可能发布：
 
@@ -152,7 +152,7 @@ uv run --locked python scripts/release/verify_artifacts.py \
 5. 生成保留 14 天的 `release-staged-<SHA>`：六个用户包、各平台来源/许可清单、`ASSET-MANIFEST.json`、MIT、固定发行说明和整体 `SHA256SUMS.txt`
 6. 仅 tag push 的 `release-publish` 取得 `contents: write`；它不 checkout 或执行项目代码，仅下载同一次 run 的暂存集，复核最终哈希/数量，并以 `--verify-tag --prerelease --latest=false --notes-file` 创建 Pre-release。已有同名 Release 拒绝覆盖；不上传 PyPI
 
-自动暂存的六个用户包是 Python wheel/sdist、Windows x64 Setup/Portable、macOS 15 arm64/x86_64 preview ZIP；Actions 外层 artifact ZIP 不作为用户安装包。Android CI 使用临时 debug 证书，只证明对应包的运行，不公开为 Release APK。本机持久签名 APK、公开证书、来源与许可/验收报告单独准备；公开前仍需完成该资产的审核和签名保管。当前预检实现后的实际多平台构建结果须在[发布准备](releases/release-readiness.md)记录，不以历史 CI 代替。
+自动暂存的六个用户包是 Python wheel/sdist、Windows x64 Setup/Portable、macOS 15 arm64/x86_64 preview ZIP；Actions 外层 artifact ZIP 不作为用户安装包。Android CI 使用临时 debug 证书，只证明对应包的运行，不公开为 Release APK。本机持久签名 APK、公开证书、来源与许可/验收报告单独准备；公开前仍需完成该资产的审核和签名保管。本轮 [预检 37031347112](https://github.com/Maximora-byte/swu-checkin/actions/runs/37031347112) 已完成全部平台构建、三组 debug 运行验证和 17 文件暂存；六个实际用户包也已独立下载复核。持久签名 APK 另通过 60 项生产模拟器验收。来源、哈希、保留的失败和边界见 [发布准备](releases/release-readiness.md)及 [验收清单](releases/v2.1.0-acceptance.json)。
 
 本轮使用数字 `2.1.0` 配合 GitHub Pre-release 属性，保留 Windows 安装器的三段数字要求；不是 Python `2.1.0rc1`。Android 独立使用 `versionName=0.1.1-preview` / `versionCode=3`。当前只完成发布准备，不创建 tag/Release，也不移动已发布 tag。预检的临时 merge-test commit 与合并后 main commit 可能不同；最终发行须按选定 main/tag commit 重建或重新运行，不能仅凭源码树相同改写产物来源。
 
