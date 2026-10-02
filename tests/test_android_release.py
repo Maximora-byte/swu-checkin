@@ -1,11 +1,26 @@
 """Production Android gates must reject unsafe data handling and unsigned/debug builds."""
 
 import struct
+import sys
+from importlib import import_module
+from pathlib import Path
 
 import pytest
 
-from scripts.android.verify_release_device import require_absent
-from scripts.android.verify_signed_apk import certificate_digest, verify_elf, verify_manifest
+# The pytest console entry point does not add the checkout root to sys.path.
+# Load only these repository scripts, then restore the global search path so
+# both console pytest and python -m pytest exercise the same module objects.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+try:
+    device_verifier = import_module("scripts.android.verify_release_device")
+    apk_verifier = import_module("scripts.android.verify_signed_apk")
+finally:
+    sys.path.pop(0)
+
+require_absent = device_verifier.require_absent
+certificate_digest = apk_verifier.certificate_digest
+verify_elf = apk_verifier.verify_elf
+verify_manifest = apk_verifier.verify_manifest
 
 
 @pytest.mark.parametrize("text,code", [("package:/data/app/user/base.apk", 0), ("permission denied", 1), ("", 2)])
@@ -53,7 +68,7 @@ def test_release_device_stops_on_adb_failure_even_with_complete_test_output(tmp_
     import argparse
     import subprocess
 
-    from scripts.android import verify_release_device as verifier
+    verifier = device_verifier
 
     certificate = "ab" * 32
     apk = tmp_path / "app.apk"
@@ -121,7 +136,7 @@ def test_signed_preview_rejects_source_changes_after_metadata_generation(tmp_pat
     import subprocess
     from zipfile import ZipFile
 
-    from scripts.android import verify_signed_apk as verifier
+    verifier = apk_verifier
 
     commit, tree = "a" * 40, "b" * 40
     lock = tmp_path / "uv.lock"
@@ -186,7 +201,7 @@ def test_release_device_preserves_uninstalled_packages_with_retained_data(tmp_pa
     import argparse
     import subprocess
 
-    from scripts.android import verify_release_device as verifier
+    verifier = device_verifier
 
     calls = []
     retained = verifier.APP_ID + suffix
