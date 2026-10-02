@@ -4,7 +4,7 @@
 [![Release](https://img.shields.io/github/v/release/Maximora-byte/swu-checkin)](https://github.com/Maximora-byte/swu-checkin/releases/latest)
 [![License](https://img.shields.io/github/license/Maximora-byte/swu-checkin)](LICENSE)
 
-西南大学钉钉查寝工具，提供 Python CLI、Windows / macOS 桌面预览版、Windows 脚本计划任务、GitHub Actions 和受限 systemd timer 部署。各入口共用认证与签到业务核心。
+西南大学钉钉查寝工具，提供 Python CLI、Windows / macOS 桌面预览版、Android 手动客户端、Windows 脚本计划任务、GitHub Actions 和受限 systemd timer 部署。各入口共用认证与签到业务核心。
 
 > [!IMPORTANT]
 > 这是由 [Maximora-byte](https://github.com/Maximora-byte) 独立维护的非官方社区项目，源自 [Sorynthia/swu-checkin](https://github.com/Sorynthia/swu-checkin)。本仓库保留原项目署名与 MIT 许可证，但路线、发布和支持均由当前仓库独立负责；它不代表西南大学、钉钉或原上游作者。
@@ -38,12 +38,15 @@
 
 ## 选择运行方式
 
+Android 0.1.0 手动预览支持校园账号登录、人工验证码、可选加密保存、只读查询与诊断，以及明确确认后的单次手动签到。启动不联网，没有后台自动签到。最低 Android 7.0，仅支持 64 位设备；调试签名安装包、使用步骤和验收范围见 [Android 客户端指南](docs/android-client.md)。
+
 | 场景 | 推荐方式 | 特点 |
 | --- | --- | --- |
 | 先确认账号和接口是否可用 | [本地 CLI](docs/quickstart.md) | 最快；先 `setup` / `probe`，再决定是否正式运行 |
 | 长期在线 Linux 主机 | [systemd 部署](DEPLOYMENT.md) | 时间稳定、权限隔离、双次 timer、可选 Telegram 汇总 |
 | 想使用 Windows 中文窗口 | [桌面预览版](docs/windows-desktop.md) | 独立 EXE；默认不联网、不启用任务；未签名，下载以 Releases 资产为准 |
 | 想使用 macOS 中文窗口 | [macOS 手动预览](docs/macos-desktop.md) | 原生分架构 .app；可选钥匙串、内存 token；无后台任务、未公证 |
+| 想在 Android 手机手动使用 | [Android 手动预览](docs/android-client.md) | 人工验证码、可选密钥库加密保存、先查询再确认提交；无后台任务 |
 | 已使用 Windows Python 脚本部署 | [Windows 脚本指南](docs/windows.md) | 需要 uv/Python；安装诊断成功后会启用正式定时任务 |
 | 没有自己的服务器 | [GitHub Actions](GITHUB_ACTIONS.md) | 配置简单，但 cron 可能排队延迟，不保证准点 |
 

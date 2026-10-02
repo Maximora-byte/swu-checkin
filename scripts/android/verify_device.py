@@ -1,4 +1,4 @@
-"""Run credential-free acceptance on one explicitly selected Android device."""
+"""Run synthetic acceptance on one explicitly selected Android device."""
 
 from __future__ import annotations
 
@@ -38,6 +38,12 @@ def read_page_size(getconf: str, smaps: str = "") -> int:
     if page and int(page[1]) > 0:
         return int(page[1]) * 1024
     raise ValueError("device did not report a valid kernel page size")
+
+
+def check_disposable_account(marker: str) -> None:
+    """Never uninstall or clear an existing account-bearing application."""
+    if marker.strip() != "NO_SAVED_ACCOUNT":
+        raise ValueError("acceptance refuses to clear saved accounts; use a disposable installation")
 
 
 def accept(args: argparse.Namespace) -> None:
@@ -81,6 +87,14 @@ def accept(args: argparse.Namespace) -> None:
             if package.returncode == 1 and (installed or package.stderr.strip()):
                 package.check_returncode()
             if installed:
+                if package_id == APP_ID:
+                    marker = adb(
+                        "shell",
+                        f"run-as {APP_ID} sh -c 'if [ -e no_backup/account.enc ] || "
+                        "[ -e no_backup/account.enc.bak ]; then echo SAVED_ACCOUNT; "
+                        "else echo NO_SAVED_ACCOUNT; fi'",
+                    )
+                    check_disposable_account(marker.stdout)
                 adb("uninstall", package_id)
         adb("install", str(args.apk.resolve()), timeout=180)
         adb("install", str(args.test_apk.resolve()), timeout=180)

@@ -9,6 +9,9 @@ EXPECTED_TESTS = {
     ("io.github.maximorabyte.swucheckin.RuntimeFeasibilityTest", "verifiedPublicHttpsFromEmbeddedPython"),
     ("io.github.maximorabyte.swucheckin.CrossProcessLockTest", "lockIsSharedAndProcessDeathReleasesIt"),
     ("io.github.maximorabyte.swucheckin.DiagnosticsUiTest", "diagnosticButtonsAndRecreation"),
+    ("io.github.maximorabyte.swucheckin.AccountSecurityTest", "encryptionTamperingAndMissingKeyFailClosed"),
+    ("io.github.maximorabyte.swucheckin.AccountSecurityTest", "captchaCancellationTimeoutAndStaleAnswer"),
+    ("io.github.maximorabyte.swucheckin.CheckinUiTest", "manualLoginQueryConfirmationAndCancellation"),
 }
 
 

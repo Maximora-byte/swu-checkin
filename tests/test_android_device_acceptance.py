@@ -42,6 +42,13 @@ def test_expected_16kb_device_is_accepted(check_device):
     check_device({"api": 35, "abi": "x86_64", "page_size": 16384}, api=35, abi="x86_64", page_size=16384)
 
 
+def test_saved_account_is_never_cleared_by_acceptance(device_acceptance):
+    device_acceptance.check_disposable_account("NO_SAVED_ACCOUNT\n")
+    for marker in ("SAVED_ACCOUNT", "", "permission denied", "NO_SAVED_ACCOUNT\nSAVED_ACCOUNT"):
+        with pytest.raises(ValueError, match="refuses to clear saved accounts"):
+            device_acceptance.check_disposable_account(marker)
+
+
 @pytest.mark.parametrize(
     "metadata",
     [

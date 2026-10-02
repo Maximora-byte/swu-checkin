@@ -22,7 +22,10 @@ import org.junit.runner.Description
 class DiagnosticsUiTest {
     private val compose = createAndroidComposeRule<MainActivity>()
     @get:Rule val rules: RuleChain = RuleChain.outerRule(Timeout.seconds(300)).around(object : TestWatcher() {
-        override fun starting(description: Description) { Log.i("FeasibilityUiTest", "launching activity") }
+        override fun starting(description: Description) {
+            Log.i("FeasibilityUiTest", "launching activity")
+            DeviceForeground.warm()
+        }
     }).around(compose)
 
     @Test fun diagnosticButtonsAndRecreation() {

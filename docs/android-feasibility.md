@@ -1,6 +1,6 @@
 # Android 可行性验证（开发预览）
 
-这是 Android 移植的**第一道验证门槛**，不是已完成的手机签到客户端。APK 没有账号/密码输入、学校诊断或签到入口；启动不会联网。只有点击“验证公共 HTTPS”或执行指定 instrumentation 测试时才访问 `https://www.python.org/robots.txt`，不携带账号数据，也不访问学校。
+本文记录 Android 移植的运行环境验证和原可行性 APK 历史验收。当前源码已扩展为 [0.1.0 手动客户端](android-client.md)，支持登录、人工验证码、加密账号、只读查询和确认后的手动签到。启动不会联网；环境检测页仍不接触账号或学校服务，公共 HTTPS 检查仅访问 `https://www.python.org/robots.txt`。
 
 ## 选型与官方依据
 
@@ -15,12 +15,12 @@
 
 ## 边界
 
-- Kotlin + Jetpack Compose 只提供验证按钮；Chaquopy 加载仓库原有 Python 核心，不复制签到逻辑
+- Kotlin + Jetpack Compose 提供手动客户端与独立环境检测页；Chaquopy 加载仓库原有 Python 核心，不复制签到逻辑
 - Android 单独固定纯 Python 运行依赖于 [`requirements-android.txt`](../android/requirements-android.txt)，包括明确打包的 tzdata；默认桌面/CLI 依赖与 uv.lock 不变
 - 不打包 ddddocr、Pillow、ONNX、OpenCV，不假设桌面原生 wheel 能在 Android 工作；核心依赖验证码提供器的惰性 OCR 接缝
 - 只声明 INTERNET，无位置、后台定位、闹钟、启动广播、外部存储或通知权限；无 WorkManager/自动签到
 - 禁用应用备份，测试文件位于应用 `noBackupFilesDir` 下，不写 Python 源码/解压目录
-- 测试统一 `formal_execution.execute_formal_checkin_with_lock` 边界，传入的是无网络的锁争用函数，绝不调用正式签到
+- 环境测试使用无网络锁争用函数；客户端使用同一 `RuntimeLock` 实现，合成业务测试不向学校发出请求
 - 学校返回的宿舍坐标不是真实 GPS，也不能证明本人在寝；后续手动签到仍必须由用户确认本人在寝并遵守学校规定
 
 ## 构建与 CI
@@ -39,7 +39,7 @@ Gradle wrapper 与 distribution 都校验固定 SHA256。SDK 路径放本地 `an
 
 CI API24 保留 1536 MB / 2 核的轻量配置；API35 普通镜像固定 4096 MB 内存，16 KB 镜像固定 6144 MB，均为 4 核并记录配置。16 KB 官方 Google 镜像在默认 2560 MB 下曾触发 `lowmemorykiller`，前台测试进程被系统杀死；该失败必须保留系统日志并通过增加模拟器内存重新验证，不能忽略失败或降低测试要求。本机启动 API35 对应镜像也应显式传入 `-memory 4096` / `-memory 6144` 和 `-accel on`。
 
-[`android-feasibility.yml`](../.github/workflows/android-feasibility.yml) 分别构建双 ABI debug APK、运行 Android lint、检查 APK 中的 Python/ABI，并在 API24/4 KB、API35/4 KB、API35/16 KB x86_64 模拟器执行真实 embedded Python instrumentation。API35 的实际页大小必须匹配矩阵，否则失败。每次安装状态执行四项测试，包括实际按钮点击和 Activity 重建；首次安装、同版本覆盖安装、清数据共三轮。测试公共 HTTPS 需网络，失败不会被改写为通过。模拟器安装的是 package job 的同一 APK/test APK，先核对源 commit 与两个 APK 的 SHA256，不独立重建。证据包含源码、APK hash、原始测试结果、真实界面、完整一次性模拟器系统日志；debug APK 使用临时 debug 签名，不是生产签名、Release 或自动发布。
+[`android-feasibility.yml`](../.github/workflows/android-feasibility.yml) 分别构建双 ABI debug APK、运行 Android lint、检查 APK 中的 Python/ABI，并在 API24/4 KB、API35/4 KB、API35/16 KB x86_64 模拟器执行真实 embedded Python instrumentation。API35 的实际页大小必须匹配矩阵，否则失败。当前每次安装状态执行七项测试，包括加密账号、人工验证码、手动签到确认、实际按钮点击和 Activity 重建；首次安装、同版本覆盖安装、清数据共三轮。测试公共 HTTPS 需网络，失败不会被改写为通过。模拟器安装的是 package job 的同一 APK/test APK，先核对源 commit 与两个 APK 的 SHA256，不独立重建。证据包含源码、APK hash、原始测试结果、真实界面、完整一次性模拟器系统日志；debug APK 使用临时 debug 签名，不是生产签名、Release 或自动发布。
 
 ### Windows 本机构建与明确设备验收
 
@@ -63,9 +63,9 @@ python scripts/android/verify_device.py --adb "$env:ANDROID_HOME/platform-tools/
   --evidence-dir .local-tools/evidence/api35-16k-run1 --system-logs
 ```
 
-系统日志开关仅允许一次性模拟器。脚本只卸载/清除这个不含账号的可行性应用，不清除整个设备；同版本覆盖安装不代表跨版本升级迁移。普通镜像应使用 `--page-size 4096`，真实 arm64 手机应使用 `--abi arm64-v8a` 并填入实测页大小。
+系统日志开关仅允许一次性模拟器。脚本只卸载/清除无已保存账号的测试安装，不清除整个设备；同版本覆盖安装不代表跨版本升级迁移。普通镜像应使用 `--page-size 4096`，真实 arm64 手机应使用 `--abi arm64-v8a` 并填入实测页大小。
 
-真实手机需要解锁、保持亮屏并让验证应用留在前台；系统出现 USB 安装提示时，允许验证 APK 与测试包安装。脚本每轮会先打开验证应用，避免从后台启动页面被设备限制。Android 7 缺少 `getconf` 时读取 `/proc/self/smaps` 的真实 `KernelPageSize`；读取失败仍算失败，不假定为 4 KB。界面测试包含启动和清理阶段在内的 300 秒超时，并记录不含用户数据的固定步骤，超时仍算失败。
+真实手机需要解锁、保持亮屏并让验证应用留在前台；系统出现 USB 安装提示时，允许验证 APK 与测试包安装。脚本每轮会先打开验证应用，避免从后台启动页面被设备限制。Android 7 缺少 `getconf` 时读取 `/proc/self/smaps` 的真实 `KernelPageSize`；读取失败仍算失败，不假定为 4 KB。界面测试包含启动和清理阶段在内的 300 秒超时，超时仍算失败。当前客户端验收每轮七项；脚本发现已有加密账号或无法确认测试安装为空时，拒绝卸载/清数据。
 
 ### 2026-10-02 真机验收
 
@@ -75,7 +75,7 @@ vivo X200 Pro，Android 16 / API36，`arm64-v8a`，实际内存页大小 `4096`�
 
 同一修复版 APK 在本机官方 API24 / 4 KB 与 API35 / 16 KB x86_64 模拟器上各通过三轮、12 项测试；验收脚本相关主机回归 31 passed。云端当前结果与原始失败证据记录在 PR，不用本机结果改写云端结果。
 
-这份真机结果只证明该 arm64 / 4 KB 设备的运行环境验证通过；16 KB 真机、跨版本数据迁移、账号登录与签到仍未验证。当前没有账号/签到界面。
+以上 SHA256 和 12 项结果属于原可行性 APK，不能用于证明后来新增的账号界面通过。当前手动客户端须核对自己的源码、包哈希和七项测试结果；16 KB 真机、跨版本数据迁移和真实学校账号网络登录仍未验证。
 
 ## 完成门槛与待验证项
 
@@ -88,6 +88,4 @@ vivo X200 Pro，Android 16 / API36，`arm64-v8a`，实际内存页大小 `4096`�
 - [x] Android 跨进程锁与进程被杀后的释放（debug-only 私有第二进程测试，arm64 / 4 KB 真机与模拟器均通过）
 - [x] 同版本覆盖安装与清除数据后的重新启动（真机与模拟器均通过）；跨版本升级迁移仍待后续验证
 
-Windows 可通过项目内工具链执行上述构建和设备验收。目前 arm64 / 4 KB 真机已通过，16 KB 真机仍未验证；**其余实机门槛未过前，不进入完整账号/签到 UI，也不宣称首版完成。**
-
-后续分层为验证码/AndroidKeystore 安全适配器，再接中文只读诊断、任务“待签/已签”与明确确认的手动签到。需覆盖取消、双击、旋转、切后台、断网、进程死亡、升级与清数据；只读路径永不提交，提交超时不盲目重发，结果须以服务端回读确认。任何真实学校账号测试须另行授权；不把真实签到用作验收。
+Windows 可通过项目内工具链构建和验收。应用户明确要求继续到可用状态，当前范围推进到人工验证码、AndroidKeystore、中文只读诊断、任务待签/已签与确认后的单次手动签到，并独立验证新增界面；16 KB 真机没有可用设备，继续明确保留未验证，不宣称全部设备兼容或生产发布。任何真实学校账号测试须另行授权；不把真实签到用作验收。
