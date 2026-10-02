@@ -35,6 +35,9 @@ def test_release_manifest_rejects_debug_and_old_versions():
         "sdkVersion:'24'\ntargetSdkVersion:'36'\n"
     )
     verify_manifest(manifest)
+    verify_manifest(manifest.replace("sdkVersion:", "minSdkVersion:"))
+    with pytest.raises(ValueError):
+        verify_manifest(manifest + "minSdkVersion:'23'\n")
     for bad in (manifest + "application-debuggable", manifest.replace("versionCode='3'", "versionCode='2'")):
         with pytest.raises(ValueError):
             verify_manifest(bad)

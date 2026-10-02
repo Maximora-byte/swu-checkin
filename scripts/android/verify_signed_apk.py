@@ -50,7 +50,9 @@ def verify_manifest(text: str) -> None:
         raise ValueError("unexpected release package or version")
     if "application-debuggable" in text:
         raise ValueError("production preview must not be debuggable")
-    if "sdkVersion:'24'" not in text or "targetSdkVersion:'36'" not in text:
+    minimum = re.findall(r"^(?:sdkVersion|minSdkVersion):'(\d+)'$", text, re.MULTILINE)
+    target = re.findall(r"^targetSdkVersion:'(\d+)'$", text, re.MULTILINE)
+    if minimum != ["24"] or target != ["36"]:
         raise ValueError("unexpected supported Android SDK range")
 
 
