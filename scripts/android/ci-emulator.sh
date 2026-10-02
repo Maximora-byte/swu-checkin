@@ -37,7 +37,12 @@ done
 adb shell input keyevent 82
 adb shell getprop ro.build.version.sdk >> android/evidence/emulator.txt
 adb shell getprop ro.product.cpu.abi >> android/evidence/emulator.txt
-adb shell getconf PAGE_SIZE >> android/evidence/emulator.txt
+# Android 7's shell has no getconf. This is metadata, not a pass/fail check.
+if ! adb shell getconf PAGE_SIZE >> android/evidence/emulator.txt 2>/dev/null; then
+  adb shell cat /proc/self/smaps 2>/dev/null \
+    | awk '!found && /KernelPageSize:/ {print $2 * 1024; found=1} END {if (!found) exit 1}' \
+    >> android/evidence/emulator.txt || echo 'page_size=not_reported' >> android/evidence/emulator.txt
+fi
 # These exact APKs were downloaded from the package job, not rebuilt here.
 [[ "$(git rev-parse HEAD)" == "$(cat android/evidence/commit.txt)" ]]
 (cd android && sha256sum -c evidence/SHA256SUMS)
