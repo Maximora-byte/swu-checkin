@@ -191,6 +191,7 @@ try {
     Add-Type -Path (Join-Path $Root 'packaging\windows\portable_smoke_launcher.cs')
     $Launcher = [PortableSmokeLauncher]::new()
     Write-Host 'Restricted-token verification: same CI user, Administrators SID deny-only/absent, all non-traversal privileges removed.'
+    Write-Host ('Restricted-token default owner: ' + $Launcher.DescribeTokenOwner())
     Write-Host 'This does not substitute for a separate standard-user account or Windows 10/11 release qualification.'
 
     foreach ($Probe in @(
@@ -221,14 +222,19 @@ try {
                 $Report, $WorkingDir, (New-IsolatedEnvironment))
             $OwnedProcesses.Add($Diagnostic)
             if (-not $Diagnostic.WaitForExit(180000)) { throw 'Restricted offline diagnostic timed out.' }
-            if (Test-Path -LiteralPath $Report -PathType Leaf) {
-                # File contains only a checked allowlist of stage/result/type
-                # identifiers. Never print raw exceptions, user paths or data.
-                Get-Content -LiteralPath $Report | ForEach-Object { Write-Host "Restricted diagnostic: $_" }
-            }
-            else { Write-Warning 'Restricted offline diagnostic produced no report.' }
         }
         catch { Write-Warning 'Restricted offline diagnostic could not complete; frozen failure remains authoritative.' }
+        finally {
+            try {
+                if (Test-Path -LiteralPath $Report -PathType Leaf) {
+                    # Emit safe completed stages even after diagnostic timeout.
+                    # No raw exceptions, user paths, output or data are recorded.
+                    Get-Content -LiteralPath $Report | ForEach-Object { Write-Host "Restricted diagnostic: $_" }
+                }
+                else { Write-Warning 'Restricted offline diagnostic produced no report.' }
+            }
+            catch { Write-Warning 'Restricted offline diagnostic report could not be read.' }
+        }
         throw $FrozenFailure
     }
     foreach ($Launch in 1..2) {

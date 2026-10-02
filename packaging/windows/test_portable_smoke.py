@@ -10,6 +10,7 @@ import os
 import shutil
 import subprocess
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -144,3 +145,29 @@ def test_diagnostic_does_not_replace_frozen_acceptance_or_hardcode_desktop():
     assert "RevertToSelf()" in launcher
     assert 'desktop = @"winsta0' not in launcher
     assert "new StartupInfo { cb = Marshal.SizeOf<StartupInfo>() }" in launcher
+
+
+def test_command_diagnostics_do_not_emit_arbitrary_output():
+    helper = load_diagnostic()
+    result = helper.classify_command(
+        SimpleNamespace(
+            returncode=3,
+            stdout="private output\nIDENTITY_OK\nCOM_FAIL:-2147024891\nprivate account",
+            stderr="private credential",
+        )
+    )
+    assert result == {
+        "returncode": 3,
+        "stdout_category": "OTHER",
+        "stderr_present": True,
+        "progress_xml": False,
+        "phases": ["IDENTITY_OK", "COM_FAIL:-2147024891"],
+    }
+    assert "private" not in json.dumps(result)
+
+
+def test_partial_diagnostics_are_emitted_before_original_failure():
+    source = SCRIPT.read_text(encoding="utf-8")
+    emission = source.index('Write-Host "Restricted diagnostic: $_"')
+    assert source.index("finally {", source.index("$FrozenFailure = $_")) < emission
+    assert emission < source.index("throw $FrozenFailure")

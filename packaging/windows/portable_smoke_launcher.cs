@@ -188,6 +188,20 @@ public sealed class PortableSmokeLauncher : IDisposable
         }
     }
 
+    public string DescribeTokenOwner()
+    {
+        IntPtr userInfo = ReadToken(token, 1); // TokenUser
+        IntPtr ownerInfo = ReadToken(token, 4); // TokenOwner
+        try
+        {
+            var user = new SecurityIdentifier(Marshal.ReadIntPtr(userInfo));
+            var owner = new SecurityIdentifier(Marshal.ReadIntPtr(ownerInfo));
+            return "owner_is_user=" + owner.Equals(user) + "; owner_is_administrators=" +
+                owner.IsWellKnown(WellKnownSidType.BuiltinAdministratorsSid);
+        }
+        finally { Marshal.FreeHGlobal(userInfo); Marshal.FreeHGlobal(ownerInfo); }
+    }
+
     public string ProbeWritableDirectory(string directory)
     {
         // Check this harness's synthetic directories with the exact launch
