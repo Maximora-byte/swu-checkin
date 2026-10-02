@@ -16,7 +16,7 @@ object ProbeRunner {
     private val main = Handler(Looper.getMainLooper())
     var busy by mutableStateOf(false)
         private set
-    var result by mutableStateOf("尚未运行。此 APK 仅验证运行环境，不能登录或签到。")
+    var result by mutableStateOf("尚未运行。此页面仅检查运行环境，不登录学校账号或提交签到。")
         private set
 
     fun run(context: Context, withHttps: Boolean) {
