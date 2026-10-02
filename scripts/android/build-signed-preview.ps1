@@ -6,6 +6,17 @@ param(
     [Uri]$DownloadProxy
 )
 $ErrorActionPreference = 'Stop'
+function Set-SigningAcl([string]$Path, [Security.AccessControl.FileSystemSecurity]$Security, [switch]$Directory) {
+    # Set-Acl's provider may request SACL privileges unnecessarily on PowerShell 7.
+    # Persist only the edited filesystem security descriptor directly instead.
+    if ($PSVersionTable.PSEdition -eq 'Core') {
+        if ($Directory) { [IO.FileSystemAclExtensions]::SetAccessControl([IO.DirectoryInfo]::new($Path), $Security) }
+        else { [IO.FileSystemAclExtensions]::SetAccessControl([IO.FileInfo]::new($Path), $Security) }
+    } else {
+        if ($Directory) { [IO.Directory]::SetAccessControl($Path, $Security) }
+        else { [IO.File]::SetAccessControl($Path, $Security) }
+    }
+}
 $projectRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 $signingPath = [IO.Path]::GetFullPath($SigningRoot)
 if ($signingPath.StartsWith($projectRoot + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase) -or $signingPath -eq $projectRoot) {
@@ -36,23 +47,25 @@ foreach ($existing in @($keyFile, $passwordFile, $certificateFile)) {
 # Restrict this dedicated directory to the current Windows user and SYSTEM.
 $owner = [Security.Principal.WindowsIdentity]::GetCurrent().User
 $systemSid = New-Object Security.Principal.SecurityIdentifier('S-1-5-18')
-$acl = New-Object Security.AccessControl.DirectorySecurity
+$acl = Get-Acl -LiteralPath $signingPath
 $acl.SetAccessRuleProtection($true, $false)
+foreach ($existingRule in @($acl.Access)) { $acl.RemoveAccessRuleSpecific($existingRule) }
 $acl.SetOwner($owner)
 foreach ($sid in @($owner, $systemSid)) {
     $rule = New-Object Security.AccessControl.FileSystemAccessRule($sid, 'FullControl', 'ContainerInherit,ObjectInherit', 'None', 'Allow')
     $acl.AddAccessRule($rule)
 }
-Set-Acl -LiteralPath $signingPath -AclObject $acl
+Set-SigningAcl $signingPath $acl -Directory
 foreach ($existing in @($keyFile, $passwordFile)) {
     if (Test-Path -LiteralPath $existing) {
-        $fileAcl = New-Object Security.AccessControl.FileSecurity
+        $fileAcl = Get-Acl -LiteralPath $existing
         $fileAcl.SetAccessRuleProtection($true, $false)
+        foreach ($existingRule in @($fileAcl.Access)) { $fileAcl.RemoveAccessRuleSpecific($existingRule) }
         $fileAcl.SetOwner($owner)
         foreach ($sid in @($owner, $systemSid)) {
             $fileAcl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule($sid, 'FullControl', 'Allow')))
         }
-        Set-Acl -LiteralPath $existing -AclObject $fileAcl
+        Set-SigningAcl $existing $fileAcl
     }
 }
 $savedSigningEnvironment = @{}
