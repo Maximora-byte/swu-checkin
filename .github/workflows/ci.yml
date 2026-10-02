@@ -131,7 +131,7 @@ jobs:
       - name: Windows Actions 结果与通知分支回归
         shell: powershell
         run: |
-          uv run --locked --all-groups pytest -q tests/test_actions_workflow.py
+          uv run --locked --all-groups pytest -q -W error::pytest.PytestUnhandledThreadExceptionWarning tests/test_actions_workflow.py
           if ($LASTEXITCODE -ne 0) { throw "Windows workflow shell acceptance failed." }
 
   package-quality:

@@ -35,6 +35,7 @@ def _run(script: str, env: dict[str, str]) -> subprocess.CompletedProcess[str]:
         env={**os.environ, **env},
         capture_output=True,
         text=True,
+        encoding="utf-8",
         check=False,
     )
 
