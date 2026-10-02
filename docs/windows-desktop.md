@@ -4,6 +4,8 @@
 
 合并时的验证记录：[Windows Server 2022 x64 构建与冒烟测试](https://github.com/Maximora-byte/swu-checkin/actions/runs/36897730511)、[合并后普通 CI](https://github.com/Maximora-byte/swu-checkin/actions/runs/36901319136)。这些记录只证明相应 commit 的检查结果，不构成学校认证、Windows 10/11 全面支持或后续构建的保证。
 
+免安装使用可选择完整应用 ZIP，见 [Windows 免安装指南](windows-portable.md)。新构建输出明确命名的 `*-Portable.zip`；安装版行为和用户数据目录不变。
+
 ## 面向使用者
 
 安装程序文件为 `SWUCheckin-<版本>-win-x64-Setup.exe`（本版本目标为 `SWUCheckin-2.0.0-win-x64-Setup.exe`）。先在本仓库 Releases 中确认该资产确实存在、来源与校验值匹配，再安装并从开始菜单打开 **SWU Checkin**；用户无需另装 Python、uv 或 OCR 模型。支持目标是 Windows 10/11 x64，其他架构未验收。不要从同名第三方下载站获取，也不要把 GitHub 自动生成的 Source code ZIP 或 Python sdist 当作 EXE 安装包。
@@ -45,7 +47,7 @@
 
 出现“无法确认计划任务状态”或“计划任务最终状态无法确认”时，界面不会假装已关闭/已启用，而会锁定调度控件。请在 Windows 任务计划程序核对该任务及本地配置，处理后重开应用，不要连续点开关或重新注册。任务状态与签到结果是不同状态，见 [故障排查](troubleshooting.md)。
 
-`SWUCheckin.exe` 不是 Python CLI 的改名版本：无参数打开窗口；只支持 `--scheduled`、`--self-test` 和帮助选项，没有 `run` / `probe` 子命令。开发者可用 `uv run --locked python -m swu_checkin.desktop` 启动源码 GUI，但启用桌面任务要求冻结安装版，不能从可能移动的开发目录注册。
+`SWUCheckin.exe` 不是 Python CLI 的改名版本：无参数打开窗口；只支持 `--scheduled`、`--self-test` 和帮助选项，没有 `run` / `probe` 子命令。开发者可用 `uv run --locked python -m swu_checkin.desktop` 启动源码 GUI，但启用桌面任务要求冻结应用（安装版或放在固定本地路径的免安装版），不能从可能移动的开发目录注册。
 
 ## 构建环境（开发者）
 
@@ -73,6 +75,7 @@
 `dist/windows/` 包含：
 
 - `SWUCheckin-<版本>-win-x64-Setup.exe`：当前用户安装程序
+- `SWUCheckin-<版本>-win-x64-Portable.zip`：完整免安装 ZIP，内附中文说明、来源及独立清单
 - `SWUCheckin/`：完整冻结应用，内含自己的 `SHA256SUMS.txt`
 - `BUILD-INFO.json`：版本、Git commit、工作区是否脏、源码树摘要、uv.lock 摘要、Python 与全部已安装依赖版本
 - `TOOLCHAIN.txt`：uv、Inno Setup 版本与源码提交时间
@@ -84,7 +87,7 @@
 
 ## CI 与离线冒烟测试
 
-[Windows desktop 工作流](../.github/workflows/windows-desktop.yml) 支持手动 `workflow_dispatch` 和相关文件变动的 `pull_request` 触发：Windows x64 构建，运行冻结 EXE 的 `--self-test`，再生成安装包、执行隔离安装/GUI/卸载冒烟测试，并上传保留 14 天的 Actions artifact。它不在普通 push 或仅文档变动时自动触发、不发布 Release，也不注入学校账号 secret，不运行真实签到或生产任务。普通 CI 与 Release 工作流的职责见 [开发、CI 与发布](development.md)。
+[Windows desktop 工作流](../.github/workflows/windows-desktop.yml) 支持手动 `workflow_dispatch` 和相关文件变动的 `pull_request` 触发：Windows x64 构建，运行冻结 EXE 的 `--self-test`，再生成安装包与免安装 ZIP，先对解压 ZIP 执行非管理员受限 token/GUI/重开冒烟，再执行隔离安装/GUI/卸载冒烟测试，并上传保留 14 天的 Actions artifact。它不在普通 push 或仅文档变动时自动触发、不发布 Release，也不注入学校账号 secret，不运行真实签到或生产任务。普通 CI 与 Release 工作流的职责见 [开发、CI 与发布](development.md)。
 
 `--self-test` 使用合成数据检查 Tk、OCR、时区、证书、DPAPI 往返和临时运行锁，并只读查询随机任务名以确认“确实不存在”；不读取账号或连接学校。构建在非零退出或 180 秒超时时失败。`scripts/windows/verify-install.ps1` 仅允许在一次性的 GitHub-hosted Windows runner 运行。它先调用独立的 `task_scheduler_smoke.py`：使用生产 XML 生成器，将动作替换为系统 `cmd.exe /d /c exit 0`，触发时间推迟至少六天，以随机 `SWUCheckin-CI-*` 名称注册无害任务，验证 COM 有效属性和 UTF-16 注册流程，然后删除并确认不存在；不执行该任务、不注册真实 `--scheduled` 任务。
 
