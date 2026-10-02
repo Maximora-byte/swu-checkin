@@ -12,7 +12,6 @@ import android.os.Messenger
 import android.os.Process
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
-import com.chaquo.python.Python
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -25,7 +24,7 @@ class CrossProcessLockTest {
     @Test fun lockIsSharedAndProcessDeathReleasesIt() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val path = context.noBackupFilesDir.resolve("cross-process.lock").absolutePath
-        val module = Python.getInstance().getModule("android_lock_probe")
+        val module = PythonRuntime.instance(context).getModule("android_lock_probe")
         val connected = CountDownLatch(1)
         val disconnected = CountDownLatch(1)
         var remote: Messenger? = null

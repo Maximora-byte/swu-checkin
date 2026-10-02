@@ -25,8 +25,8 @@ class MainActivity : ComponentActivity() {
                 ) {
                     Text("Android / Python 3.13 可行性验证", style = MaterialTheme.typography.titleLarge)
                     Text("不保存账号密码，不访问学校服务，不请求位置权限。学校宿舍坐标不是真实 GPS，也不能证明本人在寝。")
-                    Button(enabled = !ProbeRunner.busy, onClick = { ProbeRunner.run(noBackupFilesDir.absolutePath, false) }) { Text("验证离线运行环境") }
-                    Button(enabled = !ProbeRunner.busy, onClick = { ProbeRunner.run(noBackupFilesDir.absolutePath, true) }) { Text("验证公共 HTTPS（python.org）") }
+                    Button(enabled = !ProbeRunner.busy, onClick = { ProbeRunner.run(applicationContext, false) }) { Text("验证离线运行环境") }
+                    Button(enabled = !ProbeRunner.busy, onClick = { ProbeRunner.run(applicationContext, true) }) { Text("验证公共 HTTPS（python.org）") }
                     Text(ProbeRunner.result)
                 }
             }
