@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
 import subprocess
 import time
 from pathlib import Path
@@ -29,6 +30,16 @@ def check_device(metadata: dict, *, api: int, abi: str, page_size: int) -> None:
             raise ValueError(f"device {key}: expected {value}, got {metadata.get(key)}")
 
 
+def read_page_size(getconf: str, smaps: str = "") -> int:
+    """Android 7 lacks getconf: read the shell process's actual kernel page size."""
+    if getconf.strip().isdecimal() and int(getconf.strip()) > 0:
+        return int(getconf.strip())
+    page = re.search(r"^KernelPageSize:\s+(\d+)\s+kB\s*$", smaps, re.MULTILINE)
+    if page and int(page[1]) > 0:
+        return int(page[1]) * 1024
+    raise ValueError("device did not report a valid kernel page size")
+
+
 def accept(args: argparse.Namespace) -> None:
     evidence = args.evidence_dir.resolve()
     # A previous successful result must never survive a failed re-run.
@@ -40,10 +51,12 @@ def accept(args: argparse.Namespace) -> None:
             [*base, *command], capture_output=True, encoding="utf-8", errors="replace", timeout=timeout, check=check
         )
 
+    page = adb("shell", "getconf", "PAGE_SIZE", check=False)
+    smaps = adb("shell", "cat", "/proc/self/smaps").stdout if page.returncode else ""
     metadata = {
         "api": int(adb("shell", "getprop", "ro.build.version.sdk").stdout.strip()),
         "abi": adb("shell", "getprop", "ro.product.cpu.abi").stdout.strip(),
-        "page_size": int(adb("shell", "getconf", "PAGE_SIZE").stdout.strip()),
+        "page_size": read_page_size(page.stdout if page.returncode == 0 else "", smaps),
         "emulator": adb("shell", "getprop", "ro.kernel.qemu").stdout.strip() == "1",
     }
     check_device(metadata, api=args.api, abi=args.abi, page_size=args.page_size)
