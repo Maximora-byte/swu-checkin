@@ -245,5 +245,6 @@ finally {
         try { $Process.WaitForExit(10000) | Out-Null }
         finally { $Process.Dispose() }
     }
-    Remove-Item -LiteralPath $Sandbox -Recurse -Force
+    try { Remove-Item -LiteralPath $Sandbox -Recurse -Force }
+    catch { Write-Warning "Leaving isolated smoke files for runner disposal: $($_.Exception.Message)" }
 }
