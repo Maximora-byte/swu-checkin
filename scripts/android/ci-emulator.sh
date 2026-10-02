@@ -10,9 +10,9 @@ export ANDROID_EMULATOR_HOME="$ANDROID_USER_HOME"
 export ANDROID_AVD_HOME="$ANDROID_USER_HOME/avd"
 mkdir -p "$ANDROID_AVD_HOME"
 case "$api:$page_size" in
-  24:4096) image="system-images;android-24;default;x86_64"; memory_mb=4096 ;;
-  35:4096) image="system-images;android-35;google_apis;x86_64"; memory_mb=4096 ;;
-  35:16384) image="system-images;android-35;google_apis_ps16k;x86_64"; memory_mb=6144 ;;
+  24:4096) image="system-images;android-24;default;x86_64"; memory_mb=1536; cores=2 ;;
+  35:4096) image="system-images;android-35;google_apis;x86_64"; memory_mb=4096; cores=4 ;;
+  35:16384) image="system-images;android-35;google_apis_ps16k;x86_64"; memory_mb=6144; cores=4 ;;
   *) echo 'Unsupported feasibility API' >&2; exit 1 ;;
 esac
 "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "$image" emulator platform-tools </dev/null
@@ -27,14 +27,14 @@ sudo chmod 0600 /dev/kvm
 [[ -r /dev/kvm && -w /dev/kvm ]]
 accel=on
 mkdir -p android/evidence
-printf 'api=%s\nabi=x86_64\nacceleration=%s\nexpected_page_size=%s\nmemory_mb=%s\n' \
-  "$api" "$accel" "$page_size" "$memory_mb" > android/evidence/emulator.txt
+printf 'api=%s\nabi=x86_64\nacceleration=%s\nexpected_page_size=%s\nmemory_mb=%s\ncores=%s\n' \
+  "$api" "$accel" "$page_size" "$memory_mb" "$cores" > android/evidence/emulator.txt
 stat -c 'kvm_mode=%a kvm_uid=%u kvm_gid=%g' /dev/kvm >> android/evidence/emulator.txt
 # The 16 KB Google image exceeds the emulator's default 2560 MB during startup:
 # lowmemorykiller can kill even the foreground instrumentation process.
 "$ANDROID_HOME/emulator/emulator" -avd swu-feasibility -no-window -no-audio \
   -no-boot-anim -no-snapshot -no-metrics -gpu swiftshader_indirect -accel "$accel" \
-  -memory "$memory_mb" -cores 4 \
+  -memory "$memory_mb" -cores "$cores" \
   > android/evidence/emulator.log 2>&1 &
 emulator_pid=$!
 cleanup() {

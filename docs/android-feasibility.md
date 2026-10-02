@@ -37,7 +37,7 @@ cd android
 
 Gradle wrapper 与 distribution 都校验固定 SHA256。SDK 路径放本地 `android/local.properties` 或 `ANDROID_HOME`，不得提交。工作流使用 GitHub runner 已安装的官方工具和已有 SDK 许可，不自动接受新条款。较新的 x86_64 Android 在纯软件模拟下可能发生系统 watchdog/进程崩溃；CI 要求硬件加速，限定 GitHub-hosted 一次性 VM，只给当前测试用户 `/dev/kvm` 的 0600 访问权限。拒绝在自托管机器上修改设备权限，不开放世界可写权限，不修改用户电脑的虚拟化设置。
 
-CI 普通镜像固定 4096 MB 内存，16 KB 镜像固定 6144 MB，并记录配置。16 KB 官方 Google 镜像在默认 2560 MB 下曾触发 `lowmemorykiller`，前台测试进程被系统杀死；该失败必须保留系统日志并通过增加模拟器内存重新验证，不能忽略失败或降低测试要求。本机启动对应镜像也应显式传入 `-memory 4096` / `-memory 6144` 和 `-accel on`。
+CI API24 保留 1536 MB / 2 核的轻量配置；API35 普通镜像固定 4096 MB 内存，16 KB 镜像固定 6144 MB，均为 4 核并记录配置。16 KB 官方 Google 镜像在默认 2560 MB 下曾触发 `lowmemorykiller`，前台测试进程被系统杀死；该失败必须保留系统日志并通过增加模拟器内存重新验证，不能忽略失败或降低测试要求。本机启动 API35 对应镜像也应显式传入 `-memory 4096` / `-memory 6144` 和 `-accel on`。
 
 [`android-feasibility.yml`](../.github/workflows/android-feasibility.yml) 分别构建双 ABI debug APK、运行 Android lint、检查 APK 中的 Python/ABI，并在 API24/4 KB、API35/4 KB、API35/16 KB x86_64 模拟器执行真实 embedded Python instrumentation。API35 的实际页大小必须匹配矩阵，否则失败。每次安装状态执行四项测试，包括实际按钮点击和 Activity 重建；首次安装、同版本覆盖安装、清数据共三轮。测试公共 HTTPS 需网络，失败不会被改写为通过。模拟器安装的是 package job 的同一 APK/test APK，先核对源 commit 与两个 APK 的 SHA256，不独立重建。证据包含源码、APK hash、原始测试结果、真实界面、完整一次性模拟器系统日志；debug APK 使用临时 debug 签名，不是生产签名、Release 或自动发布。
 
