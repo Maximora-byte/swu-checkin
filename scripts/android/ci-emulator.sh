@@ -15,10 +15,23 @@ case "$api" in
 esac
 "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "$image" emulator platform-tools </dev/null
 printf 'no\n' | "$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager" create avd -n swu-feasibility --force -k "$image" -p "$ANDROID_AVD_HOME/swu-feasibility.avd"
+# Off by default, and never enabled by pull_request. The caller must approve
+# this specific manual run before setting the workflow input. Access is scoped
+# to the current user and this disposable VM, not world-writable permissions.
+if [[ "${SWU_KVM_REQUESTED:-false}" == true ]]; then
+  [[ -c /dev/kvm && ! -L /dev/kvm ]]
+  sudo chown "$(id -u):$(id -g)" /dev/kvm
+  sudo chmod 0600 /dev/kvm
+  [[ -r /dev/kvm && -w /dev/kvm ]]
+fi
 accel=off
 if [[ -r /dev/kvm && -w /dev/kvm ]]; then accel=on; fi
 mkdir -p android/evidence
-printf 'api=%s\nabi=x86_64\nacceleration=%s\n' "$api" "$accel" > android/evidence/emulator.txt
+printf 'api=%s\nabi=x86_64\nacceleration=%s\nmanual_kvm_requested=%s\n' \
+  "$api" "$accel" "${SWU_KVM_REQUESTED:-false}" > android/evidence/emulator.txt
+if [[ "${SWU_KVM_REQUESTED:-false}" == true ]]; then
+  stat -c 'kvm_mode=%a kvm_uid=%u kvm_gid=%g' /dev/kvm >> android/evidence/emulator.txt
+fi
 "$ANDROID_HOME/emulator/emulator" -avd swu-feasibility -no-window -no-audio \
   -no-boot-anim -no-snapshot -gpu swiftshader_indirect -accel "$accel" \
   > android/evidence/emulator.log 2>&1 &

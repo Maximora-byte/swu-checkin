@@ -8,6 +8,12 @@ on:
       - 'scripts/android/**'
       - '.github/workflows/android-feasibility.yml'
   workflow_dispatch:
+    inputs:
+      enable_kvm:
+        description: 'Temporarily grant this disposable runner KVM access (requires approval)'
+        required: true
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -74,6 +80,7 @@ jobs:
       - name: Verify on emulator without credentials or school requests
         env:
           ANDROID_API: ${{ matrix.api }}
+          SWU_KVM_REQUESTED: ${{ github.event_name == 'workflow_dispatch' && inputs.enable_kvm }}
         run: scripts/android/ci-emulator.sh "$ANDROID_API"
       - name: Upload actual emulator evidence, including failures
         if: always()

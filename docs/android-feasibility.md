@@ -35,7 +35,7 @@ cd android
 ./gradlew :app:connectedDebugAndroidTest
 ```
 
-Gradle wrapper 与 distribution 都校验固定 SHA256。SDK 路径放本地 `android/local.properties` 或 `ANDROID_HOME`，不得提交。工作流使用 GitHub runner 已安装的官方工具和已有 SDK 许可，不自动接受新条款。
+Gradle wrapper 与 distribution 都校验固定 SHA256。SDK 路径放本地 `android/local.properties` 或 `ANDROID_HOME`，不得提交。工作流使用 GitHub runner 已安装的官方工具和已有 SDK 许可，不自动接受新条款。PR 默认软件模拟，不修改 KVM 权限；手动工作流的 `enable_kvm` 默认为 false。只有当前一次测试的权限变更已获批准时才能选择 true，它只给一次性 runner 的当前用户 `/dev/kvm` 的 0600 访问权限，作业结束销毁 VM，绝不修改用户电脑或持久服务器。
 
 [`android-feasibility.yml`](../.github/workflows/android-feasibility.yml) 分别构建双 ABI debug APK、运行 Android lint、检查 APK 中的 Python/ABI，并在 API24/35 x86_64 模拟器执行真实 embedded Python instrumentation。测试公共 HTTPS 需网络，失败不会被改写为通过。模拟器安装的是 package job 的同一 APK/test APK，先核对源 commit 与两个 APK 的 SHA256，不独立重建。证据 artifact 包含源 commit、APK SHA256、instrumentation 原始结果、模拟器版本与页大小；debug APK 使用临时 debug 签名，不是生产签名、Release 或自动发布。
 
