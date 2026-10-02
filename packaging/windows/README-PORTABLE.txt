@@ -18,6 +18,9 @@ SWU Checkin · Windows x64 免安装预览版
 当前构建未签名。校验值和 BUILD-INFO.json 提供完整性/来源信息，不是数字签名。
 若 Windows、SmartScreen 或单位安全策略阻止运行，请停止并核实来源、向维护者报告；
 不要关闭安全防护、修改执行策略或绕过安全警告。构建/下载来源见上面的官方仓库。
+本说明随当前源码构建的 Portable.zip 分发；已发布 v2.0.0 的原始 win-x64.zip
+不包含所有后续改动。当前源码版本号未提升，不能仅凭文件名识别来源，须核对 commit。
+各平台与下一版发布条件：https://github.com/Maximora-byte/swu-checkin/blob/main/docs/releases/release-readiness.md
 
 账号、数据与“便携”的边界
 ----------------------

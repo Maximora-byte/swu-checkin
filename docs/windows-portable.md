@@ -6,13 +6,13 @@
 
 ## 下载、校验与启动
 
-1. 从本仓库 [Releases](https://github.com/Maximora-byte/swu-checkin/releases) 选择版本，并核对资产与来源。本次构建改动首先提供在 PR 的 Actions artifact 中，**不代表新 Release 已发布**
+1. 从本仓库 [Releases](https://github.com/Maximora-byte/swu-checkin/releases) 选择实际列出的资产，并核对来源。当前最新已发布版本为 [v2.0.0](https://github.com/Maximora-byte/swu-checkin/releases/tag/v2.0.0)；当前 `main` 中新增的明确命名 `Portable.zip` 尚未作为新 Release 资产发布。新版本条件见 [发布评估](releases/release-readiness.md)
 2. 新构建文件名为 `SWUCheckin-<版本>-win-x64-Portable.zip`。Actions 下载可能还包一层 artifact ZIP：先解压外层，再完整解压这个 `Portable.zip`
 3. 用 PowerShell `Get-FileHash -Algorithm SHA256 '下载目录\SWUCheckin-<版本>-win-x64-Portable.zip'` 对照同一 portable artifact 的 `*-Portable.zip.sha256`（完整分发目录的 `SHA256SUMS.txt` 也包含该 ZIP）；同时核对 `BUILD-INFO.json` 的源码 commit。哈希只验证完整性，不能替代数字签名或可信来源
 4. 右键 ZIP 选择“全部解压缩”，放到当前用户可访问的本地目录，例如 `文档\SWU Checkin\`。目录可以有空格和中文
 5. 双击解压目录中的 `SWUCheckin.exe`。默认仅恢复本地状态，不联网、登录、提交签到或新建计划任务。先阅读包内 `README-PORTABLE.txt`
 
-已发布的 [v2.0.0](https://github.com/Maximora-byte/swu-checkin/releases/tag/v2.0.0) 原本就有 `SWUCheckin-2.0.0-win-x64.zip`，它也是完整 onedir 应用，不必运行安装程序。该旧 ZIP 的名称、内容和发布状态不被本次改动重写；再分发旧包时，仍须一并保留该 Release 单独提供的 Tcl 许可。新的 `Portable.zip` 由构建自动生成，内附免安装说明、独立校验清单、可直接查看的来源信息和 Tcl 许可，并直接对 ZIP 解压后的内容验收。
+已发布的 [v2.0.0](https://github.com/Maximora-byte/swu-checkin/releases/tag/v2.0.0) 有 `SWUCheckin-2.0.0-win-x64.zip`，它也是完整 onedir 应用，不必运行安装程序。该旧 ZIP 的名称、内容和发布状态保持原样；再分发旧包时，仍须一并保留该 Release 单独提供的 Tcl 许可。当前源码中的 `Portable.zip` 由构建自动生成，内附免安装说明、独立校验清单、可直接查看的来源信息和 Tcl 许可，并直接对 ZIP 解压后的内容验收。源码尚未改动版本号，因此不能只用文件名中的 `2.0.0` 区分旧 Release 与新构建，须核对 `BUILD-INFO.json` 的 commit。
 
 GitHub 自动生成的 `Source code (zip)` 是源码，不是免安装程序。安装程序 `*-Setup.exe`、Python wheel/sdist、Actions 外层 ZIP 与内部 `*-Portable.zip` 是不同文件。
 

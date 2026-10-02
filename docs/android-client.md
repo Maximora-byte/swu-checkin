@@ -4,7 +4,9 @@ Android 客户端已经接入仓库原有认证与签到核心。打开应用不
 
 ## 安装与使用
 
-最低 Android 7.0 / API24，只支持 `arm64-v8a` 和 `x86_64` 的 64 位设备。当前安装包使用调试签名，属于手动预览；不是应用商店或正式签名发布。构建产物位于 `android/app/build/outputs/apk/debug/app-debug.apk`，云端可从成功的 [Android 工作流](https://github.com/Maximora-byte/swu-checkin/actions/workflows/android-feasibility.yml)下载 package artifact。仓库中不提交 APK 或签名私钥。
+最低 Android 7.0 / API24，只支持 `arm64-v8a` 和 `x86_64` 的 64 位设备。截至 2026-10-02，Android 已合入 `main`，尚无 Android Release 资产；最新 v2.0.0 不包含本客户端。当前安装包使用调试签名，属于手动预览。构建产物位于 `android/app/build/outputs/apk/debug/app-debug.apk`，云端可从成功的 [Android 工作流](https://github.com/Maximora-byte/swu-checkin/actions/workflows/android-feasibility.yml)下载 package artifact（保留 14 天）。仓库中不提交 APK 或签名私钥。
+
+package artifact 内的 `app-debug.apk` 是应用，`app-debug-androidTest.apk` 仅供开发验收；日常使用不用安装测试包。核对该运行的源码和 `SHA256SUMS`，不可把不同运行生成的 debug 包混用。当前 APK 对外分发前还需补齐仓库/Chaquopy 许可并核对运行时许可；新版发布计划见 [发布评估](releases/release-readiness.md)。
 
 1. 安装后打开 **SWU 查寝**，输入校园账号和密码。
 2. 点击 **查询今日状态**。出现验证码时，输入图片中的英文字母和数字；当前验证码与同一登录会话绑定，两分钟未填写会取消。
@@ -34,3 +36,25 @@ Android 客户端已经接入仓库原有认证与签到核心。打开应用不
 设备验收脚本只操作本应用及测试包，并在卸载/清数据前检查已保存账号；发现账号或无法确认时拒绝继续。真实手机只收集本应用报告及环境检测页，一次性模拟器才允许完整系统日志。
 
 验收结果与包哈希记录在 PR 和交付报告。16 KB 真机与真实学校账号网络登录未验证；4 KB 真机或合成业务测试不能替代这些证据。真实学校账号验收须由账号持有人另行明确授权，不使用真实签到作为自动验收。
+
+### 2026-10-02 功能版验收记录
+
+[PR #38](https://github.com/Maximora-byte/swu-checkin/pull/38) 已合并，`main` commit `783932b84437a8e3c2509f24cbb7aa28fec40250` 与验收源码树一致。本机与云端使用各自记录的 APK，业务流程只使用合成认证/学校传输；公共 HTTPS 是实际网络检查。
+
+| 环境 | 实际页大小 | 七项测试 × 三种安装状态 |
+| --- | ---: | ---: |
+| vivo X200 Pro，Android 16 / API36，arm64-v8a | 4096 | 21 passed |
+| 本机官方 API24，x86_64 | 4096 | 21 passed |
+| 本机官方 API35，x86_64，小屏 320×640 / 160 dpi | 16384 | 21 passed |
+| 云端官方 API24，x86_64 | 4096 | 21 passed |
+| 云端官方 API35，x86_64 | 4096 | 21 passed |
+| 云端官方 API35，x86_64 | 16384 | 21 passed |
+
+本机共 63 项，[云端运行 37019008427](https://github.com/Maximora-byte/swu-checkin/actions/runs/37019008427) 共 63 项；主机 Android 回归 40 passed。lint 为 0 errors / 6 版本建议 warnings，两个 APK 通过 16 KB zipalign，138 个 ELF 库的 LOAD 对齐通过。云端 16 KB 初次运行的系统桌面 ANR 遮住界面验收，整项仍记为失败；保留证据后，同一包完整重跑通过。历史失败没有改写为成功，详见 PR。
+
+- 本机应用 SHA256：`7f677a5fedc7193cbad5c2032dbca17d0d0331229ce6a9e6e65389c8881c3050`
+- 本机测试包 SHA256：`35b0ce173dcdce79b57a21e67a9f824532e74176bae770ed9ee2bd1bd86dd99c`
+- 云端应用 SHA256：`8e45db8ff150da14284deb9dfaeb98b6afff7be68c9276ef0ce961bff6a579b0`
+- 云端测试包 SHA256：`c4bdbeef16ff3d02156b795a1447bb9499dd77bf95e463ceb10bffbad26bf741`
+
+这些哈希只适用于该次构建；独立构建因工具链和临时签名可能不同。当前没有以真实学校账号登录或执行实际签到的验收证据，也没有 16 KB 真机或正式签名发布证据。

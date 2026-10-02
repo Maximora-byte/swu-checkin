@@ -1,6 +1,6 @@
 # 快速上手
 
-本文面向使用源码的 Python CLI，覆盖安装、只读验证、正式运行和升级。希望双击 EXE 的 Windows 用户请看 [桌面预览版](windows-desktop.md)，无需执行这里的 uv/Python 步骤。自动化部署可选择 [systemd](../DEPLOYMENT.md)、[Windows 脚本](windows.md) 或 [GitHub Actions](../GITHUB_ACTIONS.md)；启用前先确认本人在寝且符合学校规则。
+本文面向当前 `main` 的 Python CLI，覆盖安装、只读验证、正式运行和升级。Windows 用户可选 [桌面预览版](windows-desktop.md) 或 [免安装 ZIP](windows-portable.md)，无需执行这里的 uv/Python 步骤。macOS 与 Android 分别见 [macOS 桌面预览](macos-desktop.md) 和 [Android 手动客户端](android-client.md)；它们的预览验证不等于已进入稳定 Release。自动化部署可选择 [systemd](../DEPLOYMENT.md)、[Windows 脚本](windows.md) 或 [GitHub Actions](../GITHUB_ACTIONS.md)；启用前先确认本人在寝且符合学校规则。
 
 ## 1. 准备环境
 
@@ -16,7 +16,7 @@ cd swu-checkin
 uv sync --locked --no-dev --python 3.13
 ```
 
-上例使用当前默认分支。需要已发布 Python 稳定版时，先从 [Releases](https://github.com/Maximora-byte/swu-checkin/releases) 选择 tag，执行 `git checkout <tag>`，并改读该 tag 的文档；不要用旧 tag 执行只在新 `main` 中提供的命令。当前源码以 `v2.0.0` 为发布目标；桌面产物仍是未签名预览版，是否可下载以 Releases 实际列出的资产为准，见 [v2.0.0 发布说明](releases/v2.0.0.md)。
+上例使用当前默认分支。需要已发布 Python 稳定版时，先从 [Releases](https://github.com/Maximora-byte/swu-checkin/releases) 选择 tag，执行 `git checkout <tag>`，并改读该 tag 的文档；不要用旧 tag 执行只在新 `main` 中提供的命令。[v2.0.0](https://github.com/Maximora-byte/swu-checkin/releases/tag/v2.0.0) 已发布 Python 分发包和 Windows x64 未签名桌面预览资产。当前 `main` 的 Python 版本字符串仍为 `2.0.0`，但包含该 tag 之后的修复和平台预览，不能据此将新功能视为旧包已经提供。发布差异与下一版条件见 [发布评估](releases/release-readiness.md)。
 
 `uv sync --locked` 会严格使用检出版本的 `uv.lock`。如果锁文件与项目元数据不一致，命令会失败，而不是悄悄更新依赖。
 
@@ -74,10 +74,12 @@ export SWUDK_PASSWORD="你的密码"
 uv run --locked --no-dev swu-checkin probe
 ```
 
-不要把这些命令连同真实值写入 shell 历史、脚本或仓库。长期运行应使用：
+不要把这些命令连同真实值写入 shell 历史、脚本或仓库。需要保存账号或为部署提供凭据时，按实际入口选择：
 
 - GitHub Actions：Repository Secrets；
 - Windows 桌面预览版：点击“保存账号”后生成的当前用户 DPAPI 密文；
+- macOS 桌面预览版：显式保存到钥匙串，按需显式读取，仅支持手动操作；
+- Android 手动预览版：可选保存到设备 Keystore 保护的密文，仅支持手动操作；
 - Windows 脚本部署：脚本安装器生成的当前用户 DPAPI 密文，使用方式与桌面版不同；
 - Linux systemd：`/etc/swu-checkin/credentials.env`，`0600 root:root`。
 
@@ -133,6 +135,7 @@ uv run --locked --no-dev swu-checkin probe
 - systemd：保留旧 release，原子切换 symlink 后启动 `swu-checkin-probe.service`；
 - Windows 脚本：先停用旧任务，再从新 tag 根目录重新运行脚本安装器；它会在 doctor 成功后更新并启用同一个任务；
 - Windows 桌面预览版：按 [桌面指南](windows-desktop.md) 检查构建来源，先关闭任务与窗口，再更新安装包；
+- macOS / Android 预览：按各自指南核对源码、平台和签名，使用完整匹配的新包；账号存储不会随应用文件跨设备迁移；
 - GitHub Actions：同步整个稳定 tag，并确认 workflow、源码和 `uv.lock` 来自同一版本。
 
 ## 下一步
@@ -140,6 +143,8 @@ uv run --locked --no-dev swu-checkin probe
 - 长期 Linux 主机：[服务器部署](../DEPLOYMENT.md)
 - Windows 桌面预览版：[独立 EXE 使用与构建](windows-desktop.md)
 - Windows Python 脚本：[部署与迁移](windows.md)
+- macOS 手动桌面预览：[构建与钥匙串](macos-desktop.md)
+- Android 手动预览：[安装、验证码与账号保存](android-client.md)
 - 无服务器方案：[GitHub Actions](../GITHUB_ACTIONS.md)
 - 命令和环境变量：[CLI 与状态码参考](cli-reference.md)
 - 异常排查：[故障排查](troubleshooting.md)

@@ -2,7 +2,7 @@
 
 GitHub Actions 适合没有长期在线主机的用户，但 scheduled workflow **不保证准点**。公共 runner 可能延迟几分钟、几十分钟甚至更久；时间窗口严格时请使用 [systemd](DEPLOYMENT.md) 或 [Windows 计划任务](docs/windows.md)。
 
-本指南只适用于 [Maximora-byte/swu-checkin](https://github.com/Maximora-byte/swu-checkin) 的 [`.github/workflows/checkin.yml`](.github/workflows/checkin.yml)。它会执行正式签到，与测试用的 `CI`、Python `Release`、`Windows desktop build` 是不同工作流；后面三者的触发与发布边界见 [开发与发布](docs/development.md)。不要复制其他 fork 的 workflow 片段，也不要把真实凭据写进 YAML。
+本指南只适用于 [Maximora-byte/swu-checkin](https://github.com/Maximora-byte/swu-checkin) 的 [`.github/workflows/checkin.yml`](.github/workflows/checkin.yml)。它会执行正式签到，与普通 `CI`、Python `Release`、Windows/macOS 桌面构建及 Android 验证工作流不同；触发与发布边界见 [开发与发布](docs/development.md)。不要复制其他 fork 的 workflow 片段，也不要把真实凭据写进 YAML。
 
 ## 工作方式
 
@@ -11,7 +11,7 @@ GitHub Actions 适合没有长期在线主机的用户，但 scheduled workflow 
 - 单个 workflow 可通过 matrix 并行处理多个账号；
 - 使用 Python 3.13 和仓库 `uv.lock`；
 - CLI 输出 schema v1 JSON，仓库解析器严格校验后才判断成功；
-- 状态 1、2、5 视为正常终态，其他状态使当前账号 job 进入失败/通知路径；
+- 仅执行 step 成功、CLI 退出码为 0、有效 JSON 状态为 1/2/5 三者同时成立，才视为正常终态；其余组合进入失败/通知路径；
 - 邮件配置完整时，异常结果可发送邮件。
 
 每个账号 job 使用独立 runner，最长运行 15 分钟，瞬时可重试错误最多尝试 3 次、按 8/16 秒等待。不是所有错误都会重试，也不会等待到时间窗口开放。此工作流不配置 systemd 的长期状态文件或 Telegram 日汇总；本机运行锁不能协调不同 runner、独立 workflow run 或另一台设备，请避免重复调度同一账号。
@@ -137,7 +137,9 @@ fi
 
 畸形输出、未知状态码或 schema 不匹配会进入 `OUTPUT_ERROR`；缺失账号或密码直接进入 `CONFIG_ERROR`。解析成功仅表示结构有效，不代表签到成功。状态与退出码的对应关系见 [CLI 参考](docs/cli-reference.md)。
 
-当前 workflow 的“执行签到” step 使用 `continue-on-error: true`，以便继续走通知与最终检查。该 step 要求状态 1/2/5 且 CLI exit code 为 0；但后续邮件条件和“最终状态检查”只读取状态码。极端情况下若 JSON 是成功状态而 CLI 非零退出，前面的 step 会失败，邮件可能不会发送、最终 job 仍可能显示成功。排查时必须同时查看该 step 的 outcome 和退出码，不能只看绿色 job；本文不把这个组合描述为完整的退出码一致性门禁。
+当前 `main` 的“执行签到” step 使用 `continue-on-error: true`，以便继续走通知与最终检查。“汇总签到执行结果”统一计算 `execution_result.outputs.ok`：只有执行 step 的 `outcome == success`、CLI exit code 为 `0`、严格校验后的状态为 `1/2/5` 才为 `true`。邮件条件与最终 job 检查都读取这个汇总结果；成功状态 JSON 搭配非零退出码、解析失败或 step 失败均不会被绿色结果掩盖。通知成功也不会把原本失败的签到 job 改为成功。
+
+这项一致性修复属于 `v2.0.0` tag 之后的 `main`，旧 tag/fork 可能仍采用只检查状态码的后续步骤。同步时需核对完整 workflow，版本号 `2.0.0` 相同不足以证明已包含修复；当前分发差异见 [发布准备评估](docs/releases/release-readiness.md)。
 
 ## 8. 更新 fork
 

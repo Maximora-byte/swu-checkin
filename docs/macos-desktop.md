@@ -1,6 +1,6 @@
 # macOS 桌面预览版
 
-这是独立的 macOS 可行性预览，不属于已发布的 Windows v2.0.0 安装包。不会发布 Release、创建后台任务、开机启动项或修改学校接口。使用者仍须真实在寝并遵守学校规则；程序不测量 GPS，使用学校返回的寝室信息不等于证明人在寝。
+这是已经合并到当前 `main` 的 macOS 手动桌面预览，不属于已发布的 [v2.0.0](https://github.com/Maximora-byte/swu-checkin/releases/tag/v2.0.0) 资产。目前 macOS 工作流只上传限时 Actions artifact，不自动创建 Release；尚无 macOS Release 资产、Developer ID 签名或公证。它不创建后台任务、开机启动项或修改学校接口。下一版发布条件见 [发布评估](releases/release-readiness.md)。使用者仍须真实在寝并遵守学校规则；程序不测量 GPS，使用学校返回的寝室信息不等于证明人在寝。
 
 ## 支持范围与交付
 
@@ -12,6 +12,8 @@
 - macOS 桌面与 CLI 使用同一个 `formal_execution` 入口及默认跨进程锁。自定义了不同 `SWUDK_LOCK_FILE` 的入口不在同一锁域
 
 在本仓库 [macOS desktop preview workflow](https://github.com/Maximora-byte/swu-checkin/actions/workflows/macos-desktop.yml) 的成功 PR run 中选取匹配架构的 artifact。每个 artifact 包含 `.app` ZIP、`BUILD-INFO.json` 与 `SHA256SUMS.txt`；保留 14 天，GitHub 可能要求登录后下载。检查提交 SHA、架构、实际 OS 和自测记录。不存在成功 artifact 时，不能视为已交付该架构。
+
+当前功能合并前的 [双架构原生构建与验证](https://github.com/Maximora-byte/swu-checkin/actions/runs/37019008388) 已通过；覆盖两个 runner 的单元测试、生产依赖审计、合成钥匙串项与冻结应用离线自测。该 PR 工作流默认检出 GitHub 的临时 merge-test commit，不能只看 PR head 或版本字符串判断产物来源；应以 `BUILD-INFO.json` 和 run 记录为准。它证明对应源码上的云端验证，不能充当未来新 tag 的发布构建或真实 Mac 验收。
 
 下载包会受到 macOS 安全检查。若系统阻止运行，请停下并查看 [Apple 官方安全说明](https://support.apple.com/en-us/102445)。本项目不提供关闭 Gatekeeper、移除隔离属性或绕过警告的命令。正式分发前仍需要 Developer ID 签名、公证、发布审查和真实用户验收。
 
