@@ -163,3 +163,19 @@ def test_debug_lock_service_is_private_and_separate_process():
     assert service.attrib[ns + "process"] == ":lockprobe"
     assert service.attrib[ns + "name"] == ".LockProbeService"
     assert not service.findall("intent-filter")
+
+
+def test_ui_readiness_rejects_splash_wrong_package_and_disabled_controls():
+    verifier = load_script("ui_verifier", "scripts/android/verify_ui.py")
+    root = ElementTree.Element("hierarchy")
+    for text in verifier.REQUIRED_TEXT:
+        ElementTree.SubElement(root, "node", text=text, package=verifier.APP_ID, enabled="true")
+    complete = ElementTree.tostring(root, encoding="unicode")
+    verifier.verify(complete)
+    for invalid in (
+        "<hierarchy />",
+        complete.replace(verifier.APP_ID, "android.splash"),
+        complete.replace('enabled="true"', 'enabled="false"', 1),
+    ):
+        with pytest.raises(ValueError, match="not ready"):
+            verifier.verify(invalid)

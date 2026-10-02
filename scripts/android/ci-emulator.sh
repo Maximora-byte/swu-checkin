@@ -85,5 +85,19 @@ run_tests replacement-install
 adb shell pm clear "$app_id"
 run_tests cleared-data
 adb shell am start -n "$app_id/io.github.maximorabyte.swucheckin.MainActivity"
-sleep 2
+# A fixed delay can capture only the Android splash screen. Require the actual
+# app title and both enabled controls before collecting the UI screenshot.
+ui_ready=false
+for _ in $(seq 1 30); do
+  if adb shell uiautomator dump /data/local/tmp/swu-feasibility-ui.xml \
+      > android/evidence/ui-dump.log 2>&1 && \
+    adb pull /data/local/tmp/swu-feasibility-ui.xml android/evidence/feasibility-ui.xml \
+      >> android/evidence/ui-dump.log 2>&1 && \
+    python3 scripts/android/verify_ui.py android/evidence/feasibility-ui.xml; then
+    ui_ready=true
+    break
+  fi
+  sleep 2
+done
+[[ "$ui_ready" == true ]] || { echo 'Feasibility UI readiness timed out'; exit 1; }
 adb exec-out screencap -p > android/evidence/feasibility-screen.png

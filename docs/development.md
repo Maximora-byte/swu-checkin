@@ -172,3 +172,7 @@ PR 描述应区分“已通过”“平台跳过”“因环境无法运行”�
 ## Android 移植验证
 
 Android 目前仅有独立的[可行性验证工程](android-feasibility.md)，用于 Python 3.13 打包及运行环境验证；没有学校登录/签到 UI，不是已发布的手机客户端。完整 UI 需等待模拟器与真实设备门槛。
+
+## macOS 桌面预览验证
+
+[macOS 指南](macos-desktop.md) 说明原生 arm64/x86_64 CI、Keychain 合成测试、冻结 GUI/OCR smoke 和未公证交付限制。共享 `desktop_operations.py` 负责正式/只读服务调用与运行锁；`desktop_backend.py` 保留 Windows DPAPI/Task Scheduler，`macos_backend.py` 提供内存 token 与显式 Keychain 操作。业务核心和 CLI 不变。macOS 构建同 Windows desktop 一样是独立路径过滤工作流，不属于普通 `quality` 汇总；两个架构的成功结果须单独检查。

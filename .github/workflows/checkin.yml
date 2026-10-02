@@ -140,6 +140,21 @@ jobs:
           echo "✅ 签到正常完成"
         continue-on-error: true
 
+      - name: 汇总签到执行结果
+        id: execution_result
+        if: always()
+        env:
+          CHECKIN_OUTCOME: ${{ steps.checkin.outcome }}
+          CHECKIN_EXIT_CODE: ${{ steps.checkin.outputs.exit_code }}
+          CHECKIN_STATUS_CODE: ${{ steps.checkin.outputs.status_code }}
+        run: |
+          ok=false
+          if [[ "$CHECKIN_OUTCOME" == "success" && "$CHECKIN_EXIT_CODE" == "0" ]] && \
+            [[ "$CHECKIN_STATUS_CODE" == "1" || "$CHECKIN_STATUS_CODE" == "2" || "$CHECKIN_STATUS_CODE" == "5" ]]; then
+            ok=true
+          fi
+          echo "ok=$ok" >> "$GITHUB_OUTPUT"
+
       - name: 格式化执行时间
         id: format_time
         if: always()
@@ -148,7 +163,7 @@ jobs:
 
       - name: 检查邮件通知配置
         id: mail_config
-        if: always() && steps.checkin.outputs.status_code != '1' && steps.checkin.outputs.status_code != '2' && steps.checkin.outputs.status_code != '5'
+        if: always() && steps.execution_result.outputs.ok != 'true'
         env:
           MAIL_SERVER: ${{ secrets.MAIL_SERVER }}
           MAIL_PORT: ${{ secrets.MAIL_PORT }}
@@ -183,7 +198,7 @@ jobs:
 
       - name: 发送通知邮件
         id: send_mail
-        if: always() && steps.checkin.outputs.status_code != '1' && steps.checkin.outputs.status_code != '2' && steps.checkin.outputs.status_code != '5' && steps.mail_config.outputs.configured == 'true'
+        if: always() && steps.execution_result.outputs.ok != 'true' && steps.mail_config.outputs.configured == 'true'
         continue-on-error: true
         uses: dawidd6/action-send-mail@4226df7daafa6fc901a43789c49bf7ab309066e7 # v3
         with:
@@ -281,7 +296,7 @@ jobs:
             </html>
 
       - name: 邮件通知结果
-        if: always() && steps.checkin.outputs.status_code != '1' && steps.checkin.outputs.status_code != '2' && steps.checkin.outputs.status_code != '5'
+        if: always() && steps.execution_result.outputs.ok != 'true'
         run: |
           if [ "${{ steps.mail_config.outputs.configured }}" != "true" ]; then
             echo "⚠️ 邮件通知未发送：邮件配置不完整"
@@ -295,6 +310,8 @@ jobs:
 
       - name: 最终状态检查
         if: always()
+        env:
+          CHECKIN_OK: ${{ steps.execution_result.outputs.ok }}
         run: |
           echo ""
           echo "========================================="
@@ -303,11 +320,11 @@ jobs:
           echo "状态码: ${{ steps.checkin.outputs.status_code }}"
           echo "状态信息: ${{ steps.checkin.outputs.status_msg }}"
           
-          if [ "${{ steps.checkin.outputs.status_code }}" = "1" ]; then
+          if [ "$CHECKIN_OK" = "true" ] && [ "${{ steps.checkin.outputs.status_code }}" = "1" ]; then
             echo "✅ 签到成功"
-          elif [ "${{ steps.checkin.outputs.status_code }}" = "2" ]; then
+          elif [ "$CHECKIN_OK" = "true" ] && [ "${{ steps.checkin.outputs.status_code }}" = "2" ]; then
             echo "✅ 已签到，无需重复"
-          elif [ "${{ steps.checkin.outputs.status_code }}" = "5" ]; then
+          elif [ "$CHECKIN_OK" = "true" ] && [ "${{ steps.checkin.outputs.status_code }}" = "5" ]; then
             echo "✅ 请假期间无需签到"
           else
             echo "⚠️ 签到任务异常"

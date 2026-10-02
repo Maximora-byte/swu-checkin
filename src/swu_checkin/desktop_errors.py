@@ -5,6 +5,13 @@ from types import MappingProxyType
 
 
 class DesktopErrorCode(Enum):
+    MACOS_REQUIRED = "macos_required"
+    KEYCHAIN_UNAVAILABLE = "keychain_unavailable"
+    KEYCHAIN_CANCELLED = "keychain_cancelled"
+    KEYCHAIN_LOCKED = "keychain_locked"
+    KEYCHAIN_ACCESS_DENIED = "keychain_access_denied"
+    KEYCHAIN_INVALID_DATA = "keychain_invalid_data"
+    KEYCHAIN_OPERATION_FAILED = "keychain_operation_failed"
     WINDOWS_REQUIRED = "windows_required"
     TASK_IDENTITY_MISSING = "task_identity_missing"
     CREDENTIALS_EMPTY = "credentials_empty"
@@ -30,6 +37,13 @@ class DesktopErrorCode(Enum):
 
 ERROR_MESSAGES = MappingProxyType(
     {
+        DesktopErrorCode.MACOS_REQUIRED: "此预览版需要 macOS 和有效的本地用户目录。",
+        DesktopErrorCode.KEYCHAIN_UNAVAILABLE: "钥匙串不可用；账号未改存为明文。您仍可仅在本次窗口输入账号使用。",
+        DesktopErrorCode.KEYCHAIN_CANCELLED: "已取消钥匙串操作；未执行签到。",
+        DesktopErrorCode.KEYCHAIN_LOCKED: "钥匙串已锁定；请在 macOS 解锁后按需重试。",
+        DesktopErrorCode.KEYCHAIN_ACCESS_DENIED: "钥匙串访问未获允许；未读取或以明文保存账号。",
+        DesktopErrorCode.KEYCHAIN_INVALID_DATA: "钥匙串中本应用的账号数据无效，请清除后重新保存。",
+        DesktopErrorCode.KEYCHAIN_OPERATION_FAILED: "钥匙串操作未能确认成功，请检查 macOS 钥匙串后重试。",
         DesktopErrorCode.WINDOWS_REQUIRED: "桌面版需要 Windows 10/11 和有效的本地用户目录。",
         DesktopErrorCode.TASK_IDENTITY_MISSING: "计划任务缺少程序路径或用户身份。",
         DesktopErrorCode.CREDENTIALS_EMPTY: "账号和密码不能为空。",
