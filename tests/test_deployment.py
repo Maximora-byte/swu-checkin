@@ -76,7 +76,7 @@ def test_actions_treat_status_5_as_success_and_fail_on_real_errors():
     workflow = _read(".github/workflows/checkin.yml")
 
     assert '"$status_code" != "5"' in workflow
-    assert "steps.checkin.outputs.status_code != '5'" in workflow
+    assert "steps.execution_result.outputs.ok != 'true'" in workflow
     assert 'steps.checkin.outputs.status_code }}" = "5"' in workflow
     assert "exit 1" in workflow
 
