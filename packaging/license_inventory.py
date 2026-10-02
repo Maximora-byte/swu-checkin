@@ -140,12 +140,7 @@ def _runtime(root: Path, output: Path) -> list[dict]:
         )
     interpreter = tkinter.Tcl()
     tcl_version = interpreter.eval("info patchlevel")
-    tcl_library = Path(interpreter.eval("info library"))
-    tk_script = tcl_library.parent / "tk8.6/tk.tcl"
-    match = re.search(r"package require -exact Tk\s+([0-9.]+)", tk_script.read_text(encoding="utf-8"))
-    if match is None:
-        raise RuntimeError("Cannot identify bundled Tk patch version")
-    tk_version = match.group(1)
+    tk_version = _tk_version(interpreter)
     if tcl_version not in {"8.6.15", "8.6.18"} or tk_version not in {"8.6.15", "8.6.18"}:
         raise RuntimeError("Update pinned Tcl/Tk license sources before changing native runtime")
     if not ssl.OPENSSL_VERSION.startswith("OpenSSL 3.0.21 ") or sqlite3.sqlite_version != "3.50.4":
@@ -180,6 +175,25 @@ def _runtime(root: Path, output: Path) -> list[dict]:
             ]
         )
     return components
+
+
+def _tk_version(interpreter) -> str:
+    # On Windows Tcl and Tk scripts are siblings. Official macOS Python keeps
+    # them in separate Tcl.framework and Tk.framework resource directories;
+    # Tcl's package index locates the actual selected Tk library in both cases.
+    # _tkinter initializes the linked native Tk itself; package require alone
+    # follows the source-tree Windows pkgIndex path instead of installed DLLs.
+    interpreter.loadtk()
+    interpreter.withdraw()
+    tk_version = interpreter.eval("package provide Tk")
+    tk_script = Path(interpreter.eval("set tk_library")) / "tk.tcl"
+    interpreter.destroy()
+    if not tk_script.is_file():
+        raise RuntimeError("Cannot find the selected Tk runtime's original script")
+    match = re.search(r"package require -exact Tk\s+([0-9.]+)", tk_script.read_text(encoding="utf-8"))
+    if match is None or match.group(1) != tk_version:
+        raise RuntimeError("Tk runtime and bundled script patch versions disagree")
+    return tk_version
 
 
 def verify(output: Path) -> None:

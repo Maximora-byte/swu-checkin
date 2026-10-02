@@ -14,6 +14,31 @@ LICENSES = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(LICENSES)
 
 
+def test_tk_version_uses_selected_framework_path(tmp_path):
+    tk = tmp_path / "Tk.framework/Versions/8.6/Resources/Scripts"
+    tk.mkdir(parents=True)
+    script = tk / "tk.tcl"
+    script.write_text("package require -exact Tk 8.6.18\n", encoding="utf-8")
+
+    class Tcl:
+        def loadtk(self):
+            pass
+
+        def withdraw(self):
+            pass
+
+        def destroy(self):
+            pass
+
+        def eval(self, command):
+            return {"package provide Tk": "8.6.18", "set tk_library": str(tk)}[command]
+
+    assert LICENSES._tk_version(Tcl()) == "8.6.18"
+    script.write_text("package require -exact Tk 8.6.15\n", encoding="utf-8")
+    with pytest.raises(RuntimeError, match="disagree"):
+        LICENSES._tk_version(Tcl())
+
+
 class Distribution:
     metadata = {"Name": "example-wheel"}
     version = "1.0"
