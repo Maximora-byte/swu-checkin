@@ -1,0 +1,38 @@
+SWUCheckin Android distribution notices
+
+This application is distributed under the project MIT license in
+SWUCheckin-LICENSE.txt. Third-party code retains its original licenses.
+
+Chaquopy 17.0.0 embeds CPython 3.13.9-0 with its upstream Android build.
+Chaquopy compiles and packages the standard library, removes desktop GUI,
+tests and ensurepip, and provides JNI/import integration. SWUCheckin adds
+application code and Android integration; it does not patch CPython.
+The exact upstream build scripts and licenses are included here.
+
+Native dependencies from CPython's Android recipe are OpenSSL 3.0.18-0,
+SQLite 3.50.4-0, bzip2 1.0.8-3, libffi 3.4.4-3 and liblzma/XZ 5.4.6-1.
+CPython's acknowledgements and complete source notice blocks retain
+attributions for Expat, HACL*, Karamel, BLAKE2, libmpdec, dtoa and other
+incorporated code. These notices also include upstream source portions
+not used by Android; their inclusion does not make those portions runtime
+dependencies. System-provided Android libraries are not bundled here.
+
+The bootstrap contains setuptools 68.2.2 and pyelftools 0.26. Their
+original notices are retained inside bootstrap.imy, and omitted vendor
+licenses are supplied in Setuptools-vendor and Construct license files.
+
+Python requirements retain their wheel licenses, AUTHORS and NOTICE files
+inside requirements-common.imy, including certifi's MPL-2.0 license and
+tzdata's license and nested Apache license. Corresponding unmodified
+certifi source is available via its exact PyPI release URL in inventory.json.
+
+AndroidX, Kotlin, kotlinx libraries, Guava ListenableFuture, JetBrains
+annotations and JSpecify use Apache-2.0. Individual upstream archive notices
+are copied into Maven/ where present. LLVM compiler runtime terms are also
+included for the NDK used by the upstream runtime build.
+
+The sorted inventory.json records the original sources and SHA-256 of each
+license/notice file, actual runtime Python metadata, resolved Maven inputs
+(including metadata-only platforms), and all bundled native library bytes.
+Use scripts/android/verify_apk.py to verify the final APK against this
+checked-in inventory. Update and review the inventory when dependencies change.

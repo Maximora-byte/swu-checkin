@@ -1,6 +1,6 @@
 # CLI 与状态码参考
 
-本文描述当前 `main` 中的 Python CLI、结果与安全边界。图形应用另见 [Windows 桌面](windows-desktop.md)、[macOS 桌面](macos-desktop.md) 和 [Android 手动客户端](android-client.md)；它们不提供同一套 CLI 参数。稳定 tag 应使用该 tag 自带文档，不能将当前源码版本字符串 `2.0.0` 或开发分支的新行为视为已发布 v2.0.0 已经提供。版本差异见 [发布评估](releases/release-readiness.md)。
+本文描述当前源码的 Python CLI、结果与安全边界；项目版本已同步为 **2.1.0 预发布候选**，尚无新 tag/Release，CLI 状态码与 JSON schema v1 沿用。图形应用另见 [Windows 桌面](windows-desktop.md)、[macOS 桌面](macos-desktop.md)和 [Android](android-client.md)，它们不提供同一套 CLI 参数。最新公开 v2.0.0 应使用自身 tag 文档；候选差异见 [v2.1.0 说明](releases/v2.1.0.md)与 [发布准备](releases/release-readiness.md)。
 
 ## 命令
 

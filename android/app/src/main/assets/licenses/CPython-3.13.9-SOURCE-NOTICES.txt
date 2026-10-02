@@ -1,0 +1,2116 @@
+
+=== Modules/_blake2/blake2b_impl.c, Modules/_blake2/blake2module.c, Modules/_blake2/blake2s_impl.c ===
+/*
+ * Written in 2013 by Dmitry Chestnykh <dmitry@codingrobots.com>
+ * Modified for CPython by Christian Heimes <christian@python.org>
+ *
+ * To the extent possible under law, the author have dedicated all
+ * copyright and related and neighboring rights to this software to
+ * the public domain worldwide. This software is distributed without
+ * any warranty. http://creativecommons.org/publicdomain/zero/1.0/
+ */
+
+=== Modules/_blake2/impl/blake2-config.h, Modules/_blake2/impl/blake2-impl.h, Modules/_blake2/impl/blake2.h, Modules/_blake2/impl/blake2b-load-sse2.h, Modules/_blake2/impl/blake2b-load-sse41.h, Modules/_blake2/impl/blake2b-round.h, Modules/_blake2/impl/blake2b.c, Modules/_blake2/impl/blake2s-load-sse2.h, Modules/_blake2/impl/blake2s-load-sse41.h, Modules/_blake2/impl/blake2s-load-xop.h, Modules/_blake2/impl/blake2s-round.h, Modules/_blake2/impl/blake2s.c ===
+/*
+   BLAKE2 reference source code package - optimized C implementations
+
+   Written in 2012 by Samuel Neves <sneves@dei.uc.pt>
+
+   To the extent possible under law, the author(s) have dedicated all copyright
+   and related and neighboring rights to this software to the public domain
+   worldwide. This software is distributed without any warranty.
+
+   You should have received a copy of the CC0 Public Domain Dedication along with
+   this software. If not, see <http://creativecommons.org/publicdomain/zero/1.0/>.
+*/
+
+=== Modules/_blake2/impl/blake2b-ref.c, Modules/_blake2/impl/blake2s-ref.c ===
+/*
+   BLAKE2 reference source code package - reference C implementations
+
+   Written in 2012 by Samuel Neves <sneves@dei.uc.pt>
+
+   To the extent possible under law, the author(s) have dedicated all copyright
+   and related and neighboring rights to this software to the public domain
+   worldwide. This software is distributed without any warranty.
+
+   You should have received a copy of the CC0 Public Domain Dedication along with
+   this software. If not, see <http://creativecommons.org/publicdomain/zero/1.0/>.
+*/
+
+=== Modules/_codecsmodule.c ===
+/* ------------------------------------------------------------------------
+
+   _codecs -- Provides access to the codec registry and the builtin
+              codecs.
+
+   This module should never be imported directly. The standard library
+   module "codecs" wraps this builtin module for use within Python.
+
+   The codec registry is accessible via:
+
+     register(search_function) -> None
+
+     lookup(encoding) -> CodecInfo object
+
+   The builtin Unicode codecs use the following interface:
+
+     <encoding>_encode(Unicode_object[,errors='strict']) ->
+        (string object, bytes consumed)
+
+     <encoding>_decode(char_buffer_obj[,errors='strict']) ->
+        (Unicode object, bytes consumed)
+
+   These <encoding>s are available: utf_8, unicode_escape,
+   raw_unicode_escape, latin_1, ascii (7-bit), mbcs (on win32).
+
+
+Written by Marc-Andre Lemburg (mal@lemburg.com).
+
+Copyright (c) Corporation for National Research Initiatives.
+
+   ------------------------------------------------------------------------ */
+
+=== Modules/_cursesmodule.c ===
+/*
+ *   This is a curses module for Python.
+ *
+ *   Based on prior work by Lance Ellinghaus and Oliver Andrich
+ *   Version 1.2 of this module: Copyright 1994 by Lance Ellinghouse,
+ *    Cathedral City, California Republic, United States of America.
+ *
+ *   Version 1.5b1, heavily extended for ncurses by Oliver Andrich:
+ *   Copyright 1996,1997 by Oliver Andrich, Koblenz, Germany.
+ *
+ *   Tidied for Python 1.6, and currently maintained by <amk@amk.ca>.
+ *
+ *   Permission is hereby granted, free of charge, to any person obtaining
+ *   a copy of this source file to use, copy, modify, merge, or publish it
+ *   subject to the following conditions:
+ *
+ *   The above copyright notice and this permission notice shall be included
+ *   in all copies or in any new file that contains a substantial portion of
+ *   this file.
+ *
+ *   THE  AUTHOR  MAKES  NO  REPRESENTATIONS ABOUT  THE  SUITABILITY  OF
+ *   THE  SOFTWARE FOR  ANY  PURPOSE.  IT IS  PROVIDED  "AS IS"  WITHOUT
+ *   EXPRESS OR  IMPLIED WARRANTY.  THE AUTHOR DISCLAIMS  ALL WARRANTIES
+ *   WITH  REGARD TO  THIS  SOFTWARE, INCLUDING  ALL IMPLIED  WARRANTIES
+ *   OF   MERCHANTABILITY,  FITNESS   FOR  A   PARTICULAR  PURPOSE   AND
+ *   NON-INFRINGEMENT  OF THIRD  PARTY  RIGHTS. IN  NO  EVENT SHALL  THE
+ *   AUTHOR  BE LIABLE  TO  YOU  OR ANY  OTHER  PARTY  FOR ANY  SPECIAL,
+ *   INDIRECT,  OR  CONSEQUENTIAL  DAMAGES  OR  ANY  DAMAGES  WHATSOEVER
+ *   WHETHER IN AN  ACTION OF CONTRACT, NEGLIGENCE,  STRICT LIABILITY OR
+ *   ANY OTHER  ACTION ARISING OUT OF  OR IN CONNECTION WITH  THE USE OR
+ *   PERFORMANCE OF THIS SOFTWARE.
+ */
+
+=== Modules/_decimal/_decimal.c ===
+/*
+ * Copyright (c) 2008-2012 Stefan Krah. All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ *
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ *
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS "AS IS" AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ */
+
+=== Modules/_decimal/docstrings.h ===
+/*
+ * Copyright (c) 2001-2012 Python Software Foundation. All Rights Reserved.
+ * Modified and extended by Stefan Krah.
+ */
+
+=== Modules/_decimal/libmpdec/basearith.c, Modules/_decimal/libmpdec/basearith.h, Modules/_decimal/libmpdec/bench.c, Modules/_decimal/libmpdec/bench_full.c, Modules/_decimal/libmpdec/bits.h, Modules/_decimal/libmpdec/constants.c, Modules/_decimal/libmpdec/constants.h, Modules/_decimal/libmpdec/context.c, Modules/_decimal/libmpdec/convolute.c, Modules/_decimal/libmpdec/convolute.h, Modules/_decimal/libmpdec/crt.c, Modules/_decimal/libmpdec/crt.h, Modules/_decimal/libmpdec/difradix2.c, Modules/_decimal/libmpdec/difradix2.h, Modules/_decimal/libmpdec/examples/compare.c, Modules/_decimal/libmpdec/examples/div.c, Modules/_decimal/libmpdec/examples/divmod.c, Modules/_decimal/libmpdec/examples/multiply.c, Modules/_decimal/libmpdec/examples/pow.c, Modules/_decimal/libmpdec/examples/powmod.c, Modules/_decimal/libmpdec/examples/shift.c, Modules/_decimal/libmpdec/examples/sqrt.c, Modules/_decimal/libmpdec/fnt.c, Modules/_decimal/libmpdec/fnt.h, Modules/_decimal/libmpdec/fourstep.c, Modules/_decimal/libmpdec/fourstep.h, Modules/_decimal/libmpdec/io.c, Modules/_decimal/libmpdec/io.h, Modules/_decimal/libmpdec/mpalloc.c, Modules/_decimal/libmpdec/mpalloc.h, Modules/_decimal/libmpdec/mpdecimal.c, Modules/_decimal/libmpdec/mpdecimal.h, Modules/_decimal/libmpdec/mpsignal.c, Modules/_decimal/libmpdec/numbertheory.c, Modules/_decimal/libmpdec/numbertheory.h, Modules/_decimal/libmpdec/sixstep.c, Modules/_decimal/libmpdec/sixstep.h, Modules/_decimal/libmpdec/transpose.c, Modules/_decimal/libmpdec/transpose.h, Modules/_decimal/libmpdec/typearith.h, Modules/_decimal/libmpdec/umodarith.h ===
+/*
+ * Copyright (c) 2008-2020 Stefan Krah. All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ *
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ *
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS "AS IS" AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ */
+
+=== Modules/_elementtree.c ===
+/*--------------------------------------------------------------------
+ * Licensed to PSF under a Contributor Agreement.
+ * See https://www.python.org/psf/license for licensing details.
+ *
+ * _elementtree - C accelerator for xml.etree.ElementTree
+ * Copyright (c) 1999-2009 by Secret Labs AB.  All rights reserved.
+ * Copyright (c) 1999-2009 by Fredrik Lundh.
+ *
+ * info@pythonware.com
+ * http://www.pythonware.com
+ *--------------------------------------------------------------------
+ */
+
+=== Modules/_hacl/Hacl_Hash_MD5.c, Modules/_hacl/Hacl_Hash_MD5.h, Modules/_hacl/Hacl_Hash_SHA1.c, Modules/_hacl/Hacl_Hash_SHA1.h, Modules/_hacl/Hacl_Hash_SHA2.c, Modules/_hacl/Hacl_Hash_SHA2.h, Modules/_hacl/Hacl_Hash_SHA3.c, Modules/_hacl/Hacl_Hash_SHA3.h, Modules/_hacl/Hacl_Streaming_Types.h, Modules/_hacl/internal/Hacl_Hash_MD5.h, Modules/_hacl/internal/Hacl_Hash_SHA1.h, Modules/_hacl/internal/Hacl_Hash_SHA2.h, Modules/_hacl/internal/Hacl_Hash_SHA3.h ===
+/* MIT License
+ *
+ * Copyright (c) 2016-2022 INRIA, CMU and Microsoft Corporation
+ * Copyright (c) 2022-2023 HACL* Contributors
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
+
+=== Modules/_hacl/include/krml/FStar_UInt128_Verified.h, Modules/_hacl/include/krml/FStar_UInt_8_16_32_64.h ===
+/*
+  Copyright (c) INRIA and Microsoft Corporation. All rights reserved.
+  Licensed under the Apache 2.0 License.
+*/
+
+=== Modules/_hacl/include/krml/fstar_uint128_struct_endianness.h, Modules/_hacl/include/krml/internal/target.h, Modules/_hacl/include/krml/lowstar_endianness.h ===
+/* Copyright (c) INRIA and Microsoft Corporation. All rights reserved.
+   Licensed under the Apache 2.0 License. */
+
+=== Modules/_localemodule.c ===
+/***********************************************************
+Copyright (C) 1997, 2002, 2003, 2007, 2008 Martin von Loewis
+
+Permission to use, copy, modify, and distribute this software and its
+documentation for any purpose and without fee is hereby granted,
+provided that the above copyright notice appear in all copies.
+
+This software comes with no warranty. Use at your own risk.
+
+******************************************************************/
+
+=== Modules/_multiprocessing/multiprocessing.c ===
+/*
+ * Extension module used by multiprocessing package
+ *
+ * multiprocessing.c
+ *
+ * Copyright (c) 2006-2008, R Oudkerk
+ * Licensed to PSF under a Contributor Agreement.
+ */
+
+=== Modules/_multiprocessing/semaphore.c ===
+/*
+ * A type which wraps a semaphore
+ *
+ * semaphore.c
+ *
+ * Copyright (c) 2006-2008, R Oudkerk
+ * Licensed to PSF under a Contributor Agreement.
+ */
+
+=== Modules/_sqlite/connection.c ===
+/* connection.c - the connection type
+ *
+ * Copyright (C) 2004-2010 Gerhard Häring <gh@ghaering.de>
+ *
+ * This file is part of pysqlite.
+ *
+ * This software is provided 'as-is', without any express or implied
+ * warranty.  In no event will the authors be held liable for any damages
+ * arising from the use of this software.
+ *
+ * Permission is granted to anyone to use this software for any purpose,
+ * including commercial applications, and to alter it and redistribute it
+ * freely, subject to the following restrictions:
+ *
+ * 1. The origin of this software must not be misrepresented; you must not
+ *    claim that you wrote the original software. If you use this software
+ *    in a product, an acknowledgment in the product documentation would be
+ *    appreciated but is not required.
+ * 2. Altered source versions must be plainly marked as such, and must not be
+ *    misrepresented as being the original software.
+ * 3. This notice may not be removed or altered from any source distribution.
+ */
+
+=== Modules/_sqlite/connection.h ===
+/* connection.h - definitions for the connection type
+ *
+ * Copyright (C) 2004-2010 Gerhard Häring <gh@ghaering.de>
+ *
+ * This file is part of pysqlite.
+ *
+ * This software is provided 'as-is', without any express or implied
+ * warranty.  In no event will the authors be held liable for any damages
+ * arising from the use of this software.
+ *
+ * Permission is granted to anyone to use this software for any purpose,
+ * including commercial applications, and to alter it and redistribute it
+ * freely, subject to the following restrictions:
+ *
+ * 1. The origin of this software must not be misrepresented; you must not
+ *    claim that you wrote the original software. If you use this software
+ *    in a product, an acknowledgment in the product documentation would be
+ *    appreciated but is not required.
+ * 2. Altered source versions must be plainly marked as such, and must not be
+ *    misrepresented as being the original software.
+ * 3. This notice may not be removed or altered from any source distribution.
+ */
+
+=== Modules/_sqlite/cursor.c ===
+/* cursor.c - the cursor type
+ *
+ * Copyright (C) 2004-2010 Gerhard Häring <gh@ghaering.de>
+ *
+ * This file is part of pysqlite.
+ *
+ * This software is provided 'as-is', without any express or implied
+ * warranty.  In no event will the authors be held liable for any damages
+ * arising from the use of this software.
+ *
+ * Permission is granted to anyone to use this software for any purpose,
+ * including commercial applications, and to alter it and redistribute it
+ * freely, subject to the following restrictions:
+ *
+ * 1. The origin of this software must not be misrepresented; you must not
+ *    claim that you wrote the original software. If you use this software
+ *    in a product, an acknowledgment in the product documentation would be
+ *    appreciated but is not required.
+ * 2. Altered source versions must be plainly marked as such, and must not be
+ *    misrepresented as being the original software.
+ * 3. This notice may not be removed or altered from any source distribution.
+ */
+
+=== Modules/_sqlite/cursor.h ===
+/* cursor.h - definitions for the cursor type
+ *
+ * Copyright (C) 2004-2010 Gerhard Häring <gh@ghaering.de>
+ *
+ * This file is part of pysqlite.
+ *
+ * This software is provided 'as-is', without any express or implied
+ * warranty.  In no event will the authors be held liable for any damages
+ * arising from the use of this software.
+ *
+ * Permission is granted to anyone to use this software for any purpose,
+ * including commercial applications, and to alter it and redistribute it
+ * freely, subject to the following restrictions:
+ *
+ * 1. The origin of this software must not be misrepresented; you must not
+ *    claim that you wrote the original software. If you use this software
+ *    in a product, an acknowledgment in the product documentation would be
+ *    appreciated but is not required.
+ * 2. Altered source versions must be plainly marked as such, and must not be
+ *    misrepresented as being the original software.
+ * 3. This notice may not be removed or altered from any source distribution.
+ */
+
+=== Modules/_sqlite/microprotocols.c ===
+/* microprotocols.c - minimalist and non-validating protocols implementation
+ *
+ * Copyright (C) 2003-2004 Federico Di Gregorio <fog@debian.org>
+ *
+ * This file is part of psycopg and was adapted for pysqlite. Federico Di
+ * Gregorio gave the permission to use it within pysqlite under the following
+ * license:
+ *
+ * This software is provided 'as-is', without any express or implied
+ * warranty.  In no event will the authors be held liable for any damages
+ * arising from the use of this software.
+ *
+ * Permission is granted to anyone to use this software for any purpose,
+ * including commercial applications, and to alter it and redistribute it
+ * freely, subject to the following restrictions:
+ *
+ * 1. The origin of this software must not be misrepresented; you must not
+ *    claim that you wrote the original software. If you use this software
+ *    in a product, an acknowledgment in the product documentation would be
+ *    appreciated but is not required.
+ * 2. Altered source versions must be plainly marked as such, and must not be
+ *    misrepresented as being the original software.
+ * 3. This notice may not be removed or altered from any source distribution.
+ */
+
+=== Modules/_sqlite/microprotocols.h ===
+/* microprotocols.c - definitions for minimalist and non-validating protocols
+ *
+ * Copyright (C) 2003-2004 Federico Di Gregorio <fog@debian.org>
+ *
+ * This file is part of psycopg and was adapted for pysqlite. Federico Di
+ * Gregorio gave the permission to use it within pysqlite under the following
+ * license:
+ *
+ * This software is provided 'as-is', without any express or implied
+ * warranty.  In no event will the authors be held liable for any damages
+ * arising from the use of this software.
+ *
+ * Permission is granted to anyone to use this software for any purpose,
+ * including commercial applications, and to alter it and redistribute it
+ * freely, subject to the following restrictions:
+ *
+ * 1. The origin of this software must not be misrepresented; you must not
+ *    claim that you wrote the original software. If you use this software
+ *    in a product, an acknowledgment in the product documentation would be
+ *    appreciated but is not required.
+ * 2. Altered source versions must be plainly marked as such, and must not be
+ *    misrepresented as being the original software.
+ * 3. This notice may not be removed or altered from any source distribution.
+ */
+
+=== Modules/_sqlite/module.c ===
+/* module.c - the module itself
+ *
+ * Copyright (C) 2004-2010 Gerhard Häring <gh@ghaering.de>
+ *
+ * This file is part of pysqlite.
+ *
+ * This software is provided 'as-is', without any express or implied
+ * warranty.  In no event will the authors be held liable for any damages
+ * arising from the use of this software.
+ *
+ * Permission is granted to anyone to use this software for any purpose,
+ * including commercial applications, and to alter it and redistribute it
+ * freely, subject to the following restrictions:
+ *
+ * 1. The origin of this software must not be misrepresented; you must not
+ *    claim that you wrote the original software. If you use this software
+ *    in a product, an acknowledgment in the product documentation would be
+ *    appreciated but is not required.
+ * 2. Altered source versions must be plainly marked as such, and must not be
+ *    misrepresented as being the original software.
+ * 3. This notice may not be removed or altered from any source distribution.
+ */
+
+=== Modules/_sqlite/module.h ===
+/* module.h - definitions for the module
+ *
+ * Copyright (C) 2004-2010 Gerhard Häring <gh@ghaering.de>
+ *
+ * This file is part of pysqlite.
+ *
+ * This software is provided 'as-is', without any express or implied
+ * warranty.  In no event will the authors be held liable for any damages
+ * arising from the use of this software.
+ *
+ * Permission is granted to anyone to use this software for any purpose,
+ * including commercial applications, and to alter it and redistribute it
+ * freely, subject to the following restrictions:
+ *
+ * 1. The origin of this software must not be misrepresented; you must not
+ *    claim that you wrote the original software. If you use this software
+ *    in a product, an acknowledgment in the product documentation would be
+ *    appreciated but is not required.
+ * 2. Altered source versions must be plainly marked as such, and must not be
+ *    misrepresented as being the original software.
+ * 3. This notice may not be removed or altered from any source distribution.
+ */
+
+=== Modules/_sqlite/prepare_protocol.c ===
+/* prepare_protocol.c - the protocol for preparing values for SQLite
+ *
+ * Copyright (C) 2005-2010 Gerhard Häring <gh@ghaering.de>
+ *
+ * This file is part of pysqlite.
+ *
+ * This software is provided 'as-is', without any express or implied
+ * warranty.  In no event will the authors be held liable for any damages
+ * arising from the use of this software.
+ *
+ * Permission is granted to anyone to use this software for any purpose,
+ * including commercial applications, and to alter it and redistribute it
+ * freely, subject to the following restrictions:
+ *
+ * 1. The origin of this software must not be misrepresented; you must not
+ *    claim that you wrote the original software. If you use this software
+ *    in a product, an acknowledgment in the product documentation would be
+ *    appreciated but is not required.
+ * 2. Altered source versions must be plainly marked as such, and must not be
+ *    misrepresented as being the original software.
+ * 3. This notice may not be removed or altered from any source distribution.
+ */
+
+=== Modules/_sqlite/prepare_protocol.h ===
+/* prepare_protocol.h - the protocol for preparing values for SQLite
+ *
+ * Copyright (C) 2005-2010 Gerhard Häring <gh@ghaering.de>
+ *
+ * This file is part of pysqlite.
+ *
+ * This software is provided 'as-is', without any express or implied
+ * warranty.  In no event will the authors be held liable for any damages
+ * arising from the use of this software.
+ *
+ * Permission is granted to anyone to use this software for any purpose,
+ * including commercial applications, and to alter it and redistribute it
+ * freely, subject to the following restrictions:
+ *
+ * 1. The origin of this software must not be misrepresented; you must not
+ *    claim that you wrote the original software. If you use this software
+ *    in a product, an acknowledgment in the product documentation would be
+ *    appreciated but is not required.
+ * 2. Altered source versions must be plainly marked as such, and must not be
+ *    misrepresented as being the original software.
+ * 3. This notice may not be removed or altered from any source distribution.
+ */
+
+=== Modules/_sqlite/row.c ===
+/* row.c - an enhanced tuple for database rows
+ *
+ * Copyright (C) 2005-2010 Gerhard Häring <gh@ghaering.de>
+ *
+ * This file is part of pysqlite.
+ *
+ * This software is provided 'as-is', without any express or implied
+ * warranty.  In no event will the authors be held liable for any damages
+ * arising from the use of this software.
+ *
+ * Permission is granted to anyone to use this software for any purpose,
+ * including commercial applications, and to alter it and redistribute it
+ * freely, subject to the following restrictions:
+ *
+ * 1. The origin of this software must not be misrepresented; you must not
+ *    claim that you wrote the original software. If you use this software
+ *    in a product, an acknowledgment in the product documentation would be
+ *    appreciated but is not required.
+ * 2. Altered source versions must be plainly marked as such, and must not be
+ *    misrepresented as being the original software.
+ * 3. This notice may not be removed or altered from any source distribution.
+ */
+
+=== Modules/_sqlite/row.h ===
+/* row.h - an enhanced tuple for database rows
+ *
+ * Copyright (C) 2005-2010 Gerhard Häring <gh@ghaering.de>
+ *
+ * This file is part of pysqlite.
+ *
+ * This software is provided 'as-is', without any express or implied
+ * warranty.  In no event will the authors be held liable for any damages
+ * arising from the use of this software.
+ *
+ * Permission is granted to anyone to use this software for any purpose,
+ * including commercial applications, and to alter it and redistribute it
+ * freely, subject to the following restrictions:
+ *
+ * 1. The origin of this software must not be misrepresented; you must not
+ *    claim that you wrote the original software. If you use this software
+ *    in a product, an acknowledgment in the product documentation would be
+ *    appreciated but is not required.
+ * 2. Altered source versions must be plainly marked as such, and must not be
+ *    misrepresented as being the original software.
+ * 3. This notice may not be removed or altered from any source distribution.
+ */
+
+=== Modules/_sqlite/statement.c ===
+/* statement.c - the statement type
+ *
+ * Copyright (C) 2005-2010 Gerhard Häring <gh@ghaering.de>
+ *
+ * This file is part of pysqlite.
+ *
+ * This software is provided 'as-is', without any express or implied
+ * warranty.  In no event will the authors be held liable for any damages
+ * arising from the use of this software.
+ *
+ * Permission is granted to anyone to use this software for any purpose,
+ * including commercial applications, and to alter it and redistribute it
+ * freely, subject to the following restrictions:
+ *
+ * 1. The origin of this software must not be misrepresented; you must not
+ *    claim that you wrote the original software. If you use this software
+ *    in a product, an acknowledgment in the product documentation would be
+ *    appreciated but is not required.
+ * 2. Altered source versions must be plainly marked as such, and must not be
+ *    misrepresented as being the original software.
+ * 3. This notice may not be removed or altered from any source distribution.
+ */
+
+=== Modules/_sqlite/statement.h ===
+/* statement.h - definitions for the statement type
+ *
+ * Copyright (C) 2005-2010 Gerhard Häring <gh@ghaering.de>
+ *
+ * This file is part of pysqlite.
+ *
+ * This software is provided 'as-is', without any express or implied
+ * warranty.  In no event will the authors be held liable for any damages
+ * arising from the use of this software.
+ *
+ * Permission is granted to anyone to use this software for any purpose,
+ * including commercial applications, and to alter it and redistribute it
+ * freely, subject to the following restrictions:
+ *
+ * 1. The origin of this software must not be misrepresented; you must not
+ *    claim that you wrote the original software. If you use this software
+ *    in a product, an acknowledgment in the product documentation would be
+ *    appreciated but is not required.
+ * 2. Altered source versions must be plainly marked as such, and must not be
+ *    misrepresented as being the original software.
+ * 3. This notice may not be removed or altered from any source distribution.
+ */
+
+=== Modules/_sqlite/util.c ===
+/* util.c - various utility functions
+ *
+ * Copyright (C) 2005-2010 Gerhard Häring <gh@ghaering.de>
+ *
+ * This file is part of pysqlite.
+ *
+ * This software is provided 'as-is', without any express or implied
+ * warranty.  In no event will the authors be held liable for any damages
+ * arising from the use of this software.
+ *
+ * Permission is granted to anyone to use this software for any purpose,
+ * including commercial applications, and to alter it and redistribute it
+ * freely, subject to the following restrictions:
+ *
+ * 1. The origin of this software must not be misrepresented; you must not
+ *    claim that you wrote the original software. If you use this software
+ *    in a product, an acknowledgment in the product documentation would be
+ *    appreciated but is not required.
+ * 2. Altered source versions must be plainly marked as such, and must not be
+ *    misrepresented as being the original software.
+ * 3. This notice may not be removed or altered from any source distribution.
+ */
+
+=== Modules/_sqlite/util.h ===
+/* util.h - various utility functions
+ *
+ * Copyright (C) 2005-2010 Gerhard Häring <gh@ghaering.de>
+ *
+ * This file is part of pysqlite.
+ *
+ * This software is provided 'as-is', without any express or implied
+ * warranty.  In no event will the authors be held liable for any damages
+ * arising from the use of this software.
+ *
+ * Permission is granted to anyone to use this software for any purpose,
+ * including commercial applications, and to alter it and redistribute it
+ * freely, subject to the following restrictions:
+ *
+ * 1. The origin of this software must not be misrepresented; you must not
+ *    claim that you wrote the original software. If you use this software
+ *    in a product, an acknowledgment in the product documentation would be
+ *    appreciated but is not required.
+ * 2. Altered source versions must be plainly marked as such, and must not be
+ *    misrepresented as being the original software.
+ * 3. This notice may not be removed or altered from any source distribution.
+ */
+
+=== Modules/_sre/sre.c ===
+/*
+ * Secret Labs' Regular Expression Engine
+ *
+ * regular expression matching engine
+ *
+ * partial history:
+ * 1999-10-24 fl   created (based on existing template matcher code)
+ * 2000-03-06 fl   first alpha, sort of
+ * 2000-08-01 fl   fixes for 1.6b1
+ * 2000-08-07 fl   use PyOS_CheckStack() if available
+ * 2000-09-20 fl   added expand method
+ * 2001-03-20 fl   lots of fixes for 2.1b2
+ * 2001-04-15 fl   export copyright as Python attribute, not global
+ * 2001-04-28 fl   added __copy__ methods (work in progress)
+ * 2001-05-14 fl   fixes for 1.5.2 compatibility
+ * 2001-07-01 fl   added BIGCHARSET support (from Martin von Loewis)
+ * 2001-10-18 fl   fixed group reset issue (from Matthew Mueller)
+ * 2001-10-20 fl   added split primitive; re-enable unicode for 1.6/2.0/2.1
+ * 2001-10-21 fl   added sub/subn primitive
+ * 2001-10-24 fl   added finditer primitive (for 2.2 only)
+ * 2001-12-07 fl   fixed memory leak in sub/subn (Guido van Rossum)
+ * 2002-11-09 fl   fixed empty sub/subn return type
+ * 2003-04-18 mvl  fully support 4-byte codes
+ * 2003-10-17 gn   implemented non recursive scheme
+ * 2013-02-04 mrab added fullmatch primitive
+ *
+ * Copyright (c) 1997-2001 by Secret Labs AB.  All rights reserved.
+ *
+ * This version of the SRE library can be redistributed under CNRI's
+ * Python 1.6 license.  For any other use, please contact Secret Labs
+ * AB (info@pythonware.com).
+ *
+ * Portions of this engine have been developed in cooperation with
+ * CNRI.  Hewlett-Packard provided funding for 1.6 integration and
+ * other compatibility work.
+ */
+
+=== Modules/_sre/sre.h, Modules/_sre/sre_lib.h ===
+/*
+ * Secret Labs' Regular Expression Engine
+ *
+ * regular expression matching engine
+ *
+ * Copyright (c) 1997-2001 by Secret Labs AB.  All rights reserved.
+ *
+ * See the sre.c file for information on usage and redistribution.
+ */
+
+=== Modules/_sre/sre_constants.h, Modules/_sre/sre_targets.h ===
+/*
+ * Secret Labs' Regular Expression Engine
+ *
+ * regular expression matching engine
+ *
+ * Auto-generated by Tools/build/generate_sre_constants.py from
+ * Lib/re/_constants.py.
+ *
+ * Copyright (c) 1997-2001 by Secret Labs AB.  All rights reserved.
+ *
+ * See the sre.c file for information on usage and redistribution.
+ */
+
+=== Modules/_stat.c ===
+/* stat.h interface
+ *
+ * The module defines all S_IF*, S_I*, UF_*, SF_* and ST_* constants to
+ * sensible default values as well as defines S_IS*() macros in order to keep
+ * backward compatibility with the old stat.py module.
+ *
+ * New constants and macros such as S_IFDOOR / S_ISDOOR() are always defined
+ * as int 0.
+ *
+ * NOTE: POSIX only defines the values of the S_I* permission bits.
+ *
+ */
+
+=== Modules/_tkinter.c ===
+/***********************************************************
+Copyright (C) 1994 Steen Lumholt.
+
+                        All Rights Reserved
+
+******************************************************************/
+
+=== Modules/_winapi.c ===
+/*
+ * Support routines from the Windows API
+ *
+ * This module was originally created by merging PC/_subprocess.c with
+ * Modules/_multiprocessing/win32_functions.c.
+ *
+ * Copyright (c) 2004 by Fredrik Lundh <fredrik@pythonware.com>
+ * Copyright (c) 2004 by Secret Labs AB, http://www.pythonware.com
+ * Copyright (c) 2004 by Peter Astrand <astrand@lysator.liu.se>
+ *
+ * By obtaining, using, and/or copying this software and/or its
+ * associated documentation, you agree that you have read, understood,
+ * and will comply with the following terms and conditions:
+ *
+ * Permission to use, copy, modify, and distribute this software and
+ * its associated documentation for any purpose and without fee is
+ * hereby granted, provided that the above copyright notice appears in
+ * all copies, and that both that copyright notice and this permission
+ * notice appear in supporting documentation, and that the name of the
+ * authors not be used in advertising or publicity pertaining to
+ * distribution of the software without specific, written prior
+ * permission.
+ *
+ * THE AUTHORS DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS SOFTWARE,
+ * INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS.
+ * IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY SPECIAL, INDIRECT OR
+ * CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS
+ * OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT,
+ * NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION
+ * WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+ *
+ */
+
+=== Modules/addrinfo.h ===
+/*
+ * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the project nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE PROJECT OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ */
+
+=== Modules/atexitmodule.c ===
+/*
+ *  atexit - allow programmer to define multiple exit functions to be executed
+ *  upon normal program termination.
+ *
+ *   Translated from atexit.py by Collin Winter.
+ +   Copyright 2007 Python Software Foundation.
+ */
+
+=== Modules/expat/ascii.h ===
+/*
+                            __  __            _
+                         ___\ \/ /_ __   __ _| |_
+                        / _ \\  /| '_ \ / _` | __|
+                       |  __//  \| |_) | (_| | |_
+                        \___/_/\_\ .__/ \__,_|\__|
+                                 |_| XML parser
+
+   Copyright (c) 1999-2000 Thai Open Source Software Center Ltd
+   Copyright (c) 2000      Clark Cooper <coopercc@users.sourceforge.net>
+   Copyright (c) 2002      Fred L. Drake, Jr. <fdrake@users.sourceforge.net>
+   Copyright (c) 2007      Karl Waclawek <karl@waclawek.net>
+   Copyright (c) 2017      Sebastian Pipping <sebastian@pipping.org>
+   Licensed under the MIT license:
+
+   Permission is  hereby granted,  free of charge,  to any  person obtaining
+   a  copy  of  this  software   and  associated  documentation  files  (the
+   "Software"),  to  deal in  the  Software  without restriction,  including
+   without  limitation the  rights  to use,  copy,  modify, merge,  publish,
+   distribute, sublicense, and/or sell copies of the Software, and to permit
+   persons  to whom  the Software  is  furnished to  do so,  subject to  the
+   following conditions:
+
+   The above copyright  notice and this permission notice  shall be included
+   in all copies or substantial portions of the Software.
+
+   THE  SOFTWARE  IS  PROVIDED  "AS  IS",  WITHOUT  WARRANTY  OF  ANY  KIND,
+   EXPRESS  OR IMPLIED,  INCLUDING  BUT  NOT LIMITED  TO  THE WARRANTIES  OF
+   MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN
+   NO EVENT SHALL THE AUTHORS OR  COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+   DAMAGES OR  OTHER LIABILITY, WHETHER  IN AN  ACTION OF CONTRACT,  TORT OR
+   OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
+   USE OR OTHER DEALINGS IN THE SOFTWARE.
+*/
+
+=== Modules/expat/asciitab.h, Modules/expat/iasciitab.h, Modules/expat/latin1tab.h, Modules/expat/utf8tab.h ===
+/*
+                            __  __            _
+                         ___\ \/ /_ __   __ _| |_
+                        / _ \\  /| '_ \ / _` | __|
+                       |  __//  \| |_) | (_| | |_
+                        \___/_/\_\ .__/ \__,_|\__|
+                                 |_| XML parser
+
+   Copyright (c) 1997-2000 Thai Open Source Software Center Ltd
+   Copyright (c) 2000      Clark Cooper <coopercc@users.sourceforge.net>
+   Copyright (c) 2002      Fred L. Drake, Jr. <fdrake@users.sourceforge.net>
+   Copyright (c) 2017      Sebastian Pipping <sebastian@pipping.org>
+   Licensed under the MIT license:
+
+   Permission is  hereby granted,  free of charge,  to any  person obtaining
+   a  copy  of  this  software   and  associated  documentation  files  (the
+   "Software"),  to  deal in  the  Software  without restriction,  including
+   without  limitation the  rights  to use,  copy,  modify, merge,  publish,
+   distribute, sublicense, and/or sell copies of the Software, and to permit
+   persons  to whom  the Software  is  furnished to  do so,  subject to  the
+   following conditions:
+
+   The above copyright  notice and this permission notice  shall be included
+   in all copies or substantial portions of the Software.
+
+   THE  SOFTWARE  IS  PROVIDED  "AS  IS",  WITHOUT  WARRANTY  OF  ANY  KIND,
+   EXPRESS  OR IMPLIED,  INCLUDING  BUT  NOT LIMITED  TO  THE WARRANTIES  OF
+   MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN
+   NO EVENT SHALL THE AUTHORS OR  COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+   DAMAGES OR  OTHER LIABILITY, WHETHER  IN AN  ACTION OF CONTRACT,  TORT OR
+   OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
+   USE OR OTHER DEALINGS IN THE SOFTWARE.
+*/
+
+=== Modules/expat/expat.h ===
+/*
+                            __  __            _
+                         ___\ \/ /_ __   __ _| |_
+                        / _ \\  /| '_ \ / _` | __|
+                       |  __//  \| |_) | (_| | |_
+                        \___/_/\_\ .__/ \__,_|\__|
+                                 |_| XML parser
+
+   Copyright (c) 1997-2000 Thai Open Source Software Center Ltd
+   Copyright (c) 2000      Clark Cooper <coopercc@users.sourceforge.net>
+   Copyright (c) 2000-2005 Fred L. Drake, Jr. <fdrake@users.sourceforge.net>
+   Copyright (c) 2001-2002 Greg Stein <gstein@users.sourceforge.net>
+   Copyright (c) 2002-2016 Karl Waclawek <karl@waclawek.net>
+   Copyright (c) 2016-2025 Sebastian Pipping <sebastian@pipping.org>
+   Copyright (c) 2016      Cristian Rodríguez <crrodriguez@opensuse.org>
+   Copyright (c) 2016      Thomas Beutlich <tc@tbeu.de>
+   Copyright (c) 2017      Rhodri James <rhodri@wildebeest.org.uk>
+   Copyright (c) 2022      Thijs Schreijer <thijs@thijsschreijer.nl>
+   Copyright (c) 2023      Hanno Böck <hanno@gentoo.org>
+   Copyright (c) 2023      Sony Corporation / Snild Dolkow <snild@sony.com>
+   Copyright (c) 2024      Taichi Haradaguchi <20001722@ymail.ne.jp>
+   Copyright (c) 2025      Matthew Fernandez <matthew.fernandez@gmail.com>
+   Licensed under the MIT license:
+
+   Permission is  hereby granted,  free of charge,  to any  person obtaining
+   a  copy  of  this  software   and  associated  documentation  files  (the
+   "Software"),  to  deal in  the  Software  without restriction,  including
+   without  limitation the  rights  to use,  copy,  modify, merge,  publish,
+   distribute, sublicense, and/or sell copies of the Software, and to permit
+   persons  to whom  the Software  is  furnished to  do so,  subject to  the
+   following conditions:
+
+   The above copyright  notice and this permission notice  shall be included
+   in all copies or substantial portions of the Software.
+
+   THE  SOFTWARE  IS  PROVIDED  "AS  IS",  WITHOUT  WARRANTY  OF  ANY  KIND,
+   EXPRESS  OR IMPLIED,  INCLUDING  BUT  NOT LIMITED  TO  THE WARRANTIES  OF
+   MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN
+   NO EVENT SHALL THE AUTHORS OR  COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+   DAMAGES OR  OTHER LIABILITY, WHETHER  IN AN  ACTION OF CONTRACT,  TORT OR
+   OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
+   USE OR OTHER DEALINGS IN THE SOFTWARE.
+*/
+
+=== Modules/expat/expat_external.h ===
+/*
+                            __  __            _
+                         ___\ \/ /_ __   __ _| |_
+                        / _ \\  /| '_ \ / _` | __|
+                       |  __//  \| |_) | (_| | |_
+                        \___/_/\_\ .__/ \__,_|\__|
+                                 |_| XML parser
+
+   Copyright (c) 1997-2000 Thai Open Source Software Center Ltd
+   Copyright (c) 2000      Clark Cooper <coopercc@users.sourceforge.net>
+   Copyright (c) 2000-2004 Fred L. Drake, Jr. <fdrake@users.sourceforge.net>
+   Copyright (c) 2001-2002 Greg Stein <gstein@users.sourceforge.net>
+   Copyright (c) 2002-2006 Karl Waclawek <karl@waclawek.net>
+   Copyright (c) 2016      Cristian Rodríguez <crrodriguez@opensuse.org>
+   Copyright (c) 2016-2019 Sebastian Pipping <sebastian@pipping.org>
+   Copyright (c) 2017      Rhodri James <rhodri@wildebeest.org.uk>
+   Copyright (c) 2018      Yury Gribov <tetra2005@gmail.com>
+   Licensed under the MIT license:
+
+   Permission is  hereby granted,  free of charge,  to any  person obtaining
+   a  copy  of  this  software   and  associated  documentation  files  (the
+   "Software"),  to  deal in  the  Software  without restriction,  including
+   without  limitation the  rights  to use,  copy,  modify, merge,  publish,
+   distribute, sublicense, and/or sell copies of the Software, and to permit
+   persons  to whom  the Software  is  furnished to  do so,  subject to  the
+   following conditions:
+
+   The above copyright  notice and this permission notice  shall be included
+   in all copies or substantial portions of the Software.
+
+   THE  SOFTWARE  IS  PROVIDED  "AS  IS",  WITHOUT  WARRANTY  OF  ANY  KIND,
+   EXPRESS  OR IMPLIED,  INCLUDING  BUT  NOT LIMITED  TO  THE WARRANTIES  OF
+   MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN
+   NO EVENT SHALL THE AUTHORS OR  COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+   DAMAGES OR  OTHER LIABILITY, WHETHER  IN AN  ACTION OF CONTRACT,  TORT OR
+   OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
+   USE OR OTHER DEALINGS IN THE SOFTWARE.
+*/
+
+=== Modules/expat/internal.h ===
+/* internal.h
+
+   Internal definitions used by Expat.  This is not needed to compile
+   client code.
+
+   The following calling convention macros are defined for frequently
+   called functions:
+
+   FASTCALL    - Used for those internal functions that have a simple
+                 body and a low number of arguments and local variables.
+
+   PTRCALL     - Used for functions called though function pointers.
+
+   PTRFASTCALL - Like PTRCALL, but for low number of arguments.
+
+   inline      - Used for selected internal functions for which inlining
+                 may improve performance on some platforms.
+
+   Note: Use of these macros is based on judgement, not hard rules,
+         and therefore subject to change.
+                            __  __            _
+                         ___\ \/ /_ __   __ _| |_
+                        / _ \\  /| '_ \ / _` | __|
+                       |  __//  \| |_) | (_| | |_
+                        \___/_/\_\ .__/ \__,_|\__|
+                                 |_| XML parser
+
+   Copyright (c) 2002-2003 Fred L. Drake, Jr. <fdrake@users.sourceforge.net>
+   Copyright (c) 2002-2006 Karl Waclawek <karl@waclawek.net>
+   Copyright (c) 2003      Greg Stein <gstein@users.sourceforge.net>
+   Copyright (c) 2016-2025 Sebastian Pipping <sebastian@pipping.org>
+   Copyright (c) 2018      Yury Gribov <tetra2005@gmail.com>
+   Copyright (c) 2019      David Loffredo <loffredo@steptools.com>
+   Copyright (c) 2023-2024 Sony Corporation / Snild Dolkow <snild@sony.com>
+   Copyright (c) 2024      Taichi Haradaguchi <20001722@ymail.ne.jp>
+   Licensed under the MIT license:
+
+   Permission is  hereby granted,  free of charge,  to any  person obtaining
+   a  copy  of  this  software   and  associated  documentation  files  (the
+   "Software"),  to  deal in  the  Software  without restriction,  including
+   without  limitation the  rights  to use,  copy,  modify, merge,  publish,
+   distribute, sublicense, and/or sell copies of the Software, and to permit
+   persons  to whom  the Software  is  furnished to  do so,  subject to  the
+   following conditions:
+
+   The above copyright  notice and this permission notice  shall be included
+   in all copies or substantial portions of the Software.
+
+   THE  SOFTWARE  IS  PROVIDED  "AS  IS",  WITHOUT  WARRANTY  OF  ANY  KIND,
+   EXPRESS  OR IMPLIED,  INCLUDING  BUT  NOT LIMITED  TO  THE WARRANTIES  OF
+   MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN
+   NO EVENT SHALL THE AUTHORS OR  COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+   DAMAGES OR  OTHER LIABILITY, WHETHER  IN AN  ACTION OF CONTRACT,  TORT OR
+   OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
+   USE OR OTHER DEALINGS IN THE SOFTWARE.
+*/
+
+=== Modules/expat/nametab.h ===
+/*
+                            __  __            _
+                         ___\ \/ /_ __   __ _| |_
+                        / _ \\  /| '_ \ / _` | __|
+                       |  __//  \| |_) | (_| | |_
+                        \___/_/\_\ .__/ \__,_|\__|
+                                 |_| XML parser
+
+   Copyright (c) 2000 Clark Cooper <coopercc@users.sourceforge.net>
+   Copyright (c) 2017 Sebastian Pipping <sebastian@pipping.org>
+   Licensed under the MIT license:
+
+   Permission is  hereby granted,  free of charge,  to any  person obtaining
+   a  copy  of  this  software   and  associated  documentation  files  (the
+   "Software"),  to  deal in  the  Software  without restriction,  including
+   without  limitation the  rights  to use,  copy,  modify, merge,  publish,
+   distribute, sublicense, and/or sell copies of the Software, and to permit
+   persons  to whom  the Software  is  furnished to  do so,  subject to  the
+   following conditions:
+
+   The above copyright  notice and this permission notice  shall be included
+   in all copies or substantial portions of the Software.
+
+   THE  SOFTWARE  IS  PROVIDED  "AS  IS",  WITHOUT  WARRANTY  OF  ANY  KIND,
+   EXPRESS  OR IMPLIED,  INCLUDING  BUT  NOT LIMITED  TO  THE WARRANTIES  OF
+   MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN
+   NO EVENT SHALL THE AUTHORS OR  COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+   DAMAGES OR  OTHER LIABILITY, WHETHER  IN AN  ACTION OF CONTRACT,  TORT OR
+   OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
+   USE OR OTHER DEALINGS IN THE SOFTWARE.
+*/
+
+=== Modules/expat/pyexpatns.h ===
+/* Copyright (c) 2005-2006 ActiveState Software Inc.
+ *
+ * Namespace all expat exported symbols to avoid dynamic loading symbol
+ * collisions when embedding Python.
+ *
+ * The Problem:
+ * - you embed Python in some app
+ * - the app dynamically loads libexpat of version X
+ * - the embedded Python imports pyexpat (which was built against
+ *   libexpat version X+n)
+ * --> pyexpat gets the expat symbols from the already loaded and *older*
+ *     libexpat: crash (Specifically the crash we observed was in
+ *     getting an old XML_ErrorString (from xmlparse.c) and then calling
+ *     it with newer values in the XML_Error enum:
+ *
+ *       // pyexpat.c, line 1970
+ *       ...
+ *       // Added in Expat 1.95.7.
+ *       MYCONST(XML_ERROR_UNBOUND_PREFIX);
+ *       ...
+ *
+ *
+ * The Solution:
+ * Prefix all exported symbols with "PyExpat_". This is similar to
+ * what Mozilla does for some common libs:
+ * http://lxr.mozilla.org/seamonkey/source/modules/libimg/png/mozpngconf.h#115
+ *
+ * The list of relevant exported symbols can be had with this command:
+ *
+       nm pyexpat.so \
+           | grep -v " [a-zBUA] " \
+           | grep -v "_fini\|_init\|initpyexpat"
+ *
+ * If any of those symbols are NOT prefixed with "PyExpat_" then
+ * a #define should be added for it here.
+ */
+
+=== Modules/expat/siphash.h ===
+/* ==========================================================================
+ * siphash.h - SipHash-2-4 in a single header file
+ * --------------------------------------------------------------------------
+ * Derived by William Ahern from the reference implementation[1] published[2]
+ * by Jean-Philippe Aumasson and Daniel J. Berstein.
+ * Minimal changes by Sebastian Pipping and Victor Stinner on top, see below.
+ * Licensed under the CC0 Public Domain Dedication license.
+ *
+ * 1. https://www.131002.net/siphash/siphash24.c
+ * 2. https://www.131002.net/siphash/
+ * --------------------------------------------------------------------------
+ * HISTORY:
+ *
+ * 2020-10-03  (Sebastian Pipping)
+ *   - Drop support for Visual Studio 9.0/2008 and earlier
+ *
+ * 2019-08-03  (Sebastian Pipping)
+ *   - Mark part of sip24_valid as to be excluded from clang-format
+ *   - Re-format code using clang-format 9
+ *
+ * 2018-07-08  (Anton Maklakov)
+ *   - Add "fall through" markers for GCC's -Wimplicit-fallthrough
+ *
+ * 2017-11-03  (Sebastian Pipping)
+ *   - Hide sip_tobin and sip_binof unless SIPHASH_TOBIN macro is defined
+ *
+ * 2017-07-25  (Vadim Zeitlin)
+ *   - Fix use of SIPHASH_MAIN macro
+ *
+ * 2017-07-05  (Sebastian Pipping)
+ *   - Use _SIP_ULL macro to not require a C++11 compiler if compiled as C++
+ *   - Add const qualifiers at two places
+ *   - Ensure <=80 characters line length (assuming tab width 4)
+ *
+ * 2017-06-23  (Victor Stinner)
+ *   - Address Win64 compile warnings
+ *
+ * 2017-06-18  (Sebastian Pipping)
+ *   - Clarify license note in the header
+ *   - Address C89 issues:
+ *     - Stop using inline keyword (and let compiler decide)
+ *     - Replace _Bool by int
+ *     - Turn macro siphash24 into a function
+ *     - Address invalid conversion (void pointer) by explicit cast
+ *   - Address lack of stdint.h for Visual Studio 2003 to 2008
+ *   - Always expose sip24_valid (for self-tests)
+ *
+ * 2012-11-04 - Born.  (William Ahern)
+ * --------------------------------------------------------------------------
+ * USAGE:
+ *
+ * SipHash-2-4 takes as input two 64-bit words as the key, some number of
+ * message bytes, and outputs a 64-bit word as the message digest. This
+ * implementation employs two data structures: a struct sipkey for
+ * representing the key, and a struct siphash for representing the hash
+ * state.
+ *
+ * For converting a 16-byte unsigned char array to a key, use either the
+ * macro sip_keyof or the routine sip_tokey. The former instantiates a
+ * compound literal key, while the latter requires a key object as a
+ * parameter.
+ *
+ * 	unsigned char secret[16];
+ * 	arc4random_buf(secret, sizeof secret);
+ * 	struct sipkey *key = sip_keyof(secret);
+ *
+ * For hashing a message, use either the convenience macro siphash24 or the
+ * routines sip24_init, sip24_update, and sip24_final.
+ *
+ * 	struct siphash state;
+ * 	void *msg;
+ * 	size_t len;
+ * 	uint64_t hash;
+ *
+ * 	sip24_init(&state, key);
+ * 	sip24_update(&state, msg, len);
+ * 	hash = sip24_final(&state);
+ *
+ * or
+ *
+ * 	hash = siphash24(msg, len, key);
+ *
+ * To convert the 64-bit hash value to a canonical 8-byte little-endian
+ * binary representation, use either the macro sip_binof or the routine
+ * sip_tobin. The former instantiates and returns a compound literal array,
+ * while the latter requires an array object as a parameter.
+ * --------------------------------------------------------------------------
+ * NOTES:
+ *
+ * o Neither sip_keyof, sip_binof, nor siphash24 will work with compilers
+ *   lacking compound literal support. Instead, you must use the lower-level
+ *   interfaces which take as parameters the temporary state objects.
+ *
+ * o Uppercase macros may evaluate parameters more than once. Lowercase
+ *   macros should not exhibit any such side effects.
+ * ==========================================================================
+ */
+
+=== Modules/expat/winconfig.h ===
+/*
+                            __  __            _
+                         ___\ \/ /_ __   __ _| |_
+                        / _ \\  /| '_ \ / _` | __|
+                       |  __//  \| |_) | (_| | |_
+                        \___/_/\_\ .__/ \__,_|\__|
+                                 |_| XML parser
+
+   Copyright (c) 2000      Clark Cooper <coopercc@users.sourceforge.net>
+   Copyright (c) 2002      Greg Stein <gstein@users.sourceforge.net>
+   Copyright (c) 2005      Karl Waclawek <karl@waclawek.net>
+   Copyright (c) 2017-2023 Sebastian Pipping <sebastian@pipping.org>
+   Copyright (c) 2023      Orgad Shaneh <orgad.shaneh@audiocodes.com>
+   Licensed under the MIT license:
+
+   Permission is  hereby granted,  free of charge,  to any  person obtaining
+   a  copy  of  this  software   and  associated  documentation  files  (the
+   "Software"),  to  deal in  the  Software  without restriction,  including
+   without  limitation the  rights  to use,  copy,  modify, merge,  publish,
+   distribute, sublicense, and/or sell copies of the Software, and to permit
+   persons  to whom  the Software  is  furnished to  do so,  subject to  the
+   following conditions:
+
+   The above copyright  notice and this permission notice  shall be included
+   in all copies or substantial portions of the Software.
+
+   THE  SOFTWARE  IS  PROVIDED  "AS  IS",  WITHOUT  WARRANTY  OF  ANY  KIND,
+   EXPRESS  OR IMPLIED,  INCLUDING  BUT  NOT LIMITED  TO  THE WARRANTIES  OF
+   MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN
+   NO EVENT SHALL THE AUTHORS OR  COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+   DAMAGES OR  OTHER LIABILITY, WHETHER  IN AN  ACTION OF CONTRACT,  TORT OR
+   OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
+   USE OR OTHER DEALINGS IN THE SOFTWARE.
+*/
+
+=== Modules/expat/xmlparse.c ===
+/* 28bcd8b1ba7eb595d82822908257fd9c3589b4243e3c922d0369f35bfcd7b506 (2.7.3+)
+                            __  __            _
+                         ___\ \/ /_ __   __ _| |_
+                        / _ \\  /| '_ \ / _` | __|
+                       |  __//  \| |_) | (_| | |_
+                        \___/_/\_\ .__/ \__,_|\__|
+                                 |_| XML parser
+
+   Copyright (c) 1997-2000 Thai Open Source Software Center Ltd
+   Copyright (c) 2000      Clark Cooper <coopercc@users.sourceforge.net>
+   Copyright (c) 2000-2006 Fred L. Drake, Jr. <fdrake@users.sourceforge.net>
+   Copyright (c) 2001-2002 Greg Stein <gstein@users.sourceforge.net>
+   Copyright (c) 2002-2016 Karl Waclawek <karl@waclawek.net>
+   Copyright (c) 2005-2009 Steven Solie <steven@solie.ca>
+   Copyright (c) 2016      Eric Rahm <erahm@mozilla.com>
+   Copyright (c) 2016-2025 Sebastian Pipping <sebastian@pipping.org>
+   Copyright (c) 2016      Gaurav <g.gupta@samsung.com>
+   Copyright (c) 2016      Thomas Beutlich <tc@tbeu.de>
+   Copyright (c) 2016      Gustavo Grieco <gustavo.grieco@imag.fr>
+   Copyright (c) 2016      Pascal Cuoq <cuoq@trust-in-soft.com>
+   Copyright (c) 2016      Ed Schouten <ed@nuxi.nl>
+   Copyright (c) 2017-2022 Rhodri James <rhodri@wildebeest.org.uk>
+   Copyright (c) 2017      Václav Slavík <vaclav@slavik.io>
+   Copyright (c) 2017      Viktor Szakats <commit@vsz.me>
+   Copyright (c) 2017      Chanho Park <chanho61.park@samsung.com>
+   Copyright (c) 2017      Rolf Eike Beer <eike@sf-mail.de>
+   Copyright (c) 2017      Hans Wennborg <hans@chromium.org>
+   Copyright (c) 2018      Anton Maklakov <antmak.pub@gmail.com>
+   Copyright (c) 2018      Benjamin Peterson <benjamin@python.org>
+   Copyright (c) 2018      Marco Maggi <marco.maggi-ipsu@poste.it>
+   Copyright (c) 2018      Mariusz Zaborski <oshogbo@vexillium.org>
+   Copyright (c) 2019      David Loffredo <loffredo@steptools.com>
+   Copyright (c) 2019-2020 Ben Wagner <bungeman@chromium.org>
+   Copyright (c) 2019      Vadim Zeitlin <vadim@zeitlins.org>
+   Copyright (c) 2021      Donghee Na <donghee.na@python.org>
+   Copyright (c) 2022      Samanta Navarro <ferivoz@riseup.net>
+   Copyright (c) 2022      Jeffrey Walton <noloader@gmail.com>
+   Copyright (c) 2022      Jann Horn <jannh@google.com>
+   Copyright (c) 2022      Sean McBride <sean@rogue-research.com>
+   Copyright (c) 2023      Owain Davies <owaind@bath.edu>
+   Copyright (c) 2023-2024 Sony Corporation / Snild Dolkow <snild@sony.com>
+   Copyright (c) 2024-2025 Berkay Eren Ürün <berkay.ueruen@siemens.com>
+   Copyright (c) 2024      Hanno Böck <hanno@gentoo.org>
+   Copyright (c) 2025      Matthew Fernandez <matthew.fernandez@gmail.com>
+   Licensed under the MIT license:
+
+   Permission is  hereby granted,  free of charge,  to any  person obtaining
+   a  copy  of  this  software   and  associated  documentation  files  (the
+   "Software"),  to  deal in  the  Software  without restriction,  including
+   without  limitation the  rights  to use,  copy,  modify, merge,  publish,
+   distribute, sublicense, and/or sell copies of the Software, and to permit
+   persons  to whom  the Software  is  furnished to  do so,  subject to  the
+   following conditions:
+
+   The above copyright  notice and this permission notice  shall be included
+   in all copies or substantial portions of the Software.
+
+   THE  SOFTWARE  IS  PROVIDED  "AS  IS",  WITHOUT  WARRANTY  OF  ANY  KIND,
+   EXPRESS  OR IMPLIED,  INCLUDING  BUT  NOT LIMITED  TO  THE WARRANTIES  OF
+   MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN
+   NO EVENT SHALL THE AUTHORS OR  COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+   DAMAGES OR  OTHER LIABILITY, WHETHER  IN AN  ACTION OF CONTRACT,  TORT OR
+   OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
+   USE OR OTHER DEALINGS IN THE SOFTWARE.
+*/
+
+=== Modules/expat/xmlrole.c ===
+/*
+                            __  __            _
+                         ___\ \/ /_ __   __ _| |_
+                        / _ \\  /| '_ \ / _` | __|
+                       |  __//  \| |_) | (_| | |_
+                        \___/_/\_\ .__/ \__,_|\__|
+                                 |_| XML parser
+
+   Copyright (c) 1997-2000 Thai Open Source Software Center Ltd
+   Copyright (c) 2000      Clark Cooper <coopercc@users.sourceforge.net>
+   Copyright (c) 2002      Greg Stein <gstein@users.sourceforge.net>
+   Copyright (c) 2002-2006 Karl Waclawek <karl@waclawek.net>
+   Copyright (c) 2002-2003 Fred L. Drake, Jr. <fdrake@users.sourceforge.net>
+   Copyright (c) 2005-2009 Steven Solie <steven@solie.ca>
+   Copyright (c) 2016-2023 Sebastian Pipping <sebastian@pipping.org>
+   Copyright (c) 2017      Rhodri James <rhodri@wildebeest.org.uk>
+   Copyright (c) 2019      David Loffredo <loffredo@steptools.com>
+   Copyright (c) 2021      Donghee Na <donghee.na@python.org>
+   Licensed under the MIT license:
+
+   Permission is  hereby granted,  free of charge,  to any  person obtaining
+   a  copy  of  this  software   and  associated  documentation  files  (the
+   "Software"),  to  deal in  the  Software  without restriction,  including
+   without  limitation the  rights  to use,  copy,  modify, merge,  publish,
+   distribute, sublicense, and/or sell copies of the Software, and to permit
+   persons  to whom  the Software  is  furnished to  do so,  subject to  the
+   following conditions:
+
+   The above copyright  notice and this permission notice  shall be included
+   in all copies or substantial portions of the Software.
+
+   THE  SOFTWARE  IS  PROVIDED  "AS  IS",  WITHOUT  WARRANTY  OF  ANY  KIND,
+   EXPRESS  OR IMPLIED,  INCLUDING  BUT  NOT LIMITED  TO  THE WARRANTIES  OF
+   MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN
+   NO EVENT SHALL THE AUTHORS OR  COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+   DAMAGES OR  OTHER LIABILITY, WHETHER  IN AN  ACTION OF CONTRACT,  TORT OR
+   OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
+   USE OR OTHER DEALINGS IN THE SOFTWARE.
+*/
+
+=== Modules/expat/xmlrole.h ===
+/*
+                            __  __            _
+                         ___\ \/ /_ __   __ _| |_
+                        / _ \\  /| '_ \ / _` | __|
+                       |  __//  \| |_) | (_| | |_
+                        \___/_/\_\ .__/ \__,_|\__|
+                                 |_| XML parser
+
+   Copyright (c) 1997-2000 Thai Open Source Software Center Ltd
+   Copyright (c) 2000      Clark Cooper <coopercc@users.sourceforge.net>
+   Copyright (c) 2002      Karl Waclawek <karl@waclawek.net>
+   Copyright (c) 2002      Fred L. Drake, Jr. <fdrake@users.sourceforge.net>
+   Copyright (c) 2017-2025 Sebastian Pipping <sebastian@pipping.org>
+   Licensed under the MIT license:
+
+   Permission is  hereby granted,  free of charge,  to any  person obtaining
+   a  copy  of  this  software   and  associated  documentation  files  (the
+   "Software"),  to  deal in  the  Software  without restriction,  including
+   without  limitation the  rights  to use,  copy,  modify, merge,  publish,
+   distribute, sublicense, and/or sell copies of the Software, and to permit
+   persons  to whom  the Software  is  furnished to  do so,  subject to  the
+   following conditions:
+
+   The above copyright  notice and this permission notice  shall be included
+   in all copies or substantial portions of the Software.
+
+   THE  SOFTWARE  IS  PROVIDED  "AS  IS",  WITHOUT  WARRANTY  OF  ANY  KIND,
+   EXPRESS  OR IMPLIED,  INCLUDING  BUT  NOT LIMITED  TO  THE WARRANTIES  OF
+   MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN
+   NO EVENT SHALL THE AUTHORS OR  COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+   DAMAGES OR  OTHER LIABILITY, WHETHER  IN AN  ACTION OF CONTRACT,  TORT OR
+   OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
+   USE OR OTHER DEALINGS IN THE SOFTWARE.
+*/
+
+=== Modules/expat/xmltok.c ===
+/*
+                            __  __            _
+                         ___\ \/ /_ __   __ _| |_
+                        / _ \\  /| '_ \ / _` | __|
+                       |  __//  \| |_) | (_| | |_
+                        \___/_/\_\ .__/ \__,_|\__|
+                                 |_| XML parser
+
+   Copyright (c) 1997-2000 Thai Open Source Software Center Ltd
+   Copyright (c) 2000      Clark Cooper <coopercc@users.sourceforge.net>
+   Copyright (c) 2001-2003 Fred L. Drake, Jr. <fdrake@users.sourceforge.net>
+   Copyright (c) 2002      Greg Stein <gstein@users.sourceforge.net>
+   Copyright (c) 2002-2016 Karl Waclawek <karl@waclawek.net>
+   Copyright (c) 2005-2009 Steven Solie <steven@solie.ca>
+   Copyright (c) 2016-2024 Sebastian Pipping <sebastian@pipping.org>
+   Copyright (c) 2016      Pascal Cuoq <cuoq@trust-in-soft.com>
+   Copyright (c) 2016      Don Lewis <truckman@apache.org>
+   Copyright (c) 2017      Rhodri James <rhodri@wildebeest.org.uk>
+   Copyright (c) 2017      Alexander Bluhm <alexander.bluhm@gmx.net>
+   Copyright (c) 2017      Benbuck Nason <bnason@netflix.com>
+   Copyright (c) 2017      José Gutiérrez de la Concha <jose@zeroc.com>
+   Copyright (c) 2019      David Loffredo <loffredo@steptools.com>
+   Copyright (c) 2021      Donghee Na <donghee.na@python.org>
+   Copyright (c) 2022      Martin Ettl <ettl.martin78@googlemail.com>
+   Copyright (c) 2022      Sean McBride <sean@rogue-research.com>
+   Copyright (c) 2023      Hanno Böck <hanno@gentoo.org>
+   Licensed under the MIT license:
+
+   Permission is  hereby granted,  free of charge,  to any  person obtaining
+   a  copy  of  this  software   and  associated  documentation  files  (the
+   "Software"),  to  deal in  the  Software  without restriction,  including
+   without  limitation the  rights  to use,  copy,  modify, merge,  publish,
+   distribute, sublicense, and/or sell copies of the Software, and to permit
+   persons  to whom  the Software  is  furnished to  do so,  subject to  the
+   following conditions:
+
+   The above copyright  notice and this permission notice  shall be included
+   in all copies or substantial portions of the Software.
+
+   THE  SOFTWARE  IS  PROVIDED  "AS  IS",  WITHOUT  WARRANTY  OF  ANY  KIND,
+   EXPRESS  OR IMPLIED,  INCLUDING  BUT  NOT LIMITED  TO  THE WARRANTIES  OF
+   MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN
+   NO EVENT SHALL THE AUTHORS OR  COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+   DAMAGES OR  OTHER LIABILITY, WHETHER  IN AN  ACTION OF CONTRACT,  TORT OR
+   OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
+   USE OR OTHER DEALINGS IN THE SOFTWARE.
+*/
+
+=== Modules/expat/xmltok.h ===
+/*
+                            __  __            _
+                         ___\ \/ /_ __   __ _| |_
+                        / _ \\  /| '_ \ / _` | __|
+                       |  __//  \| |_) | (_| | |_
+                        \___/_/\_\ .__/ \__,_|\__|
+                                 |_| XML parser
+
+   Copyright (c) 1997-2000 Thai Open Source Software Center Ltd
+   Copyright (c) 2000      Clark Cooper <coopercc@users.sourceforge.net>
+   Copyright (c) 2002      Fred L. Drake, Jr. <fdrake@users.sourceforge.net>
+   Copyright (c) 2002-2005 Karl Waclawek <karl@waclawek.net>
+   Copyright (c) 2016-2024 Sebastian Pipping <sebastian@pipping.org>
+   Copyright (c) 2017      Rhodri James <rhodri@wildebeest.org.uk>
+   Licensed under the MIT license:
+
+   Permission is  hereby granted,  free of charge,  to any  person obtaining
+   a  copy  of  this  software   and  associated  documentation  files  (the
+   "Software"),  to  deal in  the  Software  without restriction,  including
+   without  limitation the  rights  to use,  copy,  modify, merge,  publish,
+   distribute, sublicense, and/or sell copies of the Software, and to permit
+   persons  to whom  the Software  is  furnished to  do so,  subject to  the
+   following conditions:
+
+   The above copyright  notice and this permission notice  shall be included
+   in all copies or substantial portions of the Software.
+
+   THE  SOFTWARE  IS  PROVIDED  "AS  IS",  WITHOUT  WARRANTY  OF  ANY  KIND,
+   EXPRESS  OR IMPLIED,  INCLUDING  BUT  NOT LIMITED  TO  THE WARRANTIES  OF
+   MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN
+   NO EVENT SHALL THE AUTHORS OR  COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+   DAMAGES OR  OTHER LIABILITY, WHETHER  IN AN  ACTION OF CONTRACT,  TORT OR
+   OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
+   USE OR OTHER DEALINGS IN THE SOFTWARE.
+*/
+
+=== Modules/expat/xmltok_impl.c ===
+/* This file is included (from xmltok.c, 1-3 times depending on XML_MIN_SIZE)!
+                            __  __            _
+                         ___\ \/ /_ __   __ _| |_
+                        / _ \\  /| '_ \ / _` | __|
+                       |  __//  \| |_) | (_| | |_
+                        \___/_/\_\ .__/ \__,_|\__|
+                                 |_| XML parser
+
+   Copyright (c) 1997-2000 Thai Open Source Software Center Ltd
+   Copyright (c) 2000      Clark Cooper <coopercc@users.sourceforge.net>
+   Copyright (c) 2002      Fred L. Drake, Jr. <fdrake@users.sourceforge.net>
+   Copyright (c) 2002-2016 Karl Waclawek <karl@waclawek.net>
+   Copyright (c) 2016-2022 Sebastian Pipping <sebastian@pipping.org>
+   Copyright (c) 2017      Rhodri James <rhodri@wildebeest.org.uk>
+   Copyright (c) 2018      Benjamin Peterson <benjamin@python.org>
+   Copyright (c) 2018      Anton Maklakov <antmak.pub@gmail.com>
+   Copyright (c) 2019      David Loffredo <loffredo@steptools.com>
+   Copyright (c) 2020      Boris Kolpackov <boris@codesynthesis.com>
+   Copyright (c) 2022      Martin Ettl <ettl.martin78@googlemail.com>
+   Licensed under the MIT license:
+
+   Permission is  hereby granted,  free of charge,  to any  person obtaining
+   a  copy  of  this  software   and  associated  documentation  files  (the
+   "Software"),  to  deal in  the  Software  without restriction,  including
+   without  limitation the  rights  to use,  copy,  modify, merge,  publish,
+   distribute, sublicense, and/or sell copies of the Software, and to permit
+   persons  to whom  the Software  is  furnished to  do so,  subject to  the
+   following conditions:
+
+   The above copyright  notice and this permission notice  shall be included
+   in all copies or substantial portions of the Software.
+
+   THE  SOFTWARE  IS  PROVIDED  "AS  IS",  WITHOUT  WARRANTY  OF  ANY  KIND,
+   EXPRESS  OR IMPLIED,  INCLUDING  BUT  NOT LIMITED  TO  THE WARRANTIES  OF
+   MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN
+   NO EVENT SHALL THE AUTHORS OR  COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+   DAMAGES OR  OTHER LIABILITY, WHETHER  IN AN  ACTION OF CONTRACT,  TORT OR
+   OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
+   USE OR OTHER DEALINGS IN THE SOFTWARE.
+*/
+
+=== Modules/expat/xmltok_impl.h ===
+/*
+                            __  __            _
+                         ___\ \/ /_ __   __ _| |_
+                        / _ \\  /| '_ \ / _` | __|
+                       |  __//  \| |_) | (_| | |_
+                        \___/_/\_\ .__/ \__,_|\__|
+                                 |_| XML parser
+
+   Copyright (c) 1997-2000 Thai Open Source Software Center Ltd
+   Copyright (c) 2000      Clark Cooper <coopercc@users.sourceforge.net>
+   Copyright (c) 2017-2019 Sebastian Pipping <sebastian@pipping.org>
+   Licensed under the MIT license:
+
+   Permission is  hereby granted,  free of charge,  to any  person obtaining
+   a  copy  of  this  software   and  associated  documentation  files  (the
+   "Software"),  to  deal in  the  Software  without restriction,  including
+   without  limitation the  rights  to use,  copy,  modify, merge,  publish,
+   distribute, sublicense, and/or sell copies of the Software, and to permit
+   persons  to whom  the Software  is  furnished to  do so,  subject to  the
+   following conditions:
+
+   The above copyright  notice and this permission notice  shall be included
+   in all copies or substantial portions of the Software.
+
+   THE  SOFTWARE  IS  PROVIDED  "AS  IS",  WITHOUT  WARRANTY  OF  ANY  KIND,
+   EXPRESS  OR IMPLIED,  INCLUDING  BUT  NOT LIMITED  TO  THE WARRANTIES  OF
+   MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN
+   NO EVENT SHALL THE AUTHORS OR  COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+   DAMAGES OR  OTHER LIABILITY, WHETHER  IN AN  ACTION OF CONTRACT,  TORT OR
+   OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
+   USE OR OTHER DEALINGS IN THE SOFTWARE.
+*/
+
+=== Modules/expat/xmltok_ns.c ===
+/* This file is included!
+                            __  __            _
+                         ___\ \/ /_ __   __ _| |_
+                        / _ \\  /| '_ \ / _` | __|
+                       |  __//  \| |_) | (_| | |_
+                        \___/_/\_\ .__/ \__,_|\__|
+                                 |_| XML parser
+
+   Copyright (c) 1997-2000 Thai Open Source Software Center Ltd
+   Copyright (c) 2000      Clark Cooper <coopercc@users.sourceforge.net>
+   Copyright (c) 2002      Greg Stein <gstein@users.sourceforge.net>
+   Copyright (c) 2002      Fred L. Drake, Jr. <fdrake@users.sourceforge.net>
+   Copyright (c) 2002-2006 Karl Waclawek <karl@waclawek.net>
+   Copyright (c) 2017-2021 Sebastian Pipping <sebastian@pipping.org>
+   Licensed under the MIT license:
+
+   Permission is  hereby granted,  free of charge,  to any  person obtaining
+   a  copy  of  this  software   and  associated  documentation  files  (the
+   "Software"),  to  deal in  the  Software  without restriction,  including
+   without  limitation the  rights  to use,  copy,  modify, merge,  publish,
+   distribute, sublicense, and/or sell copies of the Software, and to permit
+   persons  to whom  the Software  is  furnished to  do so,  subject to  the
+   following conditions:
+
+   The above copyright  notice and this permission notice  shall be included
+   in all copies or substantial portions of the Software.
+
+   THE  SOFTWARE  IS  PROVIDED  "AS  IS",  WITHOUT  WARRANTY  OF  ANY  KIND,
+   EXPRESS  OR IMPLIED,  INCLUDING  BUT  NOT LIMITED  TO  THE WARRANTIES  OF
+   MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN
+   NO EVENT SHALL THE AUTHORS OR  COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+   DAMAGES OR  OTHER LIABILITY, WHETHER  IN AN  ACTION OF CONTRACT,  TORT OR
+   OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
+   USE OR OTHER DEALINGS IN THE SOFTWARE.
+*/
+
+=== Modules/getaddrinfo.c, Modules/getnameinfo.c ===
+/*
+ * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the project nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE PROJECT OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ */
+
+=== Modules/mmapmodule.c ===
+/*
+ /  Author: Sam Rushing <rushing@nightmare.com>
+ /  Hacked for Unix by AMK
+ /  $Id$
+
+ / Modified to support mmap with offset - to map a 'window' of a file
+ /   Author:  Yotam Medini  yotamm@mellanox.co.il
+ /
+ / mmapmodule.cpp -- map a view of a file into memory
+ /
+ / todo: need permission flags, perhaps a 'chsize' analog
+ /   not all functions check range yet!!!
+ /
+ /
+ / This version of mmapmodule.c has been changed significantly
+ / from the original mmapfile.c on which it was based.
+ / The original version of mmapfile is maintained by Sam at
+ / ftp://squirl.nightmare.com/pub/python/python-ext.
+*/
+
+=== Modules/sha3module.c ===
+/* SHA3 module
+ *
+ * This module provides an interface to the SHA3 algorithm
+ *
+ * See below for information about the original code this module was
+ * based upon. Additional work performed by:
+ *
+ *  Andrew Kuchling (amk@amk.ca)
+ *  Greg Stein (gstein@lyra.org)
+ *  Trevor Perrin (trevp@trevp.net)
+ *  Gregory P. Smith (greg@krypto.org)
+ *
+ * Copyright (C) 2012-2022  Christian Heimes (christian@python.org)
+ * Licensed to PSF under a Contributor Agreement.
+ *
+ */
+
+=== Modules/syslogmodule.c ===
+/***********************************************************
+Copyright 1994 by Lance Ellinghouse,
+Cathedral City, California Republic, United States of America.
+
+                        All Rights Reserved
+
+Permission to use, copy, modify, and distribute this software and its
+documentation for any purpose and without fee is hereby granted,
+provided that the above copyright notice appear in all copies and that
+both that copyright notice and this permission notice appear in
+supporting documentation, and that the name of Lance Ellinghouse
+not be used in advertising or publicity pertaining to distribution
+of the software without specific, written prior permission.
+
+LANCE ELLINGHOUSE DISCLAIMS ALL WARRANTIES WITH REGARD TO
+THIS SOFTWARE, INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND
+FITNESS, IN NO EVENT SHALL LANCE ELLINGHOUSE BE LIABLE FOR ANY SPECIAL,
+INDIRECT OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING
+FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT,
+NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION
+WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+
+******************************************************************/
+
+=== Modules/unicodedata.c ===
+/* ------------------------------------------------------------------------
+
+   unicodedata -- Provides access to the Unicode database.
+
+   The current version number is reported in the unidata_version constant.
+
+   Written by Marc-Andre Lemburg (mal@lemburg.com).
+   Modified for Python 2.0 by Fredrik Lundh (fredrik@pythonware.com)
+   Modified by Martin v. Löwis (martin@v.loewis.de)
+
+   Copyright (c) Corporation for National Research Initiatives.
+
+   ------------------------------------------------------------------------ */
+
+=== Objects/mimalloc/alloc-aligned.c, Objects/mimalloc/alloc-override.c, Objects/mimalloc/alloc-posix.c, Objects/mimalloc/options.c, Objects/mimalloc/stats.c ===
+/* ----------------------------------------------------------------------------
+Copyright (c) 2018-2021, Microsoft Research, Daan Leijen
+This is free software; you can redistribute it and/or modify it under the
+terms of the MIT license. A copy of the license can be found in the file
+"LICENSE" at the root of this distribution.
+-----------------------------------------------------------------------------*/
+
+=== Objects/mimalloc/alloc.c, Objects/mimalloc/init.c, Objects/mimalloc/prim/osx/alloc-override-zone.c ===
+/* ----------------------------------------------------------------------------
+Copyright (c) 2018-2022, Microsoft Research, Daan Leijen
+This is free software; you can redistribute it and/or modify it under the
+terms of the MIT license. A copy of the license can be found in the file
+"LICENSE" at the root of this distribution.
+-----------------------------------------------------------------------------*/
+
+=== Objects/mimalloc/arena.c, Objects/mimalloc/segment-map.c ===
+/* ----------------------------------------------------------------------------
+Copyright (c) 2019-2023, Microsoft Research, Daan Leijen
+This is free software; you can redistribute it and/or modify it under the
+terms of the MIT license. A copy of the license can be found in the file
+"LICENSE" at the root of this distribution.
+-----------------------------------------------------------------------------*/
+
+=== Objects/mimalloc/bitmap.c, Objects/mimalloc/bitmap.h ===
+/* ----------------------------------------------------------------------------
+Copyright (c) 2019-2023 Microsoft Research, Daan Leijen
+This is free software; you can redistribute it and/or modify it under the
+terms of the MIT license. A copy of the license can be found in the file
+"LICENSE" at the root of this distribution.
+-----------------------------------------------------------------------------*/
+
+=== Objects/mimalloc/heap.c ===
+/*----------------------------------------------------------------------------
+Copyright (c) 2018-2021, Microsoft Research, Daan Leijen
+This is free software; you can redistribute it and/or modify it under the
+terms of the MIT license. A copy of the license can be found in the file
+"LICENSE" at the root of this distribution.
+-----------------------------------------------------------------------------*/
+
+=== Objects/mimalloc/os.c, Objects/mimalloc/prim/osx/prim.c, Objects/mimalloc/prim/prim.c, Objects/mimalloc/prim/unix/prim.c, Objects/mimalloc/prim/wasi/prim.c, Objects/mimalloc/prim/windows/prim.c ===
+/* ----------------------------------------------------------------------------
+Copyright (c) 2018-2023, Microsoft Research, Daan Leijen
+This is free software; you can redistribute it and/or modify it under the
+terms of the MIT license. A copy of the license can be found in the file
+"LICENSE" at the root of this distribution.
+-----------------------------------------------------------------------------*/
+
+=== Objects/mimalloc/page-queue.c, Objects/mimalloc/page.c ===
+/*----------------------------------------------------------------------------
+Copyright (c) 2018-2020, Microsoft Research, Daan Leijen
+This is free software; you can redistribute it and/or modify it under the
+terms of the MIT license. A copy of the license can be found in the file
+"LICENSE" at the root of this distribution.
+-----------------------------------------------------------------------------*/
+
+=== Objects/mimalloc/random.c ===
+/* ----------------------------------------------------------------------------
+Copyright (c) 2019-2021, Microsoft Research, Daan Leijen
+This is free software; you can redistribute it and/or modify it under the
+terms of the MIT license. A copy of the license can be found in the file
+"LICENSE" at the root of this distribution.
+-----------------------------------------------------------------------------*/
+
+=== Objects/mimalloc/segment.c, Objects/mimalloc/static.c ===
+/* ----------------------------------------------------------------------------
+Copyright (c) 2018-2020, Microsoft Research, Daan Leijen
+This is free software; you can redistribute it and/or modify it under the
+terms of the MIT license. A copy of the license can be found in the file
+"LICENSE" at the root of this distribution.
+-----------------------------------------------------------------------------*/
+
+=== Objects/sliceobject.c ===
+/*
+Written by Jim Hugunin and Chris Chase.
+
+This includes both the singular ellipsis object and slice objects.
+
+Guido, feel free to do whatever you want in the way of copyrights
+for this file.
+*/
+
+=== Objects/unicodectype.c ===
+/*
+   Unicode character type helpers.
+
+   Written by Marc-Andre Lemburg (mal@lemburg.com).
+   Modified for Python 2.0 by Fredrik Lundh (fredrik@pythonware.com)
+
+   Copyright (c) Corporation for National Research Initiatives.
+
+*/
+
+=== Objects/unicodeobject.c ===
+/*
+
+Unicode implementation based on original code by Fredrik Lundh,
+modified by Marc-Andre Lemburg <mal@lemburg.com>.
+
+Major speed upgrades to the method implementations at the Reykjavik
+NeedForSpeed sprint, by Fredrik Lundh and Andrew Dalke.
+
+Copyright (c) Corporation for National Research Initiatives.
+
+--------------------------------------------------------------------
+The original string type implementation is:
+
+  Copyright (c) 1999 by Secret Labs AB
+  Copyright (c) 1999 by Fredrik Lundh
+
+By obtaining, using, and/or copying this software and/or its
+associated documentation, you agree that you have read, understood,
+and will comply with the following terms and conditions:
+
+Permission to use, copy, modify, and distribute this software and its
+associated documentation for any purpose and without fee is hereby
+granted, provided that the above copyright notice appears in all
+copies, and that both that copyright notice and this permission notice
+appear in supporting documentation, and that the name of Secret Labs
+AB or the author not be used in advertising or publicity pertaining to
+distribution of the software without specific, written prior
+permission.
+
+SECRET LABS AB AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH REGARD TO
+THIS SOFTWARE, INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND
+FITNESS.  IN NO EVENT SHALL SECRET LABS AB OR THE AUTHOR BE LIABLE FOR
+ANY SPECIAL, INDIRECT OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT
+OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+--------------------------------------------------------------------
+
+*/
+
+=== Python/codecs.c ===
+/* ------------------------------------------------------------------------
+
+   Python Codec Registry and support functions
+
+Written by Marc-Andre Lemburg (mal@lemburg.com).
+
+Copyright (c) Corporation for National Research Initiatives.
+
+   ------------------------------------------------------------------------ */
+
+=== Python/dtoa.c ===
+/****************************************************************
+ *
+ * The author of this software is David M. Gay.
+ *
+ * Copyright (c) 1991, 2000, 2001 by Lucent Technologies.
+ *
+ * Permission to use, copy, modify, and distribute this software for any
+ * purpose without fee is hereby granted, provided that this entire notice
+ * is included in all copies of any software which is or includes a copy
+ * or modification of this software and in all copies of the supporting
+ * documentation for such software.
+ *
+ * THIS SOFTWARE IS BEING PROVIDED "AS IS", WITHOUT ANY EXPRESS OR IMPLIED
+ * WARRANTY.  IN PARTICULAR, NEITHER THE AUTHOR NOR LUCENT MAKES ANY
+ * REPRESENTATION OR WARRANTY OF ANY KIND CONCERNING THE MERCHANTABILITY
+ * OF THIS SOFTWARE OR ITS FITNESS FOR ANY PARTICULAR PURPOSE.
+ *
+ ***************************************************************/
+
+=== Python/dup2.c ===
+/*
+ * Public domain dup2() lookalike
+ * by Curtis Jackson @ AT&T Technologies, Burlington, NC
+ * electronic address:  burl!rcj
+ *
+ * dup2 performs the following functions:
+ *
+ * Check to make sure that fd1 is a valid open file descriptor.
+ * Check to see if fd2 is already open; if so, close it.
+ * Duplicate fd1 onto fd2; checking to make sure fd2 is a valid fd.
+ * Return fd2 if all went well; return BADEXIT otherwise.
+ */
+
+=== Python/dynamic_annotations.c ===
+/* Copyright (c) 2008-2009, Google Inc.
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are
+ * met:
+ *
+ *     * Redistributions of source code must retain the above copyright
+ * notice, this list of conditions and the following disclaimer.
+ *     * Neither the name of Google Inc. nor the names of its
+ * contributors may be used to endorse or promote products derived from
+ * this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+ * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+ * OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+ * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+ * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+ * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * ---
+ * Author: Kostya Serebryany
+ */
+
+=== Python/getcopyright.c ===
+/* Return the copyright string.  This is updated manually. */
+
+=== Python/getopt.c ===
+/*---------------------------------------------------------------------------*
+ * <RCS keywords>
+ *
+ * C++ Library
+ *
+ * Copyright 1992-1994, David Gottner
+ *
+ *                    All Rights Reserved
+ *
+ * Permission to use, copy, modify, and distribute this software and its
+ * documentation for any purpose and without fee is hereby granted,
+ * provided that the above copyright notice, this permission notice and
+ * the following disclaimer notice appear unmodified in all copies.
+ *
+ * I DISCLAIM ALL WARRANTIES WITH REGARD TO THIS SOFTWARE, INCLUDING ALL
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS.  IN NO EVENT SHALL I
+ * BE LIABLE FOR ANY SPECIAL, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY
+ * DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA, OR PROFITS, WHETHER
+ * IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT
+ * OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+ *---------------------------------------------------------------------------*/
+
+=== Python/hashtable.c ===
+/* The implementation of the hash table (_Py_hashtable_t) is based on the
+   cfuhash project:
+   http://sourceforge.net/projects/libcfu/
+
+   Copyright of cfuhash:
+   ----------------------------------
+   Creation date: 2005-06-24 21:22:40
+   Authors: Don
+   Change log:
+
+   Copyright (c) 2005 Don Owens
+   All rights reserved.
+
+   This code is released under the BSD license:
+
+   Redistribution and use in source and binary forms, with or without
+   modification, are permitted provided that the following conditions
+   are met:
+
+     * Redistributions of source code must retain the above copyright
+       notice, this list of conditions and the following disclaimer.
+
+     * Redistributions in binary form must reproduce the above
+       copyright notice, this list of conditions and the following
+       disclaimer in the documentation and/or other materials provided
+       with the distribution.
+
+     * Neither the name of the author nor the names of its
+       contributors may be used to endorse or promote products derived
+       from this software without specific prior written permission.
+
+   THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+   "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+   LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+   FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+   COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+   INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+   (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+   SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+   HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
+   STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+   ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED
+   OF THE POSSIBILITY OF SUCH DAMAGE.
+   ----------------------------------
+*/
+
+=== Python/perf_trampoline.c ===
+/*
+
+Perf trampoline instrumentation
+===============================
+
+This file contains instrumentation to allow to associate
+calls to the CPython eval loop back to the names of the Python
+functions and filename being executed.
+
+Many native performance profilers like the Linux perf tools are
+only available to 'see' the C stack when sampling from the profiled
+process. This means that if we have the following python code:
+
+    import time
+    def foo(n):
+        # Some CPU intensive code
+
+    def bar(n):
+        foo(n)
+
+    def baz(n):
+        bar(n)
+
+    baz(10000000)
+
+A performance profiler that is only able to see native frames will
+produce the following backtrace when sampling from foo():
+
+    _PyEval_EvalFrameDefault -----> Evaluation frame of foo()
+    _PyEval_Vector
+    _PyFunction_Vectorcall
+    PyObject_Vectorcall
+    call_function
+
+    _PyEval_EvalFrameDefault ------> Evaluation frame of bar()
+    _PyEval_EvalFrame
+    _PyEval_Vector
+    _PyFunction_Vectorcall
+    PyObject_Vectorcall
+    call_function
+
+    _PyEval_EvalFrameDefault -------> Evaluation frame of baz()
+    _PyEval_EvalFrame
+    _PyEval_Vector
+    _PyFunction_Vectorcall
+    PyObject_Vectorcall
+    call_function
+
+    ...
+
+    Py_RunMain
+
+Because the profiler is only able to see the native frames and the native
+function that runs the evaluation loop is the same (_PyEval_EvalFrameDefault)
+then the profiler and any reporter generated by it will not be able to
+associate the names of the Python functions and the filenames associated with
+those calls, rendering the results useless in the Python world.
+
+To fix this problem, we introduce the concept of a trampoline frame. A
+trampoline frame is a piece of code that is unique per Python code object that
+is executed before entering the CPython eval loop. This piece of code just
+calls the original Python evaluation function (_PyEval_EvalFrameDefault) and
+forwards all the arguments received. In this way, when a profiler samples
+frames from the previous example it will see;
+
+    _PyEval_EvalFrameDefault -----> Evaluation frame of foo()
+    [Jit compiled code 3]
+    _PyEval_Vector
+    _PyFunction_Vectorcall
+    PyObject_Vectorcall
+    call_function
+
+    _PyEval_EvalFrameDefault ------> Evaluation frame of bar()
+    [Jit compiled code 2]
+    _PyEval_EvalFrame
+    _PyEval_Vector
+    _PyFunction_Vectorcall
+    PyObject_Vectorcall
+    call_function
+
+    _PyEval_EvalFrameDefault -------> Evaluation frame of baz()
+    [Jit compiled code 1]
+    _PyEval_EvalFrame
+    _PyEval_Vector
+    _PyFunction_Vectorcall
+    PyObject_Vectorcall
+    call_function
+
+    ...
+
+    Py_RunMain
+
+When we generate every unique copy of the trampoline (what here we called "[Jit
+compiled code N]") we write the relationship between the compiled code and the
+Python function that is associated with it. Every profiler requires this
+information in a different format. For example, the Linux "perf" profiler
+requires a file in "/tmp/perf-PID.map" (name and location not configurable)
+with the following format:
+
+    <compiled code address> <compiled code size> <name of the compiled code>
+
+If this file is available when "perf" generates reports, it will automatically
+associate every trampoline with the Python function that it is associated with
+allowing it to generate reports that include Python information. These reports
+then can also be filtered in a way that *only* Python information appears.
+
+Notice that for this to work, there must be a unique copied of the trampoline
+per Python code object even if the code in the trampoline is the same. To
+achieve this we have a assembly template in Objects/asm_trampiline.S that is
+compiled into the Python executable/shared library. This template generates a
+symbol that maps the start of the assembly code and another that marks the end
+of the assembly code for the trampoline.  Then, every time we need a unique
+trampoline for a Python code object, we copy the assembly code into a mmaped
+area that has executable permissions and we return the start of that area as
+our trampoline function.
+
+Asking for a mmap-ed memory area for trampoline is very wasteful so we
+allocate big arenas of memory in a single mmap call, we populate the entire
+arena with copies of the trampoline (this allows us to now have to invalidate
+the icache for the instructions in the page) and then we return the next
+available chunk every time someone asks for a new trampoline. We keep a linked
+list of arenas in case the current memory arena is exhausted and another one is
+needed.
+
+For the best results, Python should be compiled with
+CFLAGS="-fno-omit-frame-pointer -mno-omit-leaf-frame-pointer" as this allows
+profilers to unwind using only the frame pointer and not on DWARF debug
+information (note that as trampilines are dynamically generated there won't be
+any DWARF information available for them).
+*/
+
+=== Python/qsbr.c ===
+/*
+ * Implementation of safe memory reclamation scheme using
+ * quiescent states.
+ *
+ * This is derived from the "GUS" safe memory reclamation technique
+ * in FreeBSD written by Jeffrey Roberson. It is heavily modified. Any bugs
+ * in this code are likely due to the modifications.
+ *
+ * The original copyright is preserved below.
+ *
+ * Copyright (c) 2019,2020 Jeffrey Roberson <jeff@FreeBSD.org>
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice unmodified, this list of conditions, and the following
+ *    disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
+ * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+ * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+ * IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+ * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+ * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+ * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */

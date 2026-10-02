@@ -12,7 +12,7 @@
 4. 右键 ZIP 选择“全部解压缩”，放到当前用户可访问的本地目录，例如 `文档\SWU Checkin\`。目录可以有空格和中文
 5. 双击解压目录中的 `SWUCheckin.exe`。默认仅恢复本地状态，不联网、登录、提交签到或新建计划任务。先阅读包内 `README-PORTABLE.txt`
 
-已发布的 [v2.0.0](https://github.com/Maximora-byte/swu-checkin/releases/tag/v2.0.0) 有 `SWUCheckin-2.0.0-win-x64.zip`，它也是完整 onedir 应用，不必运行安装程序。该旧 ZIP 的名称、内容和发布状态保持原样；再分发旧包时，仍须一并保留该 Release 单独提供的 Tcl 许可。当前源码中的 `Portable.zip` 由构建自动生成，内附免安装说明、独立校验清单、可直接查看的来源信息和 Tcl 许可，并直接对 ZIP 解压后的内容验收。源码尚未改动版本号，因此不能只用文件名中的 `2.0.0` 区分旧 Release 与新构建，须核对 `BUILD-INFO.json` 的 commit。
+已发布 [v2.0.0](https://github.com/Maximora-byte/swu-checkin/releases/tag/v2.0.0) 的 `SWUCheckin-2.0.0-win-x64.zip` 是完整 onedir，旧名称/内容不变，再分发须保留该 Release 单独提供的 Tcl 许可。当前源码已同步 2.1.0，候选 `SWUCheckin-2.1.0-win-x64-Portable.zip` 内附说明、来源及逐文件校验，并补齐真实 Python/Tcl/Tk、依赖和 vendor 原文；构建直接验收 ZIP 解压内容。尚无新 tag/Release，最终包仍须核对自己的 BUILD-INFO commit、版本和许可清单，不只凭文件名确认来源。
 
 GitHub 自动生成的 `Source code (zip)` 是源码，不是免安装程序。安装程序 `*-Setup.exe`、Python wheel/sdist、Actions 外层 ZIP 与内部 `*-Portable.zip` 是不同文件。
 
@@ -48,11 +48,12 @@ DPAPI、显式保存、只读探测、正式签到确认和错误处理均沿用
 - `README-PORTABLE.txt`：无需联网阅读的中文启动、存储、迁移与安全说明
 - `BUILD-INFO.json`、`TOOLCHAIN.txt`：与应用内来源记录一致
 - `Tcl-8.6.15-LICENSE.txt`：与固定 Tcl 版本对应的上游许可原文；其他许可仍在冻结资源中
+- `_internal/build-info/LICENSE-INVENTORY.json`、`PYTHON-LICENSE.txt` 与 `licenses/`：实际 Python、Tcl/Tk、依赖和 vendor 原文及 SHA256，构建缺项会失败；版本变化需重新盘点
 - `SHA256SUMS.txt`：逐文件校验（不含清单自身）；外层分发清单另含 ZIP 本身的哈希
 
 [Windows desktop 工作流](../.github/workflows/windows-desktop.yml) 在**安装程序运行前**执行 `verify-portable.ps1`，直接验收新 ZIP。脚本仅允许运行在一次性 GitHub-hosted Windows runner：使用非管理员受限进程 token，隔离用户数据目录，移除 Python/uv/虚拟环境的路径与配置，将 ZIP 解压到含中文和空格的目录，运行冻结离线自测、默认 GUI 关闭/重开/关闭，并核对文件哈希、无新增任务/安装登记/快捷方式、无用户数据持久写入、无遗留自有进程。它不创建测试账号，也不改动现有文件、桌面或设备的 ACL/安全设置；仅为新建的 CI 测试 token 初始化当前用户与 SYSTEM 的默认对象 ACL，不增加权限组或特权，不使用学校账号或调用学校接口。
 
-受限 token 检查是 CI 中的无管理员权限模拟，不是干净 Windows 10/11 实机验收。原有安装/卸载与无害计划任务专项测试仍单独运行；免安装测试不会注册任何任务。Actions artifacts 保留 14 天，下载可能需要 GitHub 登录，不等同永久 Release。
+受限 token 检查是 CI 无管理员权限模拟，不是干净 Windows 10/11 实机验收。安装/卸载和无害任务专项仍独立，Portable 测试不注册任务。新版工作流支持发布预检按精确同一 SHA 调用，再由 stage 对 ZIP 内外来源/许可/哈希审核；PR/手动运行不发布。Actions artifact 保留 14 天，不等同永久 Release；候选说明见 [v2.1.0](releases/v2.1.0.md)。
 
 ## 待人工验收
 

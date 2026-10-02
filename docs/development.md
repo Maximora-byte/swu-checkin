@@ -4,14 +4,14 @@
 
 ## 1. 版本与分发边界
 
-已发布的最新版本是 [`v2.0.0`](https://github.com/Maximora-byte/swu-checkin/releases/tag/v2.0.0)。当前 `main` 仍声明相同版本，但代码已经继续演进：
+已发布的最新版本是 [`v2.0.0`](https://github.com/Maximora-byte/swu-checkin/releases/tag/v2.0.0)。当前源码准备 **v2.1.0 Pre-release**，尚未创建 tag 或 Release：
 
-- `pyproject.toml`、`swu_checkin.__version__` 与 `uv.lock` 的项目版本为 `2.0.0`；该版本的历史交付见 [v2.0.0 发布说明](releases/v2.0.0.md)，后续发布条件见 [发布准备评估](releases/release-readiness.md)
+- `pyproject.toml`、`swu_checkin.__version__` 与 `uv.lock` 的项目版本已同步为 `2.1.0`；候选范围见 [v2.1.0 说明](releases/v2.1.0.md)，历史交付见 [v2.0.0 说明](releases/v2.0.0.md)
 - 旧 [`v1.1.5`](https://github.com/Maximora-byte/swu-checkin/releases/tag/v1.1.5) 只提供 Python `.whl` 与 `.tar.gz`，不含桌面功能
 - `v2.0.0` 提供 Python 分发包及 Windows 桌面资产；其发布资产不会随 `main` 更新。`main` 后续增加人工验证码接入、Actions 统一结果门禁、Windows Portable ZIP/计划任务验证、macOS 手动预览和 Android 手动客户端
 - 实际发布状态与可下载资产以 [GitHub Releases](https://github.com/Maximora-byte/swu-checkin/releases) 为准。版本号或源码说明不证明已经完成发布；Release 应记录 tag commit、对应 CI run 与资产来源
 - Windows 产物仍为未签名预览版；已做 GitHub-hosted Windows Server 2022 x64 构建/安装和 Portable smoke，干净 Windows 10/11 x64 标准用户验收仍未完成
-- macOS 提供两个原生架构的临时 Actions artifact，采用 ad-hoc 签名，未经 Developer ID 签名或公证；Android 当前为调试签名手动预览 APK。两者都没有已发布 Release 资产
+- macOS 提供两个原生架构的临时 Actions artifact，采用 ad-hoc 签名，未经 Developer ID 签名或公证；Android 新增独立包名、持久签名的非调试候选，同时保留 CI 临时 debug 验证。两者均尚无公开 Release 资产
 
 GitHub Release 资产、临时 Actions artifact 和源码 checkout 是不同交付物。不要用历史资产或旧 commit 的绿色结果证明当前源码可交付；后续版本必须选择新的 tag，协调版本、对应构建和发布门槛。Windows、macOS、Android 的具体边界分别见[桌面版指南](windows-desktop.md)、[macOS 指南](macos-desktop.md)和 [Android 指南](android-client.md)。
 
@@ -33,7 +33,8 @@ GitHub Release 资产、临时 Actions artifact 和源码 checkout 是不同交�
 | [`scripts/windows/`](../scripts/windows/)、[`packaging/windows/`](../packaging/windows/) | 旧式 Python 部署脚本、桌面冻结构建与 Inno Setup 安装包 |
 | [`scripts/macos/`](../scripts/macos/)、[`packaging/macos/`](../packaging/macos/) | 原生 `.app` 预览构建、架构与离线 GUI/OCR 检查 |
 | [`android/`](../android/)、[`scripts/android/`](../scripts/android/) | Compose 手动客户端、Keystore、图片验证码桥接与精确 APK 设备验证 |
-| [`scripts/release/`](../scripts/release/)、[`tests/`](../tests/) | Python 发布校验、单元/集成与安全回归测试 |
+| [`scripts/release/`](../scripts/release/)、[`tests/`](../tests/) | 归档/版本校验、同源原生资产暂存、单元/集成与安全回归测试 |
+| [`packaging/license_inventory.py`](../packaging/license_inventory.py) | 桌面 Python/Tcl/Tk 与依赖/包内版权原文的逐文件许可清单 |
 
 业务修改优先落在共享服务与模型层，不应在 GUI、Actions 或计划任务中复制一套弱化校验的签到实现。正式提交使用学校返回的宿舍信息；程序不测量真实 GPS，不证明本人在寝。不得新增位置伪造、反检测、认证绕过或敏感日志，安全约束见 [安全模型](security.md)。
 
@@ -140,29 +141,31 @@ uv run --locked python scripts/release/verify_artifacts.py \
 
 [`verify_artifacts.py`](../scripts/release/verify_artifacts.py) 拒绝危险归档路径和已列出的私密文件/目录，分别安装 wheel 与 sdist，执行 `--help`、`status --help` 并核对项目/分发包版本。干净安装通过 `uv pip install` 解析分发包依赖，可能联网；这项检查证明包可安装，不等同于部署时按 `uv.lock` 安装，也不是完整敏感内容扫描。
 
-当前归档路径检查使用宿主 `Path.is_absolute()`；Windows 本机对 `/absolute/path` 的安全回归失败，尚未修复。官方 Release 和 package-quality 在 Ubuntu 执行，能够拒绝此用例；Windows 上运行该脚本不能代替官方 Linux 发布校验，也不能声称 Windows 归档安全检查全部通过。此次本机检查的 31 passed / 1 failed 记录见 [发布评估](releases/release-readiness.md)。
+归档路径现在独立解析 POSIX/Windows 语义，拒绝绝对路径、盘符/UNC、反斜杠、ADS、控制字符、遍历、Windows 尾随点/空格别名及重复路径；wheel 符号链接和 sdist 链接/特殊文件也会失败。Windows 本机 `/absolute/path` 既有缺陷已经修复；本轮发布定向回归 70 项通过。之前 31 passed / 1 failed 保留为历史记录，不能将新结果倒写成旧包已经通过。
 
-[`release.yml`](../.github/workflows/release.yml) 只由推送 `v*` tag 触发：
+[`release.yml`](../.github/workflows/release.yml) 支持路径过滤 PR、手动 `workflow_dispatch` 和 `v*` tag push。PR/手动运行只生成可审核材料，tag 才可能发布：
 
-1. `release-build-verify` 使用只读仓库权限，确认 tag commit 是 `origin/main` 的祖先；校验 tag 去掉 `v` 后与 `pyproject.toml` 版本完全相同
-2. 安装 locked 开发环境，运行 pytest、Ruff、mypy 和 `uv lock --check`，再构建并验证 wheel/sdist
-3. 仅上传这两类已验证分发包作为保留 1 天的中间 artifact
-4. `release-publish` 才取得 `contents: write`；它不 checkout 或运行项目代码，只下载对应 artifact、核对数量，并用已存在的 tag 创建 GitHub Release、生成 notes
-5. 已有同名 Release 时拒绝覆盖；该流程没有 PyPI 上传，也不上传 Windows EXE
+1. `release-build-verify` 使用只读仓库权限，检出精确 `github.sha`（PR 为临时 merge-test commit）；校验三段数字版本和 `docs/releases/v<version>.md`。tag 运行另须验证版本精确匹配、tag commit 已在 `origin/main`
+2. 安装 locked 开发环境，运行完整 pytest、Ruff、mypy、锁文件检查与生产依赖审计，再分别安装 wheel/sdist 验证；记录 `SOURCE-INFO.json`
+3. 同一精确 SHA 通过 `workflow_call(ref)` 调用 Windows、macOS 两架构和 Android 三组模拟器验证；不注入学校账号或发行签名秘密
+4. `release-stage-assets` 等待上述全部成功，核对 wheel/sdist 实际元数据、原生包内外版本/来源、producer SHA、项目 MIT 与逐项许可哈希；拒绝脏来源、旧包重命名、不完整许可和错误预览签名声明
+5. 生成保留 14 天的 `release-staged-<SHA>`：六个用户包、各平台来源/许可清单、`ASSET-MANIFEST.json`、MIT、固定发行说明和整体 `SHA256SUMS.txt`
+6. 仅 tag push 的 `release-publish` 取得 `contents: write`；它不 checkout 或执行项目代码，仅下载同一次 run 的暂存集，复核最终哈希/数量，并以 `--verify-tag --prerelease --latest=false --notes-file` 创建 Pre-release。已有同名 Release 拒绝覆盖；不上传 PyPI
 
-如发布同时包含平台预览，需另行取得与 tag commit 一致的构建产物，核对 `BUILD-INFO.json` 或源码/APK 证据、工具链与校验清单，并在发布说明中标明来源 run、签名状态与验收限制。不要把旧版本或其他 commit 的 artifact 改名后作为新版本上传；完整 onedir/`.app`/APK 分发需保留资源与适用许可。重新封装 ZIP 时还需为上传文件计算校验值，目录内的原始清单不会自动覆盖新 ZIP。
+自动暂存的六个用户包是 Python wheel/sdist、Windows x64 Setup/Portable、macOS 15 arm64/x86_64 preview ZIP；Actions 外层 artifact ZIP 不作为用户安装包。Android CI 使用临时 debug 证书，只证明对应包的运行，不公开为 Release APK。本机持久签名 APK、公开证书、来源与许可/验收报告单独准备；公开前仍需完成该资产的审核和签名保管。当前预检实现后的实际多平台构建结果须在[发布准备](releases/release-readiness.md)记录，不以历史 CI 代替。
 
-当前 Release workflow 使用 `gh release create --generate-notes`，不会自动将 `rc` tag 标成 prerelease；发布候选版前必须明确处理 prerelease 属性和发行说明。Windows 安装器构建当前只接受三段数字版本，不能直接将项目版本改为 `2.1.0rc1` 后假设所有平台仍可构建；应先协调 Python/tag、安装器数字版本及 Android `versionName`/`versionCode` 的策略，再执行新版本构建。当前评估不创建新 tag，也不修改已发布版本。
+本轮使用数字 `2.1.0` 配合 GitHub Pre-release 属性，保留 Windows 安装器的三段数字要求；不是 Python `2.1.0rc1`。Android 独立使用 `versionName=0.1.1-preview` / `versionCode=3`。当前只完成发布准备，不创建 tag/Release，也不移动已发布 tag。预检的临时 merge-test commit 与合并后 main commit 可能不同；最终发行须按选定 main/tag commit 重建或重新运行，不能仅凭源码树相同改写产物来源。
 
-Android 公开分发前还须补齐并核对项目 MIT LICENSE 与平台依赖的许可/notice。当前验收 APK 的 `app.imy` 未包含项目 MIT LICENSE，不能将该测试产物直接作为公开 Release APK；Chaquopy、嵌入式 Python 和其他依赖的许可证归档需要逐项确认。这项分发检查独立于功能测试、签名和 16 KB ELF 对齐检查，详见 [发布准备评估](releases/release-readiness.md)。
+Android 已新增项目、Chaquopy、Python 和依赖的版权原文与许可清单，APK 检查器要求内嵌原文/hash 完整；桌面构建同样收集实际 CPython、Tcl/Tk、依赖和包内 vendor 的材料。每次最终包仍须执行实际检查，源码有原文不能代替包内完整性验证。旧 debug APK 的许可缺失仍按历史记录保留，不能因源码补齐后把旧包直接公开。
 
 Release 自身不会重跑普通 CI 的所有平台/systemd/DAC/漏洞审计 job。发布前仍需确认目标 commit 的普通 CI 与适用平台验证；tag 匹配和祖先检查不能替代这些证据。版本变更需保持 `pyproject.toml`、`src/swu_checkin/__init__.py` 与锁文件一致；不要移动已发布 tag 或用同名版本重新包装不同内容。
 
 ## 6. Windows desktop 构建与验收
 
-[`windows-desktop.yml`](../.github/workflows/windows-desktop.yml) 有两个入口：
+[`windows-desktop.yml`](../.github/workflows/windows-desktop.yml) 有三个入口：
 
 - `workflow_dispatch` 手动选择 revision
+- `workflow_call(ref)` 由发布预检传入精确 SHA；单独 PR/手动构建默认也检出 `github.sha`，artifact 名与实际 HEAD 对齐
 - PR 修改 `src/**`、`tests/**`、`packaging/windows/**`、`scripts/windows/build.ps1`、`scripts/windows/verify-install.ps1`、`scripts/windows/verify-portable.ps1`、`pyproject.toml`、`uv.lock` 或该 workflow 时触发
 
 它不在普通 push 时自动运行；根目录和 `docs/` 的 Markdown 修改通常不命中 Windows 构建规则，但 `packaging/windows/**` 内的说明或许可文档会命中。合入 `main` 也不会自动发布桌面 Release。
@@ -185,14 +188,16 @@ PR 描述应区分“已通过”“平台跳过”“因环境无法运行”�
 
 Android 已有[手动客户端](android-client.md)，使用 Compose、Chaquopy 17/Python 3.13，共享原始 OAuth/CAS、身份与任务校验和提交回查。单账号、人工验证码、显式 Keystore 保存、查询/只读诊断和确认后的单次签到均有 UI；不提供 OCR、GPS 或后台自动签到。历史[可行性验证](android-feasibility.md)只描述环境诊断基线，不代表当前客户端。
 
-[`android-feasibility.yml`](../.github/workflows/android-feasibility.yml) 名称保留历史命名，实际会构建当前客户端 debug APK、测试包和 lint，再以同一组 APK 在 API 24/4 KB、API 35/4 KB、API 35/16 KB 模拟器上执行设备验收。只修改 `android/**`、`src/**`、`scripts/android/**` 或该 workflow 的 PR 会自动触发；也支持手动运行。artifact 保留 14 天，普通 push 或 Markdown 修改不会自动发布 APK。
+[`android-feasibility.yml`](../.github/workflows/android-feasibility.yml) 名称保留历史命名，实际构建当前客户端 debug APK、测试包和 lint，以同一组包在 API 24/4 KB、API 35/4 KB、API 35/16 KB 模拟器执行每行七项 × 三安装状态。支持路径过滤 PR、手动运行和发布预检的 `workflow_call(ref)`；具体触发范围见 workflow。artifact 保留 14 天，不会自动公开 APK。
+
+持久签名候选用 `scripts/android/build-signed-preview.ps1 -IncludeTests` 构建 release APK 与相同证书的 release 测试包。`verify_signed_apk.py` 核对正式包名、版本、非 debuggable、证书、版权材料以及所有 ELF/ZIP 的 16 KB 对齐。`verify_release_device.py` 仅接受一次性模拟器和未安装正式包名的环境；每行六项生产包测试 × 首装/覆盖/清数据，加合成账号保存/覆盖后读取两项共 20，验证同版本持久证书重装。跨进程第二进程测试仅在 debug 变体，不向生产包引入测试服务。命令、密钥保管与迁移限制见 [Android 指南](android-client.md)。
 
 设备验收必须记录真实 API、ABI、`getpagesize()`、源码 commit 与 APK SHA256，并逐一验证规定的 instrumentation 测试身份；首次安装、替换安装和清除本应用数据后的冷启动都需完成。测试会操作/安装/卸载本应用，仅可在授权的测试设备上运行；发现已有加密账号或无法可靠判断时，验证器拒绝破坏式安装流程。业务链测试使用合成账号和传输数据，公网站点 HTTPS 验证不访问学校，不应把这类通过结果写成真实 SWU 登录成功。
 
-当前验收覆盖一台 Android 16 arm64/4 KB 实体手机及 API 24、35/16 KB 模拟器，也有三组云端模拟器证据；仍未验证真实学校账号认证/签到及 16 KB 实体设备。发布评估应引用具体 APK 和对应报告，不将旧可行性 APK 或不同源码 revision 的累计通过数混为当前版本证据。
+历史 0.1.0 debug 验收覆盖一台 Android 16 arm64/4 KB 手机及本机/云端模拟器，具体 63/63 项和旧包哈希保留在客户端指南；它不能证明新的包名、许可和持久签名 APK 已经验收。当前 0.1.1-preview 应记录自己的报告；真实学校账号认证/签到、16 KB 实体设备、旧包账号自动迁移与异机签名恢复均不宣称已验证。
 
 ## 9. macOS 桌面预览验证
 
 [macOS 指南](macos-desktop.md) 说明原生 arm64/x86_64 CI、Keychain 合成测试、冻结 GUI/OCR smoke 和未公证交付限制。共享 `desktop_operations.py` 负责正式/只读服务调用与运行锁；`desktop_backend.py` 保留 Windows DPAPI/Task Scheduler，`macos_backend.py` 提供内存 token 与显式 Keychain 操作。macOS 不注册后台任务，`--scheduled` 明确拒绝执行；无参数启动 GUI 不读取钥匙串或访问学校。
 
-[`macos-desktop.yml`](../.github/workflows/macos-desktop.yml) 分别在 `macos-15` arm64 和 `macos-15-intel` x86_64 上构建，并检查全部 pytest、生产依赖审计、合成 Keychain 写/读/删、冻结 GUI/OCR 与来源元数据。只修改其列出的源码、测试、macOS 构建/文档、版本/锁文件或 workflow 路径的 PR 会触发，也支持手动运行；不是普通 `quality` 的一部分。两个架构的成功结果须单独检查，artifact 保留 14 天，不会自动进入 Releases。ad-hoc 签名不等于 Developer ID 或 Apple 公证，CI runner smoke 也不等于干净标准用户 Mac 的 Gatekeeper 安装验收。
+[`macos-desktop.yml`](../.github/workflows/macos-desktop.yml) 分别在 `macos-15` arm64 和 `macos-15-intel` x86_64 上构建，并检查全部 pytest、生产依赖审计、合成 Keychain 写/读/删、冻结 GUI/OCR 与来源元数据。支持路径过滤 PR、手动运行与精确 SHA 的 `workflow_call(ref)`；不是普通 `quality` 的一部分。新增实际 CPython/Tcl/Tk 与 vendor 许可原文/hash，ZIP 文件名带项目版本；版权与来源资源在签名前冻结，签名后不修改 `.app`。两个架构须分别成功，artifact 保留 14 天，经发布预检审核后才可进入六包暂存集。ad-hoc 签名不等于 Developer ID 或 Apple 公证，CI smoke 不等于干净标准用户 Mac 的 Gatekeeper 验收。

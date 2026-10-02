@@ -5,11 +5,13 @@ import hashlib
 import importlib.metadata
 import json
 import platform
-import shutil
 import subprocess
 import sys
 import tomllib
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from license_inventory import collect, verify  # noqa: E402
 
 
 def git(root: Path, *args: str) -> str:
@@ -36,32 +38,19 @@ def metadata(root: Path, output: Path) -> None:
             "version"
         ],
         "source_commit": git(root, "rev-parse", "HEAD"),
+        "source_tree": git(root, "rev-parse", "HEAD^{tree}"),
         "source_dirty": bool(git(root, "status", "--porcelain")),
         "source_tree_sha256": source_hash.hexdigest(),
         "uv_lock_sha256": hashlib.sha256((root / "uv.lock").read_bytes()).hexdigest(),
         "python": platform.python_version(),
         "architecture": platform.machine(),
+        "signature": "unsigned",
+        "preview": True,
         "dependencies": {d.metadata["Name"]: d.version for d in distributions},
     }
     (output / "BUILD-INFO.json").write_text(json.dumps(info, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    # Preserve distribution license/notice files with their original relative
-    # paths; dist-info metadata is also included recursively by the spec.
-    for dist in distributions:
-        destination = output / "licenses" / dist.metadata["Name"]
-        for file in dist.files or ():
-            if any(part.lower().startswith(("license", "copying", "notice")) for part in file.parts):
-                source = Path(dist.locate_file(file))
-                if source.is_file() and ".." not in file.parts:
-                    target = destination / str(file)
-                    target.parent.mkdir(parents=True, exist_ok=True)
-                    shutil.copyfile(source, target)
-    for name in ("LICENSE.txt", "LICENSE"):
-        source = Path(sys.base_prefix) / name
-        if source.is_file():
-            shutil.copyfile(source, output / "PYTHON-LICENSE.txt")
-            break
-    else:
-        raise RuntimeError("Python license not found; use the official Python Windows distribution")
+    collect(root, output, distributions)
+    verify(output)
 
 
 def manifest(root: Path, output: Path) -> None:

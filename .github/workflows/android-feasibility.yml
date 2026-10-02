@@ -7,7 +7,14 @@ on:
       - 'src/**'
       - 'scripts/android/**'
       - '.github/workflows/android-feasibility.yml'
+      - '.github/workflows/release.yml'
   workflow_dispatch:
+  workflow_call:
+    inputs:
+      ref:
+        description: Exact source revision selected by the release preflight
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -18,6 +25,9 @@ jobs:
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+          persist-credentials: false
       - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
         with:
           version: '0.12.15'
@@ -35,6 +45,12 @@ jobs:
       - name: Build Python 3.13 dual-ABI debug APK and lint
         working-directory: android
         run: ./gradlew --no-daemon :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug
+      - name: Verify exact resolved Maven license inventory
+        working-directory: android
+        run: |
+          mkdir -p evidence
+          ./gradlew --no-daemon :app:dependencies --configuration releaseRuntimeClasspath > evidence/runtime-dependencies.txt
+          python3 ../packaging/android/verify_maven_inventory.py evidence/runtime-dependencies.txt
       - name: Record source and APK checksums
         run: |
           mkdir -p android/evidence
@@ -67,6 +83,9 @@ jobs:
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+          persist-credentials: false
       - name: Use preinstalled Java and Android tools
         run: |
           echo "JAVA_HOME=$JAVA_HOME_17_X64" >> "$GITHUB_ENV"

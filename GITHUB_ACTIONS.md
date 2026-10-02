@@ -2,7 +2,7 @@
 
 GitHub Actions 适合没有长期在线主机的用户，但 scheduled workflow **不保证准点**。公共 runner 可能延迟几分钟、几十分钟甚至更久；时间窗口严格时请使用 [systemd](DEPLOYMENT.md) 或 [Windows 计划任务](docs/windows.md)。
 
-本指南只适用于 [Maximora-byte/swu-checkin](https://github.com/Maximora-byte/swu-checkin) 的 [`.github/workflows/checkin.yml`](.github/workflows/checkin.yml)。它会执行正式签到，与普通 `CI`、Python `Release`、Windows/macOS 桌面构建及 Android 验证工作流不同；触发与发布边界见 [开发与发布](docs/development.md)。不要复制其他 fork 的 workflow 片段，也不要把真实凭据写进 YAML。
+本指南只适用于 [Maximora-byte/swu-checkin](https://github.com/Maximora-byte/swu-checkin) 的 [`.github/workflows/checkin.yml`](.github/workflows/checkin.yml)。它会执行正式签到，与普通 CI、多平台 Release 预检/发布及 Android 验证不同；预检使用合成数据，不读取学校账号或发行签名秘密，不执行正式签到。当前源码准备 2.1.0 Pre-release，尚无新 tag/Release；触发与权限见 [开发与发布](docs/development.md)。不要把真实凭据写进 YAML。
 
 ## 工作方式
 
@@ -139,7 +139,7 @@ fi
 
 当前 `main` 的“执行签到” step 使用 `continue-on-error: true`，以便继续走通知与最终检查。“汇总签到执行结果”统一计算 `execution_result.outputs.ok`：只有执行 step 的 `outcome == success`、CLI exit code 为 `0`、严格校验后的状态为 `1/2/5` 才为 `true`。邮件条件与最终 job 检查都读取这个汇总结果；成功状态 JSON 搭配非零退出码、解析失败或 step 失败均不会被绿色结果掩盖。通知成功也不会把原本失败的签到 job 改为成功。
 
-这项一致性修复属于 `v2.0.0` tag 之后的 `main`，旧 tag/fork 可能仍采用只检查状态码的后续步骤。同步时需核对完整 workflow，版本号 `2.0.0` 相同不足以证明已包含修复；当前分发差异见 [发布准备评估](docs/releases/release-readiness.md)。
+这项一致性修复属于 v2.0.0 后的候选代码，现已纳入 2.1.0 准备；旧 tag/fork 可能仍只检查业务码。同步时须核对完整 workflow、源码和锁文件，不能只提升显示版本号；最新公开版仍是 v2.0.0。差异见 [候选说明](docs/releases/v2.1.0.md)与 [发布准备](docs/releases/release-readiness.md)。
 
 ## 8. 更新 fork
 

@@ -21,11 +21,11 @@
 ## 版本与交付渠道
 
 - 截至 2026-10-02，最新已发布 [v2.0.0](https://github.com/Maximora-byte/swu-checkin/releases/tag/v2.0.0) 包含 Python wheel/sdist、Windows x64 安装包和完整 onedir ZIP，源码 commit 为 `ccedc7b642f6391d86ba7ddfc7e42e69467c2e64`；该版本说明见 [发布说明](docs/releases/v2.0.0.md)
-- 当前 `main` 仍使用 Python 版本号 `2.0.0`，新增 macOS 手动预览、Android 手动客户端、Windows Portable ZIP、验证码提供器和 Actions 结果修复；这些变化尚未随新 Release 交付。下一版范围和条件见 [发布评估](docs/releases/release-readiness.md)，版本号不代替源码来源
-- 原生平台 Actions artifacts 保留 14 天；Windows 未签名，macOS 未公证，Android 使用临时调试签名。构建机 smoke 不替代真实用户环境验收，Android 合成业务测试不代替真实学校账号测试；支持边界见各平台指南
+- 当前源码已同步 Python 版本 **2.1.0**，准备明确标记的 GitHub Pre-release；尚无新 tag 或 Release。新增 macOS 手动预览、Android 客户端、Windows Portable、验证码提供器与 Actions 结果修复；范围见 [候选说明](docs/releases/v2.1.0.md)，证据与门槛见 [发布准备](docs/releases/release-readiness.md)
+- 原生平台 Actions artifacts 保留 14 天；Windows 未签名，macOS ad-hoc 签名且未公证。Android 区分 CI 临时 debug 验证包和本机受保护持久签名候选，签名私钥与密码不进仓库/PR。构建机 smoke 不替代真实用户环境验收，合成业务测试不替代真实学校账号测试
 - 普通 CI 的 `quality` 汇总 Linux、Windows 脚本/运行时与 Python 打包检查；桌面安装包构建单独运行。具体命令、触发条件和发布权限边界见 [开发与发布](docs/development.md)
 
-现有 Python Release 工作流只在推送 `v*` tag 时触发，要求 tag 精确匹配项目版本、commit 已包含在 `main`，并拒绝覆盖已有 Release。它创建 wheel/sdist 的普通 Release，不自动标记 Pre-release，也不附加 Windows、macOS 或 Android 资产。预发布标记与原生资产审核须在新版发布流程中明确实现；不可复用已有 `v2.0.0` tag 或仅凭合并通过就宣称跨平台发布完成。Android 对外 APK 还须补齐项目 MIT 与核对第三方许可材料；详见发布评估。
+Release 工作流在 PR/手动运行时以只读权限完成 Python 与各原生平台预检，以同一源码 SHA 审核实际用户包、来源、哈希和内嵌许可；不发布、不读取签名秘密。只有 `v*` tag push 会进入写权限的发布 job：要求 tag 精确匹配数字项目版本、commit 已包含在 `main`、全部构建与暂存门禁成功，并拒绝覆盖已有 Release。使用固定说明创建 Pre-release（不会设为 latest），自动资产范围为 Python wheel/sdist、Windows installer/Portable、macOS 两架构 ZIP；Android CI debug APK 不公开，持久签名候选另行审核。必须保留历史 tag/资产，最终候选合入后仍须核对选定 commit 的实际产物。Android 密钥保管与受保护备份由发布维护者负责；本机 DPAPI 保存不等于异机恢复已验收。
 
 ## 项目性质
 

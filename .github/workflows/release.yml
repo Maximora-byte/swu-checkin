@@ -1,10 +1,30 @@
-name: Release
+name: Release preflight and publish
 
 on:
+  pull_request:
+    paths:
+      - "src/**"
+      - "tests/**"
+      - "packaging/**"
+      - "scripts/release/**"
+      - "scripts/windows/**"
+      - "scripts/macos/**"
+      - "scripts/android/**"
+      - "android/**"
+      - "docs/releases/**"
+      - "pyproject.toml"
+      - "uv.lock"
+      - "LICENSE"
+      - ".github/workflows/release.yml"
+      - ".github/workflows/windows-desktop.yml"
+      - ".github/workflows/macos-desktop.yml"
+      - ".github/workflows/android-feasibility.yml"
+  workflow_dispatch:
   push:
     tags:
       - "v*"
 
+# PR and manual runs prepare reviewable artifacts without publishing or secrets.
 permissions:
   contents: read
 
@@ -12,17 +32,21 @@ jobs:
   build-verify:
     name: release-build-verify
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 25
     permissions:
       contents: read
+    outputs:
+      version: ${{ steps.version.outputs.version }}
     steps:
-      - name: 检出代码
+      - name: Check out exact source, including PR merge revision
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
+          ref: ${{ github.sha }}
           fetch-depth: 0
           persist-credentials: false
 
-      - name: 验证 tag commit 已进入 main
+      - name: Verify tag commit is already on main
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
         run: |
           git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
           if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
@@ -30,75 +54,175 @@ jobs:
             exit 1
           fi
 
-      - name: 安装固定版本 uv 与 Python
+      - name: Install pinned uv and Python
         uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
         with:
           version: "0.12.15"
           enable-cache: true
 
-      - name: 按锁文件安装依赖
+      - name: Install locked dependencies
         run: |
           uv python install 3.13
           uv sync --locked --all-groups --python 3.13
 
-      - name: 验证 tag 与项目版本
+      - name: Verify numeric version, exact tag and release notes
+        id: version
         run: |
-          project_version="$(uv run --locked python scripts/release/verify_release_tag.py --tag "$GITHUB_REF_NAME")"
+          project_version="$(uv run --locked python scripts/release/verify_release_tag.py)"
+          if [[ "$GITHUB_EVENT_NAME" == push && "$GITHUB_REF" == refs/tags/* ]]; then
+            uv run --locked python scripts/release/verify_release_tag.py --tag "$GITHUB_REF_NAME"
+          fi
+          test -s "docs/releases/v${project_version}.md"
           echo "PROJECT_VERSION=$project_version" >> "$GITHUB_ENV"
+          echo "version=$project_version" >> "$GITHUB_OUTPUT"
 
-      - name: 运行完整质量门禁
+      - name: Run full Python quality gates and production audit
         run: |
           uv run --locked pytest -q
           uv run --locked ruff check .
           uv run --locked ruff format --check .
           uv run --locked mypy src/swu_checkin
           uv lock --check
+          uv export --locked --no-dev --no-emit-project --format requirements-txt \
+            | uv run --locked pip-audit -r /dev/stdin
 
-      - name: 构建并验证发布 artifacts
+      - name: Build and independently install wheel and sdist
         run: |
           uv build
           uv run --locked python scripts/release/verify_artifacts.py --expected-version "$PROJECT_VERSION"
+          uv run --locked python - <<'PY'
+          import json, os, pathlib, subprocess
+          source = subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip()
+          assert source == os.environ['GITHUB_SHA']
+          data = {'version': os.environ['PROJECT_VERSION'], 'source_commit': source,
+                  'source_tree': subprocess.check_output(['git', 'rev-parse', 'HEAD^{tree}'], text=True).strip(),
+                  'checks': ['full pytest', 'Ruff', 'mypy', 'locked production audit', 'clean wheel and sdist CLI installs']}
+          pathlib.Path('dist/SOURCE-INFO.json').write_text(json.dumps(data, indent=2) + '\n', encoding='utf-8')
+          PY
 
-      - name: 上传已验证的发布 artifacts
+      - name: Upload verified Python input artifacts
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: release-distributions-${{ github.sha }}
+          name: release-python-${{ github.sha }}
           path: |
             dist/*.whl
             dist/*.tar.gz
+            dist/SOURCE-INFO.json
           if-no-files-found: error
-          retention-days: 1
+          retention-days: 14
+
+  windows:
+    needs: build-verify
+    uses: ./.github/workflows/windows-desktop.yml
+    with:
+      ref: ${{ github.sha }}
+    permissions:
+      contents: read
+
+  macos:
+    needs: build-verify
+    uses: ./.github/workflows/macos-desktop.yml
+    with:
+      ref: ${{ github.sha }}
+    permissions:
+      contents: read
+
+  android-verify:
+    needs: build-verify
+    uses: ./.github/workflows/android-feasibility.yml
+    with:
+      ref: ${{ github.sha }}
+    permissions:
+      contents: read
+
+  stage-assets:
+    name: release-stage-assets
+    needs: [build-verify, windows, macos, android-verify]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - name: Check out exact source for independent staging
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Download verified Python packages
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: release-python-${{ github.sha }}
+          path: incoming/python
+
+      - name: Download both Windows user package artifacts from this run
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          pattern: swu-checkin-windows-*-${{ github.sha }}
+          merge-multiple: true
+          path: incoming/windows
+
+      - name: Download Apple Silicon preview from this run
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: swu-checkin-macos-arm64-${{ github.sha }}
+          path: incoming/macos-arm64
+
+      - name: Download Intel preview from this run
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: swu-checkin-macos-x86_64-${{ github.sha }}
+          path: incoming/macos-x86_64
+
+      - name: Audit exact versions, source, checksums and bundled licenses
+        env:
+          PROJECT_VERSION: ${{ needs.build-verify.outputs.version }}
+        run: |
+          python3 scripts/release/stage_assets.py \
+            --python-dist incoming/python --windows-dir incoming/windows \
+            --macos-arm64-dir incoming/macos-arm64 --macos-x86-64-dir incoming/macos-x86_64 \
+            --version "$PROJECT_VERSION" --commit "$GITHUB_SHA" \
+            --notes "docs/releases/v${PROJECT_VERSION}.md" --output staged-release
+
+      - name: Upload reviewable release set and complete checksum manifest
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: release-staged-${{ github.sha }}
+          path: staged-release/
+          if-no-files-found: error
+          retention-days: 14
 
   publish:
     name: release-publish
-    needs: [build-verify]
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+    needs: [build-verify, stage-assets]
     runs-on: ubuntu-24.04
-    timeout-minutes: 5
+    timeout-minutes: 10
     permissions:
       contents: write
     steps:
-      - name: 下载已验证的发布 artifacts
+      - name: Download only the successfully staged release set from this run
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
-          name: release-distributions-${{ github.sha }}
+          name: release-staged-${{ github.sha }}
           path: dist
 
-      - name: 验证下载内容并创建 GitHub Release
+      - name: Verify final bytes and create an immutable explicit Pre-release
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: |
-          mapfile -t wheels < <(find dist -maxdepth 1 -type f -name '*.whl' -print)
-          mapfile -t sdists < <(find dist -maxdepth 1 -type f -name '*.tar.gz' -print)
-          if [[ "${#wheels[@]}" -ne 1 || "${#sdists[@]}" -ne 1 ]]; then
-            echo "Expected exactly one verified wheel and one verified sdist." >&2
+          cd dist
+          sha256sum -c SHA256SUMS.txt
+          mapfile -d '' -t assets < <(find . -maxdepth 1 -type f -print0)
+          if [[ "${#assets[@]}" -ne 17 ]]; then
+            echo "Expected six user packages and eleven reviewed supporting files." >&2
             exit 1
           fi
           if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
             echo "Release $GITHUB_REF_NAME already exists; refusing to overwrite immutable artifacts." >&2
             exit 1
           fi
-          gh release create "$GITHUB_REF_NAME" "${wheels[0]}" "${sdists[0]}" \
-            --verify-tag \
-            --title "$GITHUB_REF_NAME" \
-            --generate-notes
+          gh release create "$GITHUB_REF_NAME" "${assets[@]}" \
+            --verify-tag --prerelease --latest=false \
+            --title "$GITHUB_REF_NAME preview" --notes-file RELEASE-NOTES.md

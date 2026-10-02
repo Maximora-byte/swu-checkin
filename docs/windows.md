@@ -2,7 +2,7 @@
 
 本页介绍 `scripts/windows/install.ps1` 的脚本部署，**不是**独立 EXE 安装包。想双击中文窗口的用户请看 [Windows 桌面预览版](windows-desktop.md)。两种方式共用业务核心，但凭据格式、安装器和任务不同，不能混用。
 
-本文以当前 `main` 为准。已发布 Python 稳定版为 [v2.0.0](https://github.com/Maximora-byte/swu-checkin/releases/tag/v2.0.0)；当前源码版本字符串仍为 `2.0.0`，但不是该 tag 的同一份代码。安装时选择一致的 tag/commit，发布差异见 [发布评估](releases/release-readiness.md)。
+本文以所在源码 commit 为准。已发布 Python 稳定版仍为 [v2.0.0](https://github.com/Maximora-byte/swu-checkin/releases/tag/v2.0.0)；当前源码已同步为 2.1.0 预发布候选，未创建新 tag/Release。生产脚本部署选择已审阅且一致的 tag/commit、文档和锁文件；差异见 [候选说明](releases/v2.1.0.md)与 [发布准备](releases/release-readiness.md)。
 
 | 项目 | 本页脚本部署 | 桌面预览版 |
 | --- | --- | --- |

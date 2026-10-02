@@ -19,7 +19,7 @@ SWU Checkin · Windows x64 免安装预览版
 若 Windows、SmartScreen 或单位安全策略阻止运行，请停止并核实来源、向维护者报告；
 不要关闭安全防护、修改执行策略或绕过安全警告。构建/下载来源见上面的官方仓库。
 本说明随当前源码构建的 Portable.zip 分发；已发布 v2.0.0 的原始 win-x64.zip
-不包含所有后续改动。当前源码版本号未提升，不能仅凭文件名识别来源，须核对 commit。
+不包含所有后续改动。当前候选源码已提升到 2.1.0，仍须核对 commit 和 SHA256。
 各平台与下一版发布条件：https://github.com/Maximora-byte/swu-checkin/blob/main/docs/releases/release-readiness.md
 
 账号、数据与“便携”的边界
@@ -56,8 +56,9 @@ SWU Checkin · Windows x64 免安装预览版
 ----------
 包内 SHA256SUMS.txt 覆盖全部应用文件、本文及来源/许可材料（不包含清单自身）。
 BUILD-INFO.json 记录源码 commit、是否有未提交修改、源码摘要、锁文件和依赖版本。
-TOOLCHAIN.txt 记录构建工具链；Tcl-8.6.15-LICENSE.txt 补充 Tcl 许可原文。
-其余项目/Python/Tk/依赖许可与元数据保留在 _internal 中。再分发请保留整个包。
+TOOLCHAIN.txt 记录构建工具链；LICENSE-INVENTORY.json 列出原文来源与逐文件 SHA256。
+项目、实际 CPython/Tcl/Tk 和依赖（含内置第三方组件）的许可保留在包内。
+构建和发布预检会拒绝缺失或被修改的许可文件。再分发请保留整个包。
 
 完整说明：https://github.com/Maximora-byte/swu-checkin/blob/main/docs/windows-portable.md
 故障反馈：https://github.com/Maximora-byte/swu-checkin/issues

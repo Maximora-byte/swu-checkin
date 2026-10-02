@@ -1,54 +1,60 @@
-# 新版本发布评估（2026-10-02）
+# v2.1.0 发布准备（2026-10-02）
 
-当前代码适合准备下一版预发布，但还不能直接推送新 tag 并声称全平台稳定发布。建议下一版使用数字版本 **2.1.0**，首轮 GitHub Release 明确标记 **Pre-release**；这是候选方案，尚未修改版本、创建 tag 或发布资产。若先只发行 Python/CLI，可缩小资产范围，并继续把原生客户端标为源码/Actions 预览。
+本轮已经实现下一版的版本同步、只读预检、原生资产审核、许可收集和 Android 持久签名路线，准备 **数字版本 2.1.0 + GitHub Pre-release 标记**。当前只做发布准备，**未创建 v2.1.0 tag 或 Release**。最新公开版本仍是 [v2.0.0](https://github.com/Maximora-byte/swu-checkin/releases/tag/v2.0.0)，其源码 `ccedc7b642f6391d86ba7ddfc7e42e69467c2e64` 和历史资产保持原样。
 
-## 已发布版本与评估范围
+## 候选范围与来源
 
-最新已发布 [v2.0.0](https://github.com/Maximora-byte/swu-checkin/releases/tag/v2.0.0)，于北京时间 2026-10-02 发布，源码 commit 为 `ccedc7b642f6391d86ba7ddfc7e42e69467c2e64`。该 Release 提供 Python wheel/sdist、Windows x64 安装包和完整 onedir ZIP，以及来源、校验和 Tcl 许可材料；没有 macOS、Android 或新命名的 Portable ZIP。详细资产见 [v2.0.0 说明](v2.0.0.md)。
+`pyproject.toml`、`swu_checkin.__version__` 与 `uv.lock` 已同步为 **2.1.0**。Android 独立使用 **0.1.1-preview / versionCode=3**，release 包名为 `io.github.maximorabyte.swucheckin`；debug 保留 `.feasibility` 后缀和临时签名。说明见 [v2.1.0 候选](v2.1.0.md)，历史发行见 [v2.0.0](v2.0.0.md)。
 
-本评估的代码基线为 `main` commit `783932b84437a8e3c2509f24cbb7aa28fec40250`，源码树 `82beeff40646a90b3f38cecc61f5c0afa3dae680`。`pyproject.toml`、`swu_checkin.__version__` 和 `uv.lock` 仍为 `2.0.0`；Android 独立版本是 `0.1.0-manual` / `versionCode=2`。文档更新不会把历史二进制变成新版资产。
+候选包含 v2.0.0 后已合入的依赖/安全检查、Actions 执行结果门禁、人工验证码接缝、macOS 手动预览、Windows Portable 和 Android 手动客户端，并新增本轮发布准备。CLI 状态码和 JSON `schema_version=1` 沿用；各前端仍共享原 OAuth/CAS、身份/请假/任务校验与提交回查，不增加定位证明或后台手机签到。
 
-## 相对 v2.0.0 的候选变化
+最终发行 commit 尚需在变更合入 main 后选定。PR 构建使用同一 `github.sha` 的临时 merge-test commit；即使其树与合并后 main 相同，也不能把产物来源改写成 main commit。正式发行须从所选 main/tag commit 重建或重新运行，记录 `SOURCE-INFO.json` / `BUILD-INFO.json` / APK 内嵌来源、测试 run 与实际哈希。
 
-- [#36](https://github.com/Maximora-byte/swu-checkin/pull/36)：依赖与安全检查，加入 CodeQL、Dependency Review 和分平台依赖维护。
-- [#42](https://github.com/Maximora-byte/swu-checkin/pull/42)：Actions 用执行 step 的 outcome、CLI exit code 和业务状态统一通知与最终失败判断，修复成功 JSON 配合非零退出码仍可能显示绿色的问题。
-- [#37](https://github.com/Maximora-byte/swu-checkin/pull/37)：可注入验证码提供器，桌面 OCR 惰性加载，为人工验证码及纯 Python Android 依赖提供接缝；原有 OAuth/CAS 校验继续保留。
-- [#39](https://github.com/Maximora-byte/swu-checkin/pull/39)：macOS 15 手动桌面、可选系统钥匙串、内存 token、Apple Silicon 与 Intel 分架构预览构建。
-- [#41](https://github.com/Maximora-byte/swu-checkin/pull/41)：带使用说明、来源及校验材料的 Windows Portable ZIP；解压、离线自测和无害计划任务检查。
-- [#43](https://github.com/Maximora-byte/swu-checkin/pull/43)：修正 Windows CI 的 Bash 选择，并强制执行工作流回归检查。
-- [#38](https://github.com/Maximora-byte/swu-checkin/pull/38)：Android 中文手动客户端，人工验证码、AndroidKeyStore 加密保存、只读查询/诊断、确认后的单次签到，以及小屏键盘适配。
+## 发布前必做项的处理状态
 
-CLI 状态码和 JSON `schema_version=1` 继续沿用；新增客户端不提供实际 GPS 定位证明。正式签到需要本人在寝并符合学校规定，不能将合成测试或 HTTP 成功当作真实签到验收。
-
-## 已有证据与平台范围
-
-| 交付物 | 已验证 | 保留的限制 |
+| 必做项 | 已实现 | 最终发行前仍须核对 |
 | --- | --- | --- |
-| Python/CLI 与共享核心 | [合并后 CI](https://github.com/Maximora-byte/swu-checkin/actions/runs/37020944703) 和 [CodeQL](https://github.com/Maximora-byte/swu-checkin/actions/runs/37020944770) 成功；PR 完整质量 CI 为 1142 passed / 1 skipped | 新版本 wheel/sdist 仍须在版本同步后构建并验证安装；未使用真实学校账号作为发布测试 |
-| Windows x64 | [当前代码构建](https://github.com/Maximora-byte/swu-checkin/actions/runs/37019007437) 成功，含冻结自测、Portable、安装/GUI/卸载检查 | 未签名；缺少干净 Windows 10/11 标准用户验收；此运行不是新 tag 的发布记录 |
-| macOS 15 arm64 / x86_64 | [双架构 CI](https://github.com/Maximora-byte/swu-checkin/actions/runs/37019008388) 成功，含 Keychain 合成项与离线应用 smoke | ad-hoc 签名，未 Developer ID 签名/公证；缺少实体 Mac 干净用户验收和最终发行包许可盘点 |
-| Android API24+ arm64-v8a / x86_64 | vivo X200 Pro Android 16 / 4 KB 真机、本机 API24 / 4 KB 与 API35 / 16 KB 模拟器共 63 项；[云端三组](https://github.com/Maximora-byte/swu-checkin/actions/runs/37019008427) 共 63 项通过 | 调试签名；真实学校账号登录/实际签到、16 KB 真机和跨版本迁移未验证；对外 APK 许可材料尚未补齐 |
+| 版本与固定来源 | 三处 Python 版本为 2.1.0；Android 有独立版本/包名；tag 校验要求数字版本精确匹配，已有 Release 拒绝覆盖 | 合入后选定 main commit，确认普通 CI 和该 commit 的全部最终产物；不移动 v2.0.0 |
+| 明确 Pre-release 流程 | PR/手动只读 dry-run；同 SHA 调用四平台；tag 需在 main、质量和 stage 全成功；固定说明、`--prerelease --latest=false`；只有 publish 有写权限 | 新流程的实际云端 dry-run、actionlint 和全部平台/stage 结果，不用旧 CI 代替 |
+| 分发版权材料 | Android 新增项目/Chaquopy/实际 Python/原生库/Maven/Python 依赖/vendor 原文与受审核清单；桌面新增真实 CPython、Tcl/Tk 和包内 vendor 原文及逐文件清单 | 最终 APK/Portable/两架构 `.app` 内实际字节与许可 SHA；版本或依赖变更后重新盘点 |
+| 最终资产审核 | stage 校验版本、同源 commit、干净源码、内外 BUILD-INFO、producer SHA、项目 MIT、每项许可哈希；旧包重命名、篡改或缺失均失败 | 取得此次成功构建的实际用户包与最终 SHA；人工复核来源/签名/限制，保留原始失败和报告 |
+| Android 签名/升级路线 | 仓库外持久 RSA-4096 PKCS12，当前 Windows 用户 DPAPI 密码与受限 ACL；非调试 canonical 包；同证书 release 测试与合成账号覆盖检查 | 最终生产包 20 项/行模拟器验收；公开前维护者完成受保护备份/保管，异机恢复和真实跨版本迁移尚未验证 |
 
-上述 PR head 与云端合成合并源码的树等于评估基线；原始 commit/hash/run 均保留在 [#38](https://github.com/Maximora-byte/swu-checkin/pull/38)。这些证据说明当前代码的状态，不能替代今后版本、签名或打包方式变化后的检查。Android 详细测试身份、APK 哈希和历史失败见 [客户端指南](../android-client.md) 与 [运行环境验收](../android-feasibility.md)。
+数字 `2.1.0` 配合 GitHub 的预发布属性，继续满足 Windows 安装器三段数字要求；不是 Python `2.1.0rc1`。PR/手动预检不触发公开发布，不接触发行签名秘密或学校账号。[GitHub CLI 参数](https://cli.github.com/manual/gh_release_create)与实际实现见 [release.yml](../../.github/workflows/release.yml)。
 
-本次另在 Windows 本机运行 `tests/test_deployment.py` 与 `tests/test_release.py`，结果为 **31 passed / 1 failed**。失败是归档路径 `/absolute/path` 未被 `verify_artifacts.py` 拒绝：校验器使用宿主 `Path.is_absolute()`，Windows 对没有盘符的根路径判断与 POSIX 不同。该脚本从 v2.0.0 至评估基线未改动，官方 Release/package 门禁均在 Ubuntu 运行并能拒绝这个用例；Windows 原生构建不调用该校验器。因此它不等同于官方 Ubuntu Release 失败，但 Windows 本机归档校验尚有待修复的兼容性缺陷，不能声称所有平台发布测试全部通过。
+## 拟暂存的自动发布资产
 
-## 发布前必须处理
+发布预检只收集真实用户包，不把 Actions 外层容器 ZIP 当安装包：
 
-1. **同步版本与固定来源**：更新 `pyproject.toml`、`src/swu_checkin/__init__.py` 和 `uv.lock`，选定已合入 `main` 的 commit。Release tag 必须精确匹配 Python 项目版本；已有 `v2.0.0` 不可覆盖。Android 使用独立版本，但也需明确本次 APK 版本、源码和签名。
-2. **明确预发布流程**：现有 [release.yml](../../.github/workflows/release.yml) 在 `v*` tag 推送后直接创建普通 wheel/sdist Release，没有 `--prerelease`，不会自动上传任何原生资产。应先实现并验证 Pre-release 标记、发布说明和各平台资产审核路径，再推送 tag。GitHub 的预发布标记与 Python 版本字符串是两件独立的事，见 [官方 CLI 参数](https://cli.github.com/manual/gh_release_create)。
-3. **补齐 Android 分发许可**：本机已验收 APK `7f677a…3050` 的 `assets/chaquopy/app.imy` 没有仓库 MIT LICENSE，遍历外层与全部 IMY 也未找到仓库或 Chaquo 的版权声明。部分 pip 依赖许可已经保留，但不等于全部发行材料齐全。对外分发前应保留仓库 [MIT 原文](../../LICENSE)、[Chaquopy 17 MIT 原文](https://raw.githubusercontent.com/chaquo/chaquopy/17.0.0/LICENSE.txt)，并盘点内嵌 Python 运行时及每项依赖的许可；[Python 官方许可](https://docs.python.org/3.13/license.html)不能用某个依赖的旧版 PSF 文本代替。补齐后检查最终 APK 的实际内容与哈希。macOS 许可盘点仍待执行，未断言其包内缺失。
-4. **核对最终资产**：从选定 commit 构建 Python、Windows、macOS 和 Android 中实际准备交付的资产，记录版本、源码、工具链、测试、文件 SHA256 与签名指纹。选择相同源码的已验证产物时仍须核对实际文件与来源，不能只重命名旧包或把 Actions 容器 ZIP 当作用户安装包。许可、版本或签名变化后，须验证变化后的最终产物。
-5. **明确签名和升级路线**：Android 跨电脑临时 debug 证书可能不同，同包名覆盖安装会失败。正式分发须使用持久受保护的签名并验证升级，私钥不得提交。Windows 签名、macOS Developer ID/公证及用户环境验收仍需准备，缺失时必须明确标注预览；不得提供关闭系统防护的安装方案。Android debug 证书不适合应用商店发布，见 [官方签名说明](https://developer.android.com/studio/publish/app-signing)。
+- Python `swu_checkin-2.1.0-py3-none-any.whl` 与 `swu_checkin-2.1.0.tar.gz`
+- Windows x64 `SWUCheckin-2.1.0-win-x64-Setup.exe` 与 `SWUCheckin-2.1.0-win-x64-Portable.zip`
+- macOS 15 `SWUCheckin-2.1.0-macos15-arm64-preview.zip` 与 `SWUCheckin-2.1.0-macos15-x86_64-preview.zip`
 
-Windows 安装器当前只接受 `major.minor.patch` 数字版本，因此 `2.1.0` 加 GitHub Pre-release 标记能沿用现有版本表达。若改用 `2.1.0rc1`，还须先协调 Python/tag 版本与 Windows 安装器的数字版本、展示版本；直接加 rc 后缀会被当前构建脚本拒绝。本评估未改动发布工作流或版本。
+这六个包连同十一份来源、许可清单、项目 MIT、固定说明、`ASSET-MANIFEST.json` 和 `SHA256SUMS.txt` 组成 `release-staged-<SHA>`，保留 14 天。当前未断言最终暂存已经成功；下载状态以对应 run 为准。将来 tag job 只下载同一次运行的已审核暂存集，重验最终字节，再拒覆创建 Pre-release。
+
+**Android 不在自动公开资产内。** CI 临时 debug 证书 APK 仅供验证；本机持久签名的 canonical APK、公开证书、内嵌来源、许可与验收报告单独准备审核。暂存清单明确记录 Android omission。尚未发布 APK，也没有配置受保护发行密钥到 CI。
+
+## 已有证据与本轮待验
+
+| 平台 | 历史证据 | 本轮变化后的状态与限制 |
+| --- | --- | --- |
+| Python/CLI | PR #38 质量 CI 1142 passed / 1 skipped；[合并后 CI](https://github.com/Maximora-byte/swu-checkin/actions/runs/37020944703)成功 | 已同步版本并修复归档安全兼容；新 wheel/sdist、完整 CI 与发布 dry-run 待对应报告 |
+| Windows | [历史构建](https://github.com/Maximora-byte/swu-checkin/actions/runs/37019007437)覆盖冻结、Portable、安装/GUI/卸载 | 新版来源/许可与可复用构建待验；仍未签名，缺少干净 Windows 10/11 标准用户验收 |
+| macOS 15 两架构 | [历史双架构 CI](https://github.com/Maximora-byte/swu-checkin/actions/runs/37019008388)含 Keychain 合成项与冻结 smoke | 新版许可与版号 ZIP 待双架构结果；仍 ad-hoc 签名、未 Developer ID/公证，缺少实体 Mac 用户验收 |
+| Android | 0.1.0 debug 本机 63 项与[云端三组 63 项](https://github.com/Maximora-byte/swu-checkin/actions/runs/37019008427)，含 vivo Android 16 / 4 KB 真机 | 0.1.1-preview 新包名、许可与持久签名需独立实际验收；真实学校账号/签到、16 KB 真机、旧包迁移未验证 |
+
+历史 APK 哈希、各测试身份、页大小、失败与重跑见 [Android 客户端](../android-client.md)和 [环境验收](../android-feasibility.md)。历史通过数不累计冒充新 APK 的证据；4 KB 手机不代表 16 KB 实体手机通过。
+
+之前 Windows 发布/部署定向检查 **31 passed / 1 failed**，失败为宿主 `Path.is_absolute()` 未拒绝 `/absolute/path`；这个原始结果保留。现改为独立的 POSIX/Windows 路径判断，并覆盖盘符、UNC、反斜杠、遍历、ADS、NUL/控制字符、重复路径、尾随别名与归档链接；本轮发布定向 **70 passed**，格式检查通过。官方 Linux 完整质量门禁与新的实际分发包仍须独立执行，不把一个修复测试代替全平台发布验收。
+
+## 签名保管与升级
+
+Android 持久公开证书 SHA256：`77ad72b44323fa7917470442e21fb258b5b8bc8a367e87c83ba6fa22d08f811a`。默认私钥/DPAPI 密码放在 `%LOCALAPPDATA%\SWUCheckin\ReleaseSigning\Android`，不提交、不公开。维护者公开 APK 前应建立受保护备份和保管；本机保存不保证异机恢复已验。正式包与旧 debug 包可共存，账号因包名/AAD/Keystore 绑定须重输，不自动拷贝密文。详情见 [Android 签名与迁移](../android-client.md#持久签名构建与保管)及 [Android 官方签名说明](https://developer.android.com/studio/publish/app-signing)。
+
+Windows Authenticode、macOS Developer ID/公证和真实用户环境验收仍缺失，继续明确预览；不提供关闭系统防护或绕过警告的安装方案。哈希清单用于完整性与来源核对，不是这些平台的可信数字签名。
 
 ## 稳定版额外验收
 
-原生客户端继续保留预览标签，直至完成所声明支持范围内的干净用户环境测试、签名与升级验证。Android 需由账号持有人明确授权真实学校账号的只读登录/查询验证；实际签到应由本人在符合规定时主动操作。16 KB 模拟器结果不代表 16 KB 实体手机已经通过；没有相应设备时须保留该限制。Windows 和 macOS 也不得用构建 runner 的测试声称真实用户电脑均已验收。
+原生客户端保留预览标签，直至完成所声明支持范围内的干净用户环境、签名和跨版本更新验收。Android 学校账号只读登录/查询须由账号持有人明确授权；实际签到由本人在符合规则时主动操作，不作为自动发布测试。没有 16 KB 真机或物理 Mac 等设备时，明确保留限制，不能把模拟器或云端 runner 结果写成这些设备已通过。
 
-发布说明应分别列出 Python 与各原生客户端的成熟度、可下载资产和未验证项。校验清单不等于数字签名；成功构建不等于 Release 已发布；GitHub 自动提供的 Source code ZIP/tar.gz 不等于经过安装验证的 wheel/sdist 或客户端。
-
-## 本次文档核对范围
-
-已逐项复核仓库根目录、`docs/`、Windows 便携包使用说明与许可说明，统一当前 main、已发布 v2.0.0 和平台预览的范围。历史 v2.0.0 的功能与已知问题仍按其 tag 记录；[LICENSE](../../LICENSE) 和第三方 Tcl 许可原文保持原样。发布评估与平台指南互相引用，命令、工作流和相对链接按实际文件核对。
+发布说明应列出实际可下载包、确切来源/签名、验证结果与未验证项。构建成功、版本同步、文档更新和 Pre-release 流程实现均不等于 Release 已发布。

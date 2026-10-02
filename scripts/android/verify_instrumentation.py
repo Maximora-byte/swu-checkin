@@ -14,10 +14,17 @@ EXPECTED_TESTS = {
     ("io.github.maximorabyte.swucheckin.CheckinUiTest", "manualLoginQueryConfirmationAndCancellation"),
 }
 
+# Release APKs deliberately omit the debug-only private lock-probe process.
+# Its seven-test debug gate remains mandatory in CI; the exact production APK
+# gets its own six-test gate, including synthetic auth/UI and secure storage.
+RELEASE_EXPECTED_TESTS = EXPECTED_TESTS - {
+    ("io.github.maximorabyte.swucheckin.CrossProcessLockTest", "lockIsSharedAndProcessDeathReleasesIt"),
+}
 
-def verify(text: str) -> int:
+
+def verify(text: str, *, expected_tests: set[tuple[str, str]] = EXPECTED_TESTS) -> int:
     match = re.findall(r"^OK \((\d+) tests?\)\s*$", text, re.MULTILINE)
-    if match != [str(len(EXPECTED_TESTS))]:
+    if match != [str(len(expected_tests))]:
         raise ValueError("expected all feasibility instrumentation tests to pass")
     if re.findall(r"^INSTRUMENTATION_CODE: (-?\d+)\s*$", text, re.MULTILINE) != ["-1"]:
         raise ValueError("missing or unsuccessful instrumentation termination")
@@ -45,7 +52,7 @@ def verify(text: str) -> int:
             elif code != "1":
                 raise ValueError("test failed or was skipped")
             current = {}
-    if completed != EXPECTED_TESTS:
+    if completed != expected_tests:
         raise ValueError("expected test identities were not all successful")
     return len(completed)
 

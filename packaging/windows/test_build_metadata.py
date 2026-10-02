@@ -35,6 +35,16 @@ def test_metadata_records_dirty_source_without_contents(tmp_path, monkeypatch):
     (python_home / "LICENSE.txt").write_text("Python license", encoding="utf-8")
     monkeypatch.setattr(helper.sys, "base_prefix", str(python_home))
     monkeypatch.setattr(helper.importlib.metadata, "distributions", lambda: [])
+    # License collection is independently exercised against original wheel
+    # notices. This source-provenance fixture has no installed native runtime.
+    monkeypatch.setattr(
+        helper,
+        "collect",
+        lambda root, output, distributions: (output / "PYTHON-LICENSE.txt").write_text(
+            (python_home / "LICENSE.txt").read_text(encoding="utf-8"), encoding="utf-8"
+        ),
+    )
+    monkeypatch.setattr(helper, "verify", lambda output: None)
     monkeypatch.setattr(helper, "git", lambda root, *args: "abc123" if args[0] == "rev-parse" else " M example.py")
     monkeypatch.setattr(helper.subprocess, "check_output", lambda *args, **kwargs: b"example.py\0uv.lock\0")
     output = tmp_path / "metadata"

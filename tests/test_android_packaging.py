@@ -53,7 +53,8 @@ def test_apk_inspector_rejects_wrong_python_or_abi(tmp_path):
         inspect(apk)
     with ZipFile(apk, "a") as archive:
         archive.writestr("lib/x86_64/libpython3.13.so", b"fixture")
-    assert inspect(apk)["python"] == "3.13"
+    with pytest.raises(ValueError, match="license inventory"):
+        inspect(apk)
     with ZipFile(apk, "a") as archive:
         archive.writestr("assets/onnxruntime.so", b"fixture")
     with pytest.raises(ValueError, match="OCR"):

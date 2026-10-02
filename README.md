@@ -22,9 +22,9 @@
 
 ## 版本与下载
 
-截至 2026-10-02，最新已发布版本是 [v2.0.0](https://github.com/Maximora-byte/swu-checkin/releases/tag/v2.0.0)，提供 Python wheel/sdist、Windows x64 安装包和完整 onedir ZIP。`main` 后续加入的 macOS、Android、新版 Portable ZIP 和 Actions 修复尚未随新 Release 交付；Python 源码版本号仍为 `2.0.0`，不能据此将新代码当作 v2.0.0 资产。
+截至 2026-10-02，最新已发布版本是 [v2.0.0](https://github.com/Maximora-byte/swu-checkin/releases/tag/v2.0.0)，提供 Python wheel/sdist、Windows x64 安装包和完整 onedir ZIP。当前源码已同步为 **2.1.0 预发布候选**，新增 macOS、Android、新版 Portable ZIP 和 Actions 修复；尚未创建 v2.1.0 tag 或 Release，旧资产保持原样。
 
-下一版适合先准备 GitHub 预发布。候选范围、各平台验收证据，以及版本、发布流程和 Android 许可材料的待办见 [新版本发布评估](docs/releases/release-readiness.md)。该评估没有创建新 tag 或 Release。下载时核对发布页的资产、源码 commit、签名与 SHA256；Actions 预览 artifact 保留 14 天。
+发布预检现可从 PR 或手动运行，以同一源码构建并审核 Python、Windows 与 macOS 用户包；只有受校验的 tag push 才创建明确标记的 Pre-release。Android CI debug 包仅供验证，持久签名候选 APK 单独审核。变化与限制见 [v2.1.0 候选说明](docs/releases/v2.1.0.md)和 [发布准备](docs/releases/release-readiness.md)。下载时核对实际资产、源码 commit、签名与 SHA256；Actions artifact 保留 14 天。
 
 ## Windows desktop preview
 
@@ -44,7 +44,7 @@ Windows 桌面产物仍是未签名预览版。已发布范围与升级说明见
 
 ## 选择运行方式
 
-Android 0.1.0 手动预览支持校园账号登录、人工验证码、可选加密保存、只读查询与诊断，以及明确确认后的单次手动签到。启动不联网，没有后台自动签到。最低 Android 7.0，仅支持 64 位设备；调试签名安装包、使用步骤和验收范围见 [Android 客户端指南](docs/android-client.md)。
+Android **0.1.1-preview** 候选支持校园账号登录、人工验证码、可选加密保存、只读查询与诊断，以及明确确认后的单次手动签到。启动不联网，没有后台自动签到。最低 Android 7.0，仅支持 64 位设备；新增独立包名和持久签名的非调试构建，保留 CI debug 验证。安装、旧预览共存、账号重输和验收范围见 [Android 客户端指南](docs/android-client.md)。尚无公开 Android Release 资产。
 
 | 场景 | 推荐方式 | 特点 |
 | --- | --- | --- |
@@ -140,6 +140,7 @@ swu-checkin probe --json   # probe 的 schema v1 JSON，不提交签到
 - [故障排查](docs/troubleshooting.md)：状态 3/4、缓存 session、锁、Actions 和安全报告
 - [安全模型](docs/security.md)：认证、TokenStore、提交安全、日志与支持边界
 - [v2.0.0 发布说明](docs/releases/v2.0.0.md)：已发布资产、相对 v1.1.5 的变化与该版本限制
+- [v2.1.0 预发布候选](docs/releases/v2.1.0.md)：已准备的变化、拟交付资产与平台限制
 - [新版本发布评估](docs/releases/release-readiness.md)：当前 main 的变化、证据和发布待办
 - [开发、CI 与发布](docs/development.md)：模块分工、离线验证、发布边界
 - [贡献指南](CONTRIBUTING.md) / [维护与归属](MAINTAINERS.md)
@@ -155,7 +156,7 @@ uv run --locked mypy src/swu_checkin
 uv lock --check
 ```
 
-普通 CI 的 `quality` 汇总 Linux、Windows 与 Python 包三组门禁，包括 PowerShell/DPAPI、跨进程运行锁、Actions 语法、systemd units、Unix 状态权限、wheel/sdist 安装与锁定生产依赖审计。原生客户端使用独立的路径过滤工作流；文档修改是否触发构建取决于路径，例如 macOS 指南和 Windows 包内说明会命中对应构建规则。详见 [开发、CI 与发布](docs/development.md)。
+普通 CI 的 `quality` 汇总 Linux、Windows 与 Python 包三组门禁，包括 PowerShell/DPAPI、跨进程运行锁、Actions 语法、systemd units、Unix 状态权限、wheel/sdist 安装与锁定生产依赖审计。各原生构建支持独立运行，也由 Release 预检按精确同一 SHA 调用；预检仅生成审核材料，PR/手动运行不会发布。文档变更是否触发完整预检依路径规则而定。详见 [开发、CI 与发布](docs/development.md)。
 
 ## 支持、署名与许可证
 

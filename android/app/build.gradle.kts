@@ -5,15 +5,26 @@ plugins {
     id("com.chaquo.python")
 }
 
+val releaseStore = providers.environmentVariable("SWU_ANDROID_KEYSTORE").orNull
+val releasePassword = providers.environmentVariable("SWU_ANDROID_KEYSTORE_PASSWORD").orNull
+val releaseAlias = providers.environmentVariable("SWU_ANDROID_KEY_ALIAS").orNull
+val releaseCredentials = listOf(releaseStore, releasePassword, releaseAlias)
+require(releaseCredentials.all { it == null } || releaseCredentials.all { !it.isNullOrBlank() }) {
+    "Provide all Android release signing variables together."
+}
+val signedRelease = releaseCredentials.all { !it.isNullOrBlank() }
+val testedBuildType = providers.gradleProperty("swuTestBuildType").getOrElse("debug")
+require(testedBuildType in setOf("debug", "release")) { "Unsupported Android test build type." }
+
 android {
     namespace = "io.github.maximorabyte.swucheckin"
     compileSdk = 36
     defaultConfig {
-        applicationId = "io.github.maximorabyte.swucheckin.feasibility"
+        applicationId = "io.github.maximorabyte.swucheckin"
         minSdk = 24
         targetSdk = 36
-        versionCode = 2
-        versionName = "0.1.0-manual"
+        versionCode = 3
+        versionName = "0.1.1-preview"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         ndk { abiFilters += listOf("arm64-v8a", "x86_64") }
     }
@@ -23,8 +34,36 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
     kotlinOptions { jvmTarget = "17" }
-    // This is a test APK, not a production/signing/release configuration.
-    buildTypes { getByName("release") { isMinifyEnabled = false } }
+    signingConfigs {
+        if (signedRelease) create("previewRelease") {
+            storeFile = file(releaseStore!!)
+            storePassword = releasePassword
+            keyAlias = releaseAlias
+            keyPassword = releasePassword
+            enableV1Signing = true
+            enableV2Signing = true
+            enableV3Signing = true
+        }
+    }
+    buildTypes {
+        getByName("debug") {
+            applicationIdSuffix = ".feasibility"
+            versionNameSuffix = "-debug"
+        }
+        getByName("release") {
+            isMinifyEnabled = false
+            isDebuggable = false
+            if (signedRelease) signingConfig = signingConfigs.getByName("previewRelease")
+        }
+    }
+    testBuildType = testedBuildType
+    sourceSets.getByName("release").assets.srcDir("build/generated/release-provenance")
+}
+
+// Debug CI needs no release secrets. A release build must never silently emit
+// an unsigned or temporary-debug-signed distribution candidate.
+tasks.matching { it.name == "preReleaseBuild" }.configureEach {
+    doFirst { require(signedRelease) { "Android release build requires the protected persistent signing key." } }
 }
 
 chaquopy {

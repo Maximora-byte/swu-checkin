@@ -1,11 +1,13 @@
 # Build natively on each macOS architecture using scripts/macos/build.sh.
 import platform
+import tomllib
 from pathlib import Path
 
 from PyInstaller.utils.hooks import collect_all, copy_metadata
 
 root = Path(SPECPATH).parents[1]
-datas = [(str(root / "LICENSE"), "."), (str(root / "docs/macos-desktop.md"), ".")]
+version = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))["project"]["version"]
+datas = [(str(root / "LICENSE"), "."), (str(root / "docs/macos-desktop.md"), "."), (str(root / "build/macos/metadata"), "build-info")]
 binaries = []
 hiddenimports = ["tkinter", "tkinter.ttk", "tkinter.messagebox", "_tkinter"]
 for package in ("ddddocr", "onnxruntime", "cv2", "numpy", "certifi"):
@@ -44,6 +46,8 @@ app = BUNDLE(
     bundle_identifier="io.github.maximora-byte.swu-checkin.preview",
     info_plist={
         "CFBundleDisplayName": "SWU Check-in Preview",
+        "CFBundleShortVersionString": version,
+        "CFBundleVersion": version,
         "NSHighResolutionCapable": True,
         "LSMinimumSystemVersion": "15.0",
         "NSHumanReadableCopyright": "MIT; see bundled LICENSE",
