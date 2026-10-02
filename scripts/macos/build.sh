@@ -47,7 +47,7 @@ metadata = {
     'signature': 'ad-hoc; no Developer ID',
     'notarized': False,
     'keychain_ci_smoke_passed': os.getenv('SWU_KEYCHAIN_SMOKE_PASSED') == 'true',
-    'checks': [ 'frozen Tk GUI', 'frozen OCR inference', 'TLS trust assets', 'runtime lock', 'scheduled mode rejected'],
+    'checks': [ 'frozen Tk GUI with busy/idle native Quit guard', 'frozen OCR inference', 'TLS trust assets', 'runtime lock', 'scheduled mode rejected'],
     'not_verified': ['physical Mac clean-user acceptance', 'Gatekeeper distribution approval', 'school authentication or submission', 'macOS versions other than build runner'],
 }
 (app.parent / 'BUILD-INFO.json').write_text(json.dumps(metadata, indent=2) + '\n')

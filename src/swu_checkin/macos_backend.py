@@ -103,6 +103,7 @@ class MacOSBackend(DesktopOperations):
         import ssl
         import tempfile
         import tkinter as tk
+        from types import ModuleType
 
         import certifi
         import ddddocr
@@ -120,12 +121,28 @@ class MacOSBackend(DesktopOperations):
             with RuntimeLock(Path(directory) / "test.lock"):
                 pass
         window = tk.Tk()
+        destroyed = False
         try:
             app = DesktopApp(window, self, MACOS_PRESENTATION)
             window.update()
             assert not app.controller.busy
             assert app.username.get() == app.password.get() == ""
             assert not app.presentation.scheduling
+            warnings: list[bool] = []
+
+            class SmokeDialogs(ModuleType):
+                def showwarning(self, *args: object, **kwargs: object) -> None:
+                    warnings.append(True)
+
+            app.dialogs = SmokeDialogs("synthetic_self_test_dialogs")
+            app.controller.busy = True
+            window.tk.call("::tk::mac::Quit")
+            assert warnings == [True] and window.winfo_exists()
+            app.controller.busy = False
+            window.tk.call("::tk::mac::Quit")
+            destroyed = True
+            assert not window.tk.call("info", "commands", ".")
         finally:
-            window.destroy()
+            if not destroyed:
+                window.destroy()
         return 0

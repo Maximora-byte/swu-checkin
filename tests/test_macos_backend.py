@@ -199,3 +199,24 @@ def test_mac_launch_selects_adapter_and_gui_without_network(monkeypatch, backend
     assert backend.keychain.mock_calls == []
     desktop_operations.run_checkin.assert_not_called()
     root.mainloop.assert_called_once_with()
+
+
+def test_mac_application_menu_quit_uses_same_busy_guard(app):
+    app._register_close_handlers()
+    app.root.protocol.assert_called_once_with("WM_DELETE_WINDOW", app.close)
+    app.root.createcommand.assert_called_once_with("::tk::mac::Quit", app.close)
+    quit_callback = app.root.createcommand.call_args.args[1]
+    app.controller.busy = True
+    quit_callback()
+    app.root.destroy.assert_not_called()
+    app.dialogs.showwarning.assert_called_once()
+    app.controller.busy = False
+    quit_callback()
+    app.root.destroy.assert_called_once_with()
+
+
+def test_windows_close_does_not_register_mac_command(app):
+    app.presentation = desktop.DesktopPresentation()
+    app._register_close_handlers()
+    app.root.protocol.assert_called_once_with("WM_DELETE_WINDOW", app.close)
+    app.root.createcommand.assert_not_called()

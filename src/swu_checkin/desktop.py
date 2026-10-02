@@ -26,6 +26,7 @@ SAFE_ERROR = "操作未完成。请检查网络、账号、系统权限或本地
 
 @dataclass(frozen=True)
 class DesktopPresentation:
+    native_quit_command: str | None = None
     scheduling: bool = True
     explicit_credentials: bool = False
     font_family: str = "Microsoft YaHei UI"
@@ -34,6 +35,7 @@ class DesktopPresentation:
 
 
 MACOS_PRESENTATION = DesktopPresentation(
+    native_quit_command="::tk::mac::Quit",
     scheduling=False,
     explicit_credentials=True,
     font_family="PingFang SC",
@@ -110,7 +112,7 @@ class DesktopApp:
         root.title("西南大学寝室签到助手")
         root.geometry("720x720")
         root.minsize(680, 660)
-        root.protocol("WM_DELETE_WINDOW", self.close)
+        self._register_close_handlers()
         panel = ttk.Frame(root, padding=20)
         panel.pack(fill="both", expand=True)
         ttk.Label(panel, text="西南大学寝室签到助手", font=(self.presentation.font_family, 17, "bold")).pack(anchor="w")
@@ -189,6 +191,12 @@ class DesktopApp:
         self.current_schedule_mode: str | None = None
         self._restore_local_state()
         root.after(100, self._poll)
+
+    def _register_close_handlers(self) -> None:
+        self.root.protocol("WM_DELETE_WINDOW", self.close)
+        if self.presentation.native_quit_command:
+            # macOS menu/Dock Quit otherwise exits without WM_DELETE_WINDOW.
+            self.root.createcommand(self.presentation.native_quit_command, self.close)
 
     def _restore_local_state(self) -> None:
         if self.presentation.explicit_credentials:

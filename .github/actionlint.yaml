@@ -1,0 +1,6 @@
+# actionlint v1.7.7 predates this official GitHub-hosted runner label.
+# The allow-list only extends lint's catalog; jobs still run on GitHub-hosted Macs.
+# https://github.com/actions/runner-images/issues/13045
+self-hosted-runner:
+  labels:
+    - macos-15-intel
