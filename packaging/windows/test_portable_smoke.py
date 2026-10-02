@@ -1,0 +1,93 @@
+"""Guard the acceptance harness; these tests do not launch the application.
+
+The full restricted-token, extracted-ZIP GUI acceptance runs only in the public
+GitHub-hosted windows-2022 desktop workflow, before installer verification.
+"""
+
+import os
+import shutil
+import subprocess
+from pathlib import Path
+
+import pytest
+
+ROOT = Path(__file__).resolve().parents[2]
+SCRIPT = ROOT / "scripts/windows/verify-portable.ps1"
+LAUNCHER = Path(__file__).with_name("portable_smoke_launcher.cs")
+
+
+def test_portable_smoke_checks_ci_before_reading_or_mutating_machine():
+    source = SCRIPT.read_text(encoding="utf-8")
+    guard = source.index("throw 'Portable smoke requires")
+    assert "$env:RUNNER_ENVIRONMENT -ne 'github-hosted'" in source[:guard]
+    assert "$env:ImageOS -ne 'win22'" in source[:guard]
+    assert "$env:GITHUB_ACTIONS -ne 'true'" in source[:guard]
+    assert guard < source.index("Resolve-Path")
+    assert guard < source.index("Get-ScheduledTask")
+    assert guard < source.index("New-Item")
+    assert guard < source.index("Add-Type")
+
+
+def test_portable_smoke_verifies_archive_payload_and_runtime_isolation():
+    source = SCRIPT.read_text(encoding="utf-8")
+    assert "DistributionHashes.ContainsKey($ArchiveName)" in source
+    assert "Get-FileHash -LiteralPath $Archive -Algorithm SHA256" in source
+    assert "Assert-PayloadChecksums $AppDir" in source
+    assert "Assert-UnchangedPayload $Before $AppDir" in source
+    assert "Portable 中文路径 with spaces" in source
+    assert "$Environment['PATH'] = \"$env:SystemRoot\\System32;$env:SystemRoot\"" in source
+    assert "$Environment['LOCALAPPDATA'] = $LocalData" in source
+    assert "PYTHON|UV_|VIRTUAL_ENV|CONDA|SWUDK_|_PYI_|PYINSTALLER" in source
+    assert "foreach ($Launch in 1..2)" in source
+    assert "Start-Sleep -Seconds 32" in source
+    assert "$Gui.CloseMainWindow()" in source
+    assert "$Launcher.ActiveProcesses -ne 0" in source
+    assert "Wait-OwnedProcess $SelfTest 180" in source
+    for prohibited in ("--scheduled", "Register-ScheduledTask", "Unregister-ScheduledTask", "Set-Acl", "Stop-Process"):
+        assert prohibited not in source
+
+
+def test_restricted_launcher_verifies_child_before_running_and_has_no_elevated_fallback():
+    source = LAUNCHER.read_text(encoding="utf-8")
+    assert "LUA_TOKEN | DISABLE_MAX_PRIVILEGE" in source
+    assert "BuiltinAdministratorsSid" in source
+    assert "SE_GROUP_USE_FOR_DENY_ONLY" in source
+    assert "AssertRestricted(actualToken)" in source
+    assert source.index("AssertRestricted(actualToken)") < source.index("if (ResumeThread(info.thread)")
+    assert source.index("AssignProcessToJobObject(job, info.process)") < source.index("if (ResumeThread(info.thread)")
+    assert "CREATE_SUSPENDED | CREATE_UNICODE_ENVIRONMENT" in source
+    assert 'argument != "" && argument != "--self-test"' in source
+    assert "JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE" in source
+    assert "QueryInformationJobObject" in source
+    for prohibited in (
+        "Process.Start(",
+        "LogonUser",
+        "CreateProcessWithLogon",
+        "SetTokenInformation",
+        "SetNamedSecurityInfo",
+    ):
+        assert prohibited not in source
+
+
+@pytest.mark.skipif(shutil.which("pwsh") is None, reason="PowerShell syntax/compiler checks require pwsh")
+def test_powershell_syntax_and_restricted_launcher_compilation():
+    # Parsing and compiling do not instantiate the launcher or call Win32 APIs.
+    # This can therefore run outside the disposable acceptance VM as well.
+    command = r"""
+$ErrorActionPreference = 'Stop'
+$tokens = $null
+$errors = $null
+[System.Management.Automation.Language.Parser]::ParseFile($env:SWU_TEST_SCRIPT, [ref]$tokens, [ref]$errors) | Out-Null
+if ($errors.Count -ne 0) { $errors | Write-Error; exit 1 }
+Add-Type -Path $env:SWU_TEST_LAUNCHER
+if ($null -eq ('PortableSmokeLauncher' -as [type])) { throw 'Launcher type did not compile.' }
+"""
+    result = subprocess.run(
+        [shutil.which("pwsh"), "-NoLogo", "-NoProfile", "-NonInteractive", "-Command", command],
+        capture_output=True,
+        text=True,
+        timeout=90,
+        check=False,
+        env={**os.environ, "SWU_TEST_SCRIPT": str(SCRIPT), "SWU_TEST_LAUNCHER": str(LAUNCHER)},
+    )
+    assert result.returncode == 0, result.stdout + result.stderr

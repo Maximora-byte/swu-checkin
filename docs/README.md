@@ -5,6 +5,7 @@
 - [快速上手](quickstart.md)：从安装到首次只读验证和正式运行
 - [CLI 与状态码参考](cli-reference.md)：命令、环境变量、JSON 和退出码
 - [Windows 桌面版与构建指南](windows-desktop.md)：中文 GUI、默认关闭的定时模式、独立安装包构建与验收边界
+- [Windows 免安装版](windows-portable.md)：ZIP 解压运行、DPAPI 数据边界、升级与任务路径
 - [Windows 脚本部署](windows.md)：与桌面版区分、DPAPI、计划任务、迁移和卸载
 - [Linux systemd 部署](../DEPLOYMENT.md)：专用用户、timer、通知、升级与回滚
 - [GitHub Actions](../GITHUB_ACTIONS.md)：Secrets、多账号、邮件和延迟边界
