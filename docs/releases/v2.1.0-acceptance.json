@@ -226,5 +226,6 @@
     "Android backup restoration tested on same computer/current Windows user only; offline custody and cross-machine recovery pending before public APK",
     "same-version replacement is not arbitrary cross-version or old debug-package account migration",
     "future main/tag assets must be rebuilt from their actual commit; these PR merge-source hashes must not be relabeled"
-  ]
+  ],
+  "android_superseded_by": "v2.1.0-android-final-acceptance.json"
 }

@@ -6,7 +6,7 @@
 
 `pyproject.toml`、`swu_checkin.__version__` 与 `uv.lock` 为 **2.1.0**。Android 独立使用 **0.1.1-preview / versionCode=3**，release 包名为 `io.github.maximorabyte.swucheckin`，不允许调试；debug 保留 `.feasibility` 后缀和临时签名。变化与升级见 [v2.1.0 候选](v2.1.0.md)。
 
-本轮实际验收来源为 PR #45 的 merge-test commit **`cf1b69eb3c9d31b17e8ce79fc4aaa406dbf93fc6`**，源码树 **`9c4c7c9928d4aa71aa7512683d38950fdb0e204d`**。所有六个自动暂存用户包和本机生产 APK 均记录此来源，`source_dirty=false`；本次文档收尾不改变已测包的内嵌信息。逐包哈希、原报告摘要和代码子树见 [验收清单](v2.1.0-acceptance.json)。
+初次工程候选的六包验收来源为 PR #45 merge-test commit **`cf1b69eb3c9d31b17e8ce79fc4aaa406dbf93fc6`**，源码树 **`9c4c7c9928d4aa71aa7512683d38950fdb0e204d`**，记录见 [初次验收清单](v2.1.0-acceptance.json)。随后只修正 Android 环境页的旧说明，最终持久签名 APK 来源为分支 commit **`f62e76f9e3940de830d5cbaee89516e00fdbe89b`**，树 **`7679ef1fcf86227cb0f768729d96e91aefb3d9cd`**，三组各 20 项重新完整通过，见 [最终 Android 验收清单](v2.1.0-android-final-acceptance.json)。两份记录都为干净源码；不改写既有包来源或把两个候选测试数合计。
 
 PR 的临时 merge-test commit 与合并后 main commit 可能不同。正式发行应选定 main/tag commit，由发行流程重新构建并记录自己的来源、run 和 SHA256；即使代码树相同，也不能将这些候选文件的来源改写成 main/tag commit。每次版本或依赖变化都要重新盘点许可与产物。
 
@@ -46,7 +46,7 @@ PR 的临时 merge-test commit 与合并后 main commit 可能不同。正式发
 
 精确测试身份与 APK 哈希见 [Android 客户端](../android-client.md#011-preview-候选验证状态)。0.1.0 debug 的 vivo Android 16 / 4 KB 真机、历史本机/云端各 63 项只证明旧包，未累计为新生产包的证据。
 
-失败保留：之前 Windows 路径检查 **31 passed / 1 failed**，随后路径修复定向 70 项通过；新完整 CI 为上表结果。macOS 首轮实际 Tk.framework 路径失败已改为读取实际链接 Tk 库并在两架构重验通过。[旧源预检 37028970415](https://github.com/Maximora-byte/swu-checkin/actions/runs/37028970415) 的 16 KB ART JIT 崩溃保留。本机当前生产包 16 KB 首次尝试又遇到输入法 `system_server` 空指针导致 `DeadSystemException`；该次失败报告保留，系统恢复后同一 APK 完整重跑 20 项通过。没有关闭 JIT、删除失败测试或把失败改记为成功。
+失败保留：之前 Windows 路径检查 **31 passed / 1 failed**，随后路径修复定向 70 项通过；新完整 CI 为上表结果。macOS 首轮实际 Tk.framework 路径失败已改为读取实际链接 Tk 库并在两架构重验通过。[旧源预检 37028970415](https://github.com/Maximora-byte/swu-checkin/actions/runs/37028970415) 的 16 KB ART JIT 崩溃保留。本机初次 `cf1b69e` 生产候选的 16 KB 首次尝试又遇到输入法 `system_server` 空指针导致 `DeadSystemException`；该次失败报告保留，系统恢复后同一 APK 完整重跑 20 项通过。没有关闭 JIT、删除失败测试或把失败改记为成功。
 
 ## 签名保管与升级
 
