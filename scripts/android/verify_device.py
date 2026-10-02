@@ -78,6 +78,10 @@ def accept(args: argparse.Namespace) -> None:
                 adb("install", "-r", str(args.apk.resolve()), timeout=180)
             elif stage == "cleared-data":
                 adb("shell", "pm", "clear", APP_ID)
+            # Real devices may restrict ActivityScenario launches from a
+            # background task. Bring this credential-free app to the foreground
+            # before instrumentation; the user still needs to keep it unlocked.
+            adb("shell", "am", "start", "-W", "-n", f"{APP_ID}/io.github.maximorabyte.swucheckin.MainActivity")
             run = adb(
                 "shell",
                 "am",
