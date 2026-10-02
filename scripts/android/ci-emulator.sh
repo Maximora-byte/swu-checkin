@@ -7,8 +7,8 @@ case "$api" in
   35) image="system-images;android-35;google_apis;x86_64" ;;
   *) echo 'Unsupported feasibility API' >&2; exit 1 ;;
 esac
-sdkmanager --install "$image" emulator platform-tools </dev/null
-printf 'no\n' | avdmanager create avd -n swu-feasibility --force -k "$image"
+"$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "$image" emulator platform-tools </dev/null
+printf 'no\n' | "$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager" create avd -n swu-feasibility --force -k "$image"
 accel=off
 if [[ -r /dev/kvm && -w /dev/kvm ]]; then accel=on; fi
 mkdir -p android/evidence

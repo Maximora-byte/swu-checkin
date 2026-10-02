@@ -88,3 +88,19 @@ def test_probe_rejects_relative_directory(monkeypatch):
     report = json.loads(module.run("relative-path", False))
     assert not report["passed"]
     assert report["unexpected_failure"]
+
+
+def test_apk_inspector_checks_compressed_python_archives(tmp_path):
+    from io import BytesIO
+
+    inspect = load_script("apk_inspector_nested", "scripts/android/verify_apk.py").inspect_apk
+    packages = BytesIO()
+    with ZipFile(packages, "w") as archive:
+        archive.writestr("PIL/__init__.pyc", b"fixture")
+    apk = tmp_path / "app.apk"
+    with ZipFile(apk, "w") as archive:
+        for abi in ("arm64-v8a", "x86_64"):
+            archive.writestr(f"lib/{abi}/libpython3.13.so", b"fixture")
+        archive.writestr("assets/chaquopy/requirements-common.imy", packages.getvalue())
+    with pytest.raises(ValueError, match="OCR"):
+        inspect(apk)

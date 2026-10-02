@@ -7,6 +7,7 @@ import json
 import os
 import ssl
 import sys
+import tempfile
 from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -31,12 +32,14 @@ def run(private_directory: str, with_https: bool = False) -> str:
         probe.mkdir(mode=0o700, exist_ok=True)
         if probe.is_symlink():
             raise ValueError("invalid probe directory")
-        temporary = probe / "write-test"
-        fd = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
-        with os.fdopen(fd, "w") as handle:
-            handle.write("synthetic test only")
-        checks["private_storage"] = temporary.read_text() == "synthetic test only"
-        temporary.unlink()
+        descriptor, temporary_name = tempfile.mkstemp(prefix="write-test-", dir=probe)
+        temporary = Path(temporary_name)
+        try:
+            with os.fdopen(descriptor, "w") as handle:
+                handle.write("synthetic test only")
+            checks["private_storage"] = temporary.read_text() == "synthetic test only"
+        finally:
+            temporary.unlink(missing_ok=True)
         from swu_checkin.formal_execution import execute_formal_checkin_with_lock
         from swu_checkin.runtime_lock import RuntimeLock
 

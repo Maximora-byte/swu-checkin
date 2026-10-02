@@ -28,7 +28,8 @@ jobs:
           uv python install 3.13
           dirname "$(uv python find 3.13)" >> "$GITHUB_PATH"
           # Do not auto-accept new licenses: runner images already include SDK licenses.
-          sdkmanager --install 'platforms;android-36' 'build-tools;35.0.0' </dev/null
+          echo "$ANDROID_HOME/platform-tools" >> "$GITHUB_PATH"
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install 'platforms;android-36' 'build-tools;35.0.0' </dev/null
       - name: Verify Gradle wrapper
         run: echo '81a82aaea5abcc8ff68b3dfcb58b3c3c429378efd98e7433460610fecd7ae45f  android/gradle/wrapper/gradle-wrapper.jar' | sha256sum -c -
       - name: Build Python 3.13 dual-ABI debug APK and lint
@@ -69,7 +70,8 @@ jobs:
           echo "$JAVA_HOME_17_X64/bin" >> "$GITHUB_PATH"
           uv python install 3.13
           dirname "$(uv python find 3.13)" >> "$GITHUB_PATH"
-          sdkmanager --install 'platforms;android-36' 'build-tools;35.0.0' </dev/null
+          echo "$ANDROID_HOME/platform-tools" >> "$GITHUB_PATH"
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install 'platforms;android-36' 'build-tools;35.0.0' </dev/null
       - name: Verify on emulator without credentials or school requests
         env:
           ANDROID_API: ${{ matrix.api }}
