@@ -59,17 +59,18 @@ def accept(args: argparse.Namespace) -> None:
     (evidence / "apk-checksums.json").write_text(json.dumps(checksums, indent=2), encoding="utf-8")
     results = {}
     try:
-        # Android's pm path exits 1 when the package is absent on a fresh AVD.
-        package = adb("shell", "pm", "path", APP_ID, check=False)
-        if package.returncode not in (0, 1):
-            package.check_returncode()
-        installed = package.stdout.strip()
-        if package.returncode == 1 and (installed or package.stderr.strip()):
-            package.check_returncode()
-        if installed:
-            adb("uninstall", APP_ID)
+        for package_id in (APP_ID, f"{APP_ID}.test"):
+            # Android's pm path exits 1 when the package is absent on a fresh AVD.
+            package = adb("shell", "pm", "path", package_id, check=False)
+            if package.returncode not in (0, 1):
+                package.check_returncode()
+            installed = package.stdout.strip()
+            if package.returncode == 1 and (installed or package.stderr.strip()):
+                package.check_returncode()
+            if installed:
+                adb("uninstall", package_id)
         adb("install", str(args.apk.resolve()), timeout=180)
-        adb("install", "-r", str(args.test_apk.resolve()), timeout=180)
+        adb("install", str(args.test_apk.resolve()), timeout=180)
         # Clear only this synthetic application, never device-wide data.
         adb("shell", "pm", "clear", APP_ID)
         for stage in ("fresh-install", "replacement-install", "cleared-data"):
