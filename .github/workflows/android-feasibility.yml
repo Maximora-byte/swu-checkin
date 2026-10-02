@@ -39,7 +39,7 @@ jobs:
         run: |
           mkdir -p android/evidence
           git rev-parse HEAD > android/evidence/commit.txt
-          (cd android && sha256sum app/build/outputs/apk/debug/*.apk) > android/evidence/SHA256SUMS
+          (cd android && sha256sum app/build/outputs/apk/debug/*.apk app/build/outputs/apk/androidTest/debug/*.apk) > android/evidence/SHA256SUMS
           python3 scripts/android/verify_apk.py android/app/build/outputs/apk/debug/app-debug.apk > android/evidence/apk-inventory.json
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
@@ -61,17 +61,16 @@ jobs:
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
-      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
-        with:
-          version: '0.12.15'
-      - name: Prepare preinstalled official toolchain
+      - name: Use preinstalled Java and Android tools
         run: |
           echo "JAVA_HOME=$JAVA_HOME_17_X64" >> "$GITHUB_ENV"
           echo "$JAVA_HOME_17_X64/bin" >> "$GITHUB_PATH"
-          uv python install 3.13
-          dirname "$(uv python find 3.13)" >> "$GITHUB_PATH"
           echo "$ANDROID_HOME/platform-tools" >> "$GITHUB_PATH"
-          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install 'platforms;android-36' 'build-tools;35.0.0' </dev/null
+      - name: Download exact tested build candidates
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: android-feasibility-apk-${{ github.sha }}
+          path: android
       - name: Verify on emulator without credentials or school requests
         env:
           ANDROID_API: ${{ matrix.api }}
@@ -82,8 +81,6 @@ jobs:
         with:
           name: android-runtime-api${{ matrix.api }}-${{ github.sha }}
           path: |
-            android/app/build/reports/androidTests/
-            android/app/build/outputs/androidTest-results/
             android/evidence/
           if-no-files-found: warn
           retention-days: 14

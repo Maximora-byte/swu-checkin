@@ -104,3 +104,62 @@ def test_apk_inspector_checks_compressed_python_archives(tmp_path):
         archive.writestr("assets/chaquopy/requirements-common.imy", packages.getvalue())
     with pytest.raises(ValueError, match="OCR"):
         inspect(apk)
+
+
+def successful_instrumentation_report(verifier):
+    records = []
+    for cls, method in sorted(verifier.EXPECTED_TESTS):
+        records.extend(
+            [
+                f"INSTRUMENTATION_STATUS: class={cls}",
+                f"INSTRUMENTATION_STATUS: test={method}",
+                "INSTRUMENTATION_STATUS_CODE: 0",
+            ]
+        )
+    return "\n".join(records) + "\nOK (3 tests)\nINSTRUMENTATION_CODE: -1\n"
+
+
+@pytest.mark.parametrize(
+    "report",
+    [
+        "",
+        "OK (0 tests)",
+        "OK (2 tests)",
+        "OK (3 tests)\nFAILURES!!!",
+        "INSTRUMENTATION_FAILED: crash",
+        "OK (3 tests)",
+        "OK (3 tests)\nINSTRUMENTATION_CODE: 0",
+    ],
+)
+def test_instrumentation_report_fails_closed(report):
+    verifier = load_script("instrumentation_verifier", "scripts/android/verify_instrumentation.py")
+    with pytest.raises(ValueError):
+        verifier.verify(report)
+
+
+def test_instrumentation_report_accepts_all_tests():
+    verifier = load_script("instrumentation_verifier", "scripts/android/verify_instrumentation.py")
+    assert verifier.verify(successful_instrumentation_report(verifier)) == 3
+
+
+def test_instrumentation_report_rejects_wrong_identity_or_skipped_test():
+    verifier = load_script("instrumentation_verifier", "scripts/android/verify_instrumentation.py")
+    report = successful_instrumentation_report(verifier)
+    for changed in [
+        report.replace("lockIsSharedAndProcessDeathReleasesIt", "unrelatedTest"),
+        report.replace("STATUS_CODE: 0", "STATUS_CODE: -3", 1),
+        report.replace("INSTRUMENTATION_CODE: -1", "INSTRUMENTATION_CODE: 0"),
+        report + "INSTRUMENTATION_CODE: -1\n",
+    ]:
+        with pytest.raises(ValueError):
+            verifier.verify(changed)
+
+
+def test_debug_lock_service_is_private_and_separate_process():
+    manifest = ElementTree.parse(ROOT / "android/app/src/debug/AndroidManifest.xml").getroot()
+    ns = "{http://schemas.android.com/apk/res/android}"
+    (service,) = manifest.find("application").findall("service")
+    assert service.attrib[ns + "exported"] == "false"
+    assert service.attrib[ns + "process"] == ":lockprobe"
+    assert service.attrib[ns + "name"] == ".LockProbeService"
+    assert not service.findall("intent-filter")

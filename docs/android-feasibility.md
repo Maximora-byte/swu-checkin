@@ -37,7 +37,7 @@ cd android
 
 Gradle wrapper 与 distribution 都校验固定 SHA256。SDK 路径放本地 `android/local.properties` 或 `ANDROID_HOME`，不得提交。工作流使用 GitHub runner 已安装的官方工具和已有 SDK 许可，不自动接受新条款。
 
-[`android-feasibility.yml`](../.github/workflows/android-feasibility.yml) 分别构建双 ABI debug APK、运行 Android lint、检查 APK 中的 Python/ABI，并在 API24/35 x86_64 模拟器执行真实 embedded Python instrumentation。测试公共 HTTPS 需网络，失败不会被改写为通过。证据 artifact 包含源 commit、APK SHA256、测试 XML/HTML、模拟器版本与页大小；debug APK 使用临时 debug 签名，不是生产签名、Release 或自动发布。
+[`android-feasibility.yml`](../.github/workflows/android-feasibility.yml) 分别构建双 ABI debug APK、运行 Android lint、检查 APK 中的 Python/ABI，并在 API24/35 x86_64 模拟器执行真实 embedded Python instrumentation。测试公共 HTTPS 需网络，失败不会被改写为通过。模拟器安装的是 package job 的同一 APK/test APK，先核对源 commit 与两个 APK 的 SHA256，不独立重建。证据 artifact 包含源 commit、APK SHA256、instrumentation 原始结果、模拟器版本与页大小；debug APK 使用临时 debug 签名，不是生产签名、Release 或自动发布。
 
 ## 完成门槛与待验证项
 
@@ -47,8 +47,8 @@ Gradle wrapper 与 distribution 都校验固定 SHA256。SDK 路径放本地 `an
 - [ ] API24 和 API35 模拟器：核心 import、tzdata、app-private 读写、统一运行锁、验证证书的 HTTPS
 - [ ] arm64 真机：以上全部检查；记录 Android 版本、ABI、页大小，不记录序列号/个人信息
 - [ ] 真机 16 KB 页大小兼容性（若支持范围内），模拟器不能替代对应真机结果
-- [ ] Android 跨进程锁与进程被杀后的释放（同进程锁争用不等价于跨进程验收）
-- [ ] 升级覆盖安装与清除数据后的重新启动
+- [ ] Android 跨进程锁与进程被杀后的释放（已加入 debug-only 私有第二进程测试；等待实际结果）
+- [ ] 同版本覆盖安装与清除数据后的重新启动（已加入模拟器测试）；跨版本升级迁移仍待后续验证
 
 当前执行工作区没有 Android SDK、adb、emulator、`/dev/kvm` 或已连接真机；本机 Android 检查不可执行，交由上述 CI 验证可执行部分。**实机门槛未过前，不进入完整账号/签到 UI，也不宣称首版完成。**
 

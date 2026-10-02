@@ -2,13 +2,19 @@
 # Disposable GitHub runner only; no school account, no system security changes.
 set -euo pipefail
 api="${1:?Android API required}"
+# Recent cmdline-tools and emulator releases disagree on defaults: explicitly
+# give both tools the same disposable AVD root.
+export ANDROID_USER_HOME="${RUNNER_TEMP:?GitHub runner required}/swu-android-user"
+export ANDROID_EMULATOR_HOME="$ANDROID_USER_HOME"
+export ANDROID_AVD_HOME="$ANDROID_USER_HOME/avd"
+mkdir -p "$ANDROID_AVD_HOME"
 case "$api" in
   24) image="system-images;android-24;default;x86_64" ;;
   35) image="system-images;android-35;google_apis;x86_64" ;;
   *) echo 'Unsupported feasibility API' >&2; exit 1 ;;
 esac
 "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "$image" emulator platform-tools </dev/null
-printf 'no\n' | "$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager" create avd -n swu-feasibility --force -k "$image"
+printf 'no\n' | "$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager" create avd -n swu-feasibility --force -k "$image" -p "$ANDROID_AVD_HOME/swu-feasibility.avd"
 accel=off
 if [[ -r /dev/kvm && -w /dev/kvm ]]; then accel=on; fi
 mkdir -p android/evidence
@@ -32,4 +38,26 @@ adb shell input keyevent 82
 adb shell getprop ro.build.version.sdk >> android/evidence/emulator.txt
 adb shell getprop ro.product.cpu.abi >> android/evidence/emulator.txt
 adb shell getconf PAGE_SIZE >> android/evidence/emulator.txt
-(cd android && ./gradlew --no-daemon :app:connectedDebugAndroidTest)
+# These exact APKs were downloaded from the package job, not rebuilt here.
+[[ "$(git rev-parse HEAD)" == "$(cat android/evidence/commit.txt)" ]]
+(cd android && sha256sum -c evidence/SHA256SUMS)
+apk=android/app/build/outputs/apk/debug/app-debug.apk
+tests=android/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+app_id=io.github.maximorabyte.swucheckin.feasibility
+adb install "$apk"
+adb install "$tests"
+run_tests() {
+  adb shell am instrument -w -r "$app_id.test/androidx.test.runner.AndroidJUnitRunner" \
+    | tee "android/evidence/instrumentation-$1.txt"
+  python3 scripts/android/verify_instrumentation.py "android/evidence/instrumentation-$1.txt"
+}
+run_tests fresh-install
+# Same-version replacement exercises preservation of app-private data; it is
+# not a claim of a production-version migration test.
+adb install -r "$apk"
+run_tests replacement-install
+adb shell pm clear "$app_id"
+run_tests cleared-data
+adb shell am start -n "$app_id/io.github.maximorabyte.swucheckin.MainActivity"
+sleep 2
+adb exec-out screencap -p > android/evidence/feasibility-screen.png
