@@ -1,0 +1,90 @@
+"""Static/offline safeguards; never substitutes for actual Android device tests."""
+
+import importlib.util
+from pathlib import Path
+from xml.etree import ElementTree
+from zipfile import ZipFile
+
+import pytest
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+def load_script(name, relative):
+    spec = importlib.util.spec_from_file_location(name, ROOT / relative)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_android_manifest_has_only_internet_and_no_backup():
+    manifest = ElementTree.parse(ROOT / "android/app/src/main/AndroidManifest.xml").getroot()
+    ns = "{http://schemas.android.com/apk/res/android}"
+    assert [item.attrib[ns + "name"] for item in manifest.findall("uses-permission")] == ["android.permission.INTERNET"]
+    app = manifest.find("application")
+    assert app.attrib[ns + "allowBackup"] == "false"
+    assert app.attrib[ns + "usesCleartextTraffic"] == "false"
+    assert not app.findall("receiver")
+    assert not app.findall("service")
+
+
+def test_android_requirements_are_explicit_and_no_ocr():
+    import tomllib
+
+    locked = {item["name"]: item["version"] for item in tomllib.loads((ROOT / "uv.lock").read_text())["package"]}
+    requirements = (ROOT / "android/requirements-android.txt").read_text().splitlines()
+    names = set()
+    for line in requirements:
+        if not line or line.startswith("#"):
+            continue
+        name, version = line.split("==")
+        assert locked[name] == version
+        names.add(name)
+    assert {"requests", "beautifulsoup4", "tzdata"} <= names
+    assert not names.intersection({"ddddocr", "pillow", "onnxruntime", "numpy", "opencv-python-headless"})
+
+
+def test_apk_inspector_rejects_wrong_python_or_abi(tmp_path):
+    inspect = load_script("apk_inspector", "scripts/android/verify_apk.py").inspect_apk
+    apk = tmp_path / "app.apk"
+    with ZipFile(apk, "w") as archive:
+        archive.writestr("lib/arm64-v8a/libpython3.13.so", b"fixture")
+    with pytest.raises(ValueError, match="two 64-bit"):
+        inspect(apk)
+    with ZipFile(apk, "a") as archive:
+        archive.writestr("lib/x86_64/libpython3.13.so", b"fixture")
+    assert inspect(apk)["python"] == "3.13"
+    with ZipFile(apk, "a") as archive:
+        archive.writestr("assets/onnxruntime.so", b"fixture")
+    with pytest.raises(ValueError, match="OCR"):
+        inspect(apk)
+
+
+def test_offline_probe_imports_core_without_school_requests(tmp_path, monkeypatch):
+    import requests
+
+    def forbidden(*args, **kwargs):
+        raise AssertionError("offline probe attempted a network request")
+
+    monkeypatch.setattr(requests.Session, "request", forbidden)
+    module = load_script("android_probe", "android/app/src/main/python/android_probe.py")
+    import json
+
+    report = json.loads(module.run(str(tmp_path), False))
+    # Other tests may import OCR in the pytest process; device test uses a fresh interpreter.
+    assert report["core_import"]
+    assert report["timezone"]
+    assert report["private_storage"]
+    assert report["formal_lock_contention"]
+    assert report["formal_lock_released"]
+    assert report["https"] == "not_run"
+    assert str(tmp_path) not in json.dumps(report)
+
+
+def test_probe_rejects_relative_directory(monkeypatch):
+    import json
+
+    module = load_script("android_probe", "android/app/src/main/python/android_probe.py")
+    report = json.loads(module.run("relative-path", False))
+    assert not report["passed"]
+    assert report["unexpected_failure"]

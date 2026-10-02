@@ -142,3 +142,7 @@ uv lock --check
 - 原始项目：[Sorynthia/swu-checkin](https://github.com/Sorynthia/swu-checkin)
 
 报告问题前请阅读 [故障排查](docs/troubleshooting.md)，并只附脱敏结构信息。当前 fork 使用 MIT License；复制或修改时必须保留许可证文本与原作者署名。
+
+## Android 移植验证
+
+Android 目前仅有独立的[可行性验证工程](docs/android-feasibility.md)，用于 Python 3.13 打包及运行环境验证；没有学校登录/签到 UI，不是已发布的手机客户端。完整 UI 需等待模拟器与真实设备门槛。

@@ -46,3 +46,8 @@ Thumbs.db
 .pytest_cache/
 .coverage
 htmlcov/
+# Android (never commit a local SDK path or signing key)
+android/.gradle/
+android/local.properties
+*.jks
+*.keystore

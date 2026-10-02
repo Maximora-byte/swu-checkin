@@ -1,0 +1,11 @@
+# Pure-Python runtime only. Versions match uv.lock, except tzdata is mandatory
+# on Android. Desktop OCR dependencies remain unchanged in pyproject.toml.
+beautifulsoup4==4.15.0
+certifi==2026.7.22
+charset-normalizer==3.5.1
+idna==3.19
+requests==2.34.2
+soupsieve==2.9.2
+typing-extensions==4.16.0
+tzdata==2026.4
+urllib3==2.8.0

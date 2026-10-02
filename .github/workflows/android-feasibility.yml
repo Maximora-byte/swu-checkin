@@ -1,0 +1,87 @@
+name: Android feasibility
+
+on:
+  pull_request:
+    paths:
+      - 'android/**'
+      - 'src/**'
+      - 'scripts/android/**'
+      - '.github/workflows/android-feasibility.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  android-package:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        with:
+          version: '0.12.15'
+      - name: Prepare preinstalled official toolchain
+        run: |
+          echo "JAVA_HOME=$JAVA_HOME_17_X64" >> "$GITHUB_ENV"
+          echo "$JAVA_HOME_17_X64/bin" >> "$GITHUB_PATH"
+          uv python install 3.13
+          dirname "$(uv python find 3.13)" >> "$GITHUB_PATH"
+          # Do not auto-accept new licenses: runner images already include SDK licenses.
+          sdkmanager --install 'platforms;android-36' 'build-tools;35.0.0' </dev/null
+      - name: Verify Gradle wrapper
+        run: echo '81a82aaea5abcc8ff68b3dfcb58b3c3c429378efd98e7433460610fecd7ae45f  android/gradle/wrapper/gradle-wrapper.jar' | sha256sum -c -
+      - name: Build Python 3.13 dual-ABI debug APK and lint
+        working-directory: android
+        run: ./gradlew --no-daemon :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug
+      - name: Record source and APK checksums
+        run: |
+          mkdir -p android/evidence
+          git rev-parse HEAD > android/evidence/commit.txt
+          (cd android && sha256sum app/build/outputs/apk/debug/*.apk) > android/evidence/SHA256SUMS
+          python3 scripts/android/verify_apk.py android/app/build/outputs/apk/debug/app-debug.apk > android/evidence/apk-inventory.json
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: android-feasibility-apk-${{ github.sha }}
+          path: |
+            android/app/build/outputs/apk/
+            android/app/build/reports/lint-results-debug.*
+            android/evidence/
+          if-no-files-found: error
+          retention-days: 14
+
+  android-runtime:
+    needs: android-package
+    strategy:
+      fail-fast: false
+      matrix:
+        api: [24, 35]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        with:
+          version: '0.12.15'
+      - name: Prepare preinstalled official toolchain
+        run: |
+          echo "JAVA_HOME=$JAVA_HOME_17_X64" >> "$GITHUB_ENV"
+          echo "$JAVA_HOME_17_X64/bin" >> "$GITHUB_PATH"
+          uv python install 3.13
+          dirname "$(uv python find 3.13)" >> "$GITHUB_PATH"
+          sdkmanager --install 'platforms;android-36' 'build-tools;35.0.0' </dev/null
+      - name: Verify on emulator without credentials or school requests
+        env:
+          ANDROID_API: ${{ matrix.api }}
+        run: scripts/android/ci-emulator.sh "$ANDROID_API"
+      - name: Upload actual emulator evidence, including failures
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: android-runtime-api${{ matrix.api }}-${{ github.sha }}
+          path: |
+            android/app/build/reports/androidTests/
+            android/app/build/outputs/androidTest-results/
+            android/evidence/
+          if-no-files-found: warn
+          retention-days: 14
