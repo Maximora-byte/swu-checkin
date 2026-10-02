@@ -46,6 +46,7 @@ class CheckinUiTest {
             compose.onNodeWithText("手动签到").assertIsNotEnabled()
             compose.onNodeWithText("查询今日状态").performScrollTo().performClick()
             Log.i("ManualUiTest", "waiting for captcha")
+            compose.waitUntil(15_000) { CheckinController.busy || CheckinController.captcha.pending != null }
             compose.waitUntil(120_000) { CheckinController.captcha.pending != null }
             compose.activityRule.scenario.recreate()
             compose.onNodeWithTag("captcha").performTextInput("Ab12")

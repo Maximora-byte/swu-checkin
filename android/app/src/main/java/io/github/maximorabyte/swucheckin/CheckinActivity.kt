@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.rememberScrollState
@@ -48,7 +49,7 @@ class CheckinActivity : ComponentActivity() {
                     val state = CheckinController
                     var confirming by remember { mutableStateOf(false) }
                     var present by remember { mutableStateOf(false) }
-                    Column(Modifier.fillMaxSize().safeDrawingPadding().verticalScroll(rememberScrollState()).padding(20.dp),
+                    Column(Modifier.fillMaxSize().safeDrawingPadding().imePadding().verticalScroll(rememberScrollState()).padding(20.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         Text("SWU 查寝", style = MaterialTheme.typography.headlineMedium)
                         Text("查询不会提交签到。仅支持你主动确认的手动签到。")
