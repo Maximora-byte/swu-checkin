@@ -8,6 +8,7 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
+using System.IO;
 using System.Runtime.InteropServices;
 using System.Security.Principal;
 using System.Text;
@@ -16,7 +17,7 @@ public sealed class PortableSmokeLauncher : IDisposable
 {
     private IntPtr token;
     private IntPtr job;
-    private const uint TOKEN_ASSIGN_PRIMARY = 0x0001, TOKEN_DUPLICATE = 0x0002, TOKEN_QUERY = 0x0008;
+    private const uint TOKEN_ASSIGN_PRIMARY = 0x0001, TOKEN_DUPLICATE = 0x0002, TOKEN_IMPERSONATE = 0x0004, TOKEN_QUERY = 0x0008;
     private const uint DISABLE_MAX_PRIVILEGE = 0x1, LUA_TOKEN = 0x4;
     private const uint CREATE_SUSPENDED = 0x4, CREATE_UNICODE_ENVIRONMENT = 0x400;
     private const uint SE_GROUP_ENABLED = 0x4, SE_GROUP_USE_FOR_DENY_ONLY = 0x10;
@@ -74,6 +75,10 @@ public sealed class PortableSmokeLauncher : IDisposable
     private static extern bool CreateRestrictedToken(IntPtr existing, uint flags, uint disableCount,
         [In] SidAndAttributes[] disable, uint deleteCount, IntPtr delete,
         uint restrictCount, IntPtr restrict, out IntPtr result);
+    [DllImport("advapi32.dll", SetLastError = true)]
+    private static extern bool ImpersonateLoggedOnUser(IntPtr token);
+    [DllImport("advapi32.dll", SetLastError = true)]
+    private static extern bool RevertToSelf();
     [DllImport("advapi32.dll", SetLastError = true)]
     private static extern bool GetTokenInformation(IntPtr token, int kind, IntPtr buffer, int length, out int needed);
     [DllImport("advapi32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
@@ -158,7 +163,7 @@ public sealed class PortableSmokeLauncher : IDisposable
         IntPtr original = IntPtr.Zero, adminSid = IntPtr.Zero;
         try
         {
-            Require(OpenProcessToken(Process.GetCurrentProcess().Handle, TOKEN_ASSIGN_PRIMARY | TOKEN_DUPLICATE | TOKEN_QUERY,
+            Require(OpenProcessToken(Process.GetCurrentProcess().Handle, TOKEN_ASSIGN_PRIMARY | TOKEN_DUPLICATE | TOKEN_IMPERSONATE | TOKEN_QUERY,
                 out original), "Open own token");
             var admin = new SecurityIdentifier(WellKnownSidType.BuiltinAdministratorsSid, null);
             byte[] sid = new byte[admin.BinaryLength];
@@ -183,10 +188,50 @@ public sealed class PortableSmokeLauncher : IDisposable
         }
     }
 
+    public string ProbeWritableDirectory(string directory)
+    {
+        // Check this harness's synthetic directories with the exact launch
+        // token. No ACL or token changes, credentials, or profile loading.
+        string path = Path.Combine(directory, "portable-write-probe-" + Guid.NewGuid().ToString("N") + ".tmp");
+        Require(ImpersonateLoggedOnUser(token), "Impersonate own restricted token for storage probe");
+        try
+        {
+            File.WriteAllText(path, "synthetic-offline-probe");
+            if (File.ReadAllText(path) != "synthetic-offline-probe") return "READ_MISMATCH";
+            File.Delete(path);
+            return "WRITABLE";
+        }
+        catch (UnauthorizedAccessException) { return "ACCESS_DENIED"; }
+        catch (IOException error) { return "IO_ERROR_" + error.HResult.ToString("X8"); }
+        finally
+        {
+            // Never leave the PowerShell verification thread impersonating.
+            if (!RevertToSelf()) Environment.FailFast("Could not revert restricted-token storage probe.");
+            if (File.Exists(path)) File.Delete(path);
+        }
+    }
+
     public Process Start(string executable, string argument, string directory, IDictionary<string, string> environment)
     {
         // This deliberately narrow interface cannot run arbitrary CLI modes.
         if (argument != "" && argument != "--self-test") throw new ArgumentException("Only GUI or offline self-test permitted.");
+        return StartCommand(executable, argument, directory, environment);
+    }
+
+    public Process StartDiagnostic(string python, string script, string report, string directory,
+        IDictionary<string, string> environment)
+    {
+        // The source-only diagnostic is never an acceptance substitute and may
+        // run only this checked-in, synthetic offline helper after a failure.
+        if (!Path.GetFileName(python).Equals("python.exe", StringComparison.OrdinalIgnoreCase) ||
+            !Path.GetFileName(script).Equals("portable_diagnostic.py", StringComparison.Ordinal) ||
+            script.IndexOf('"') >= 0 || report.IndexOf('"') >= 0)
+            throw new ArgumentException("Unexpected diagnostic target.");
+        return StartCommand(python, "-I -B \"" + script + "\" \"" + report + "\"", directory, environment);
+    }
+
+    private Process StartCommand(string executable, string arguments, string directory, IDictionary<string, string> environment)
+    {
         if (executable.IndexOf('"') >= 0) throw new ArgumentException("Unexpected executable path.");
         var sorted = new SortedDictionary<string, string>(environment, StringComparer.OrdinalIgnoreCase);
         var block = new StringBuilder();
@@ -198,8 +243,10 @@ public sealed class PortableSmokeLauncher : IDisposable
         bool resumed = false;
         try
         {
-            var startup = new StartupInfo { cb = Marshal.SizeOf<StartupInfo>(), desktop = @"winsta0\default" };
-            var command = new StringBuilder("\"" + executable + "\"" + (argument == "" ? "" : " " + argument));
+            // NULL inherits the runner's existing desktop/window station;
+            // never assume the hosted runner uses winsta0\default or edit its ACL.
+            var startup = new StartupInfo { cb = Marshal.SizeOf<StartupInfo>() };
+            var command = new StringBuilder("\"" + executable + "\"" + (arguments == "" ? "" : " " + arguments));
             Require(CreateProcessAsUser(token, executable, command, IntPtr.Zero, IntPtr.Zero, false,
                 CREATE_SUSPENDED | CREATE_UNICODE_ENVIRONMENT, environmentBlock, directory, ref startup, out info),
                 "Start restricted process (no elevated fallback)");

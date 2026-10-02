@@ -146,7 +146,7 @@ $OwnedProcesses = [Collections.Generic.List[Diagnostics.Process]]::new()
 $Launcher = $null
 New-Item -ItemType Directory -Path $Sandbox, $ExtractDir, $ProfileDir, $LocalData, $RoamingData, $TempDir, $WorkingDir | Out-Null
 
-function Start-OwnedProcess([string]$Argument = '') {
+function New-IsolatedEnvironment {
     $Environment = [Collections.Generic.Dictionary[string, string]]::new([StringComparer]::OrdinalIgnoreCase)
     foreach ($Entry in [Environment]::GetEnvironmentVariables('Process').GetEnumerator()) {
         # Erase interpreter/venv, package manager and app configuration hints.
@@ -162,7 +162,10 @@ function Start-OwnedProcess([string]$Argument = '') {
     $Environment['HOMEPATH'] = $ProfileDir.Substring($Environment['HOMEDRIVE'].Length)
     $Environment['TEMP'] = $TempDir
     $Environment['TMP'] = $TempDir
-    $Process = $Launcher.Start((Join-Path $AppDir 'SWUCheckin.exe'), $Argument, $WorkingDir, $Environment)
+    return ,$Environment
+}
+function Start-OwnedProcess([string]$Argument = '') {
+    $Process = $Launcher.Start((Join-Path $AppDir 'SWUCheckin.exe'), $Argument, $WorkingDir, (New-IsolatedEnvironment))
     $OwnedProcesses.Add($Process)
     return $Process
 }
@@ -190,8 +193,44 @@ try {
     Write-Host 'Restricted-token verification: same CI user, Administrators SID deny-only/absent, all non-traversal privileges removed.'
     Write-Host 'This does not substitute for a separate standard-user account or Windows 10/11 release qualification.'
 
+    foreach ($Probe in @(
+        @{ Name = 'sandbox'; Path = $Sandbox },
+        @{ Name = 'local-data'; Path = $LocalData },
+        @{ Name = 'roaming-data'; Path = $RoamingData },
+        @{ Name = 'temporary-files'; Path = $TempDir },
+        @{ Name = 'working-directory'; Path = $WorkingDir }
+    )) {
+        $StorageResult = $Launcher.ProbeWritableDirectory($Probe.Path)
+        Write-Host "Restricted storage probe $($Probe.Name): $StorageResult"
+        if ($StorageResult -ne 'WRITABLE') {
+            throw "CI storage is not writable using the application token: $($Probe.Name) ($StorageResult)."
+        }
+    }
+
     $SelfTest = Start-OwnedProcess '--self-test'
-    Wait-OwnedProcess $SelfTest 180 'Extracted portable offline self-test'
+    try { Wait-OwnedProcess $SelfTest 180 'Extracted portable offline self-test' }
+    catch {
+        # Keep the frozen failure authoritative. A same-token source diagnostic
+        # only classifies missing runtime capabilities, never replaces the test.
+        $FrozenFailure = $_
+        try {
+            $Report = Join-Path $Sandbox 'offline-diagnostic.json'
+            $Diagnostic = $Launcher.StartDiagnostic(
+                (Join-Path $Root 'build\windows\venv\Scripts\python.exe'),
+                (Join-Path $Root 'packaging\windows\portable_diagnostic.py'),
+                $Report, $WorkingDir, (New-IsolatedEnvironment))
+            $OwnedProcesses.Add($Diagnostic)
+            if (-not $Diagnostic.WaitForExit(180000)) { throw 'Restricted offline diagnostic timed out.' }
+            if (Test-Path -LiteralPath $Report -PathType Leaf) {
+                # File contains only a checked allowlist of stage/result/type
+                # identifiers. Never print raw exceptions, user paths or data.
+                Get-Content -LiteralPath $Report | ForEach-Object { Write-Host "Restricted diagnostic: $_" }
+            }
+            else { Write-Warning 'Restricted offline diagnostic produced no report.' }
+        }
+        catch { Write-Warning 'Restricted offline diagnostic could not complete; frozen failure remains authoritative.' }
+        throw $FrozenFailure
+    }
     foreach ($Launch in 1..2) {
         # No arguments is the real double-click entry point. Never click controls,
         # populate credentials, invoke scheduled mode or contact school services.

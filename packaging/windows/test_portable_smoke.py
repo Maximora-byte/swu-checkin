@@ -4,6 +4,8 @@ The full restricted-token, extracted-ZIP GUI acceptance runs only in the public
 GitHub-hosted windows-2022 desktop workflow, before installer verification.
 """
 
+import importlib.util
+import json
 import os
 import shutil
 import subprocess
@@ -91,3 +93,54 @@ if ($null -eq ('PortableSmokeLauncher' -as [type])) { throw 'Launcher type did n
         env={**os.environ, "SWU_TEST_SCRIPT": str(SCRIPT), "SWU_TEST_LAUNCHER": str(LAUNCHER)},
     )
     assert result.returncode == 0, result.stdout + result.stderr
+
+
+def load_diagnostic():
+    spec = importlib.util.spec_from_file_location("portable_diagnostic", LAUNCHER.with_name("portable_diagnostic.py"))
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_source_diagnostic_refuses_non_ci_before_writing(monkeypatch, tmp_path):
+    helper = load_diagnostic()
+    monkeypatch.delenv("GITHUB_ACTIONS", raising=False)
+    report = tmp_path / "report.json"
+    with pytest.raises(RuntimeError, match="disposable"):
+        helper.run(report)
+    assert not report.exists()
+
+
+def test_source_diagnostic_emits_only_stage_codes_and_continues(monkeypatch, tmp_path):
+    helper = load_diagnostic()
+    monkeypatch.setattr(helper.sys, "platform", "win32")
+    monkeypatch.setenv("GITHUB_ACTIONS", "true")
+    monkeypatch.setenv("RUNNER_ENVIRONMENT", "github-hosted")
+    monkeypatch.setenv("ImageOS", "win22")
+    for name in ("tls", "tcl", "tk_window", "timezone", "ocr", "dpapi", "absent_task", "temporary_lock"):
+        monkeypatch.setattr(helper, name, lambda: None)
+
+    def fail():
+        raise PermissionError("never-print-this-sensitive-exception")
+
+    monkeypatch.setattr(helper, "ocr", fail)
+    report = tmp_path / "report.json"
+    assert helper.run(report) == 1
+    output = report.read_text()
+    assert "never-print" not in output
+    records = json.loads(output)
+    assert len(records) == 8
+    assert records[4] == {"stage": "ocr", "result": "FAIL", "type": "PermissionError"}
+    assert records[-1] == {"stage": "temporary-lock", "result": "PASS"}
+
+
+def test_diagnostic_does_not_replace_frozen_acceptance_or_hardcode_desktop():
+    source = SCRIPT.read_text(encoding="utf-8")
+    assert source.index("$FrozenFailure = $_") < source.index("$Launcher.StartDiagnostic(")
+    assert "throw $FrozenFailure" in source
+    launcher = LAUNCHER.read_text(encoding="utf-8")
+    assert "ProbeWritableDirectory" in launcher
+    assert "RevertToSelf()" in launcher
+    assert 'desktop = @"winsta0' not in launcher
+    assert "new StartupInfo { cb = Marshal.SizeOf<StartupInfo>() }" in launcher
