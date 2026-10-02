@@ -66,7 +66,6 @@ def test_restricted_launcher_verifies_child_before_running_and_has_no_elevated_f
         "Process.Start(",
         "LogonUser",
         "CreateProcessWithLogon",
-        "SetTokenInformation",
         "SetNamedSecurityInfo",
     ):
         assert prohibited not in source
@@ -184,3 +183,20 @@ def test_restricted_launcher_inherits_only_explicit_nul_stdio():
     assert source.index("UpdateProcThreadAttribute(attributes, 0") < source.index("Require(CreateProcessAsUser(token")
     assert "DeleteProcThreadAttributeList(attributes)" in source
     assert "GetStdHandle" not in source
+
+
+def test_default_dacl_change_targets_only_new_restricted_token():
+    source = LAUNCHER.read_text(encoding="utf-8")
+    assert source.count("Require(SetTokenInformation(") == 1
+    assert "SetTokenInformation(token, 6, ref info, Marshal.SizeOf<TokenDefaultDacl>())" in source
+    assert "SetTokenInformation(original" not in source
+    assert "new RawAcl(2, 2)" in source
+    assert "AceQualifier.AccessAllowed, 0x10000000, user, false, null" in source
+    assert "AceQualifier.AccessAllowed, 0x10000000, system, false, null" in source
+    normalization = source.index("NormalizeRestrictedDefaultDacl();")
+    assert source.index("CreateRestrictedToken(original") < normalization
+    assert source.index("AssertRestricted(token);", normalization) > normalization
+    assert "expected[i] != observed[i]" in source
+    assert "DefaultDaclBefore = DescribeTokenDefaultDacl();" in source
+    for forbidden in ("SetNamedSecurityInfo", "SetFileSecurity", "SetSecurityInfo", "Set-Acl", "AdjustTokenPrivileges"):
+        assert forbidden not in source

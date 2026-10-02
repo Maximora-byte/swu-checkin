@@ -116,6 +116,15 @@ def absent_task() -> None:
 
     details = {}
     STAGE_DETAILS["absent-task"] = details
+    try:
+        import _winapi
+
+        read_handle, write_handle = _winapi.CreatePipe(None, 0)
+        _winapi.CloseHandle(read_handle)
+        _winapi.CloseHandle(write_handle)
+        details["anonymous_pipe"] = {"success": True}
+    except OSError as error:
+        details["anonymous_pipe"] = {"success": False, "winerror": getattr(error, "winerror", None)}
     kernel = ctypes.WinDLL("kernel32", use_last_error=True)
     advapi = ctypes.WinDLL("advapi32", use_last_error=True)
     kernel.GetCurrentProcess.restype = ctypes.c_void_p

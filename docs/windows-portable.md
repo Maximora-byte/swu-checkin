@@ -50,7 +50,7 @@ DPAPI、显式保存、只读探测、正式签到确认和错误处理均沿用
 - `Tcl-8.6.15-LICENSE.txt`：与固定 Tcl 版本对应的上游许可原文；其他许可仍在冻结资源中
 - `SHA256SUMS.txt`：逐文件校验（不含清单自身）；外层分发清单另含 ZIP 本身的哈希
 
-[Windows desktop 工作流](../.github/workflows/windows-desktop.yml) 在**安装程序运行前**执行 `verify-portable.ps1`，直接验收新 ZIP。脚本仅允许运行在一次性 GitHub-hosted Windows runner：使用非管理员受限进程 token，隔离用户数据目录，移除 Python/uv/虚拟环境的路径与配置，将 ZIP 解压到含中文和空格的目录，运行冻结离线自测、默认 GUI 关闭/重开/关闭，并核对文件哈希、无新增任务/安装登记/快捷方式、无用户数据持久写入、无遗留自有进程。它不创建测试账号、改变 ACL 或设备安全设置，不使用学校账号或调用学校接口。
+[Windows desktop 工作流](../.github/workflows/windows-desktop.yml) 在**安装程序运行前**执行 `verify-portable.ps1`，直接验收新 ZIP。脚本仅允许运行在一次性 GitHub-hosted Windows runner：使用非管理员受限进程 token，隔离用户数据目录，移除 Python/uv/虚拟环境的路径与配置，将 ZIP 解压到含中文和空格的目录，运行冻结离线自测、默认 GUI 关闭/重开/关闭，并核对文件哈希、无新增任务/安装登记/快捷方式、无用户数据持久写入、无遗留自有进程。它不创建测试账号，也不改动现有文件、桌面或设备的 ACL/安全设置；仅为新建的 CI 测试 token 初始化当前用户与 SYSTEM 的默认对象 ACL，不增加权限组或特权，不使用学校账号或调用学校接口。
 
 受限 token 检查是 CI 中的无管理员权限模拟，不是干净 Windows 10/11 实机验收。原有安装/卸载与无害计划任务专项测试仍单独运行；免安装测试不会注册任何任务。Actions artifacts 保留 14 天，下载可能需要 GitHub 登录，不等同永久 Release。
 

@@ -192,6 +192,8 @@ try {
     $Launcher = [PortableSmokeLauncher]::new()
     Write-Host 'Restricted-token verification: same CI user, Administrators SID deny-only/absent, all non-traversal privileges removed.'
     Write-Host ('Restricted-token default owner: ' + $Launcher.DescribeTokenOwner())
+    Write-Host ('Restricted-token default DACL before: ' + $Launcher.DefaultDaclBefore)
+    Write-Host ('Restricted-token default DACL after: ' + $Launcher.DescribeTokenDefaultDacl())
     Write-Host 'This does not substitute for a separate standard-user account or Windows 10/11 release qualification.'
 
     foreach ($Probe in @(

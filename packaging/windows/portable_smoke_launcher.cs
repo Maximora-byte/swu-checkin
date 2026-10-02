@@ -1,5 +1,6 @@
-// CI-only, same-user restricted-token launcher. No accounts, passwords, ACLs,
-// registry entries, installed software or machine security settings are changed.
+// CI-only, same-user restricted-token launcher. No accounts, passwords,
+// filesystem/existing-object ACLs, registry entries or machine settings change.
+// Only the newly-created restricted token's default DACL is normalized below.
 // This checks effective non-admin access; it is not a separate standard-user
 // account, a sandbox boundary, or a replacement for supported-Windows testing.
 // API contracts: https://learn.microsoft.com/windows/win32/api/securitybaseapi/nf-securitybaseapi-createrestrictedtoken
@@ -10,6 +11,7 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
+using System.Security.AccessControl;
 using System.Security.Principal;
 using System.Text;
 
@@ -17,6 +19,8 @@ public sealed class PortableSmokeLauncher : IDisposable
 {
     private IntPtr token;
     private IntPtr job;
+    public string DefaultDaclBefore { get; private set; }
+    private const uint TOKEN_ADJUST_DEFAULT = 0x0080;
     private const uint TOKEN_ASSIGN_PRIMARY = 0x0001, TOKEN_DUPLICATE = 0x0002, TOKEN_IMPERSONATE = 0x0004, TOKEN_QUERY = 0x0008;
     private const uint DISABLE_MAX_PRIVILEGE = 0x1, LUA_TOKEN = 0x4;
     private const uint CREATE_SUSPENDED = 0x4, CREATE_UNICODE_ENVIRONMENT = 0x400;
@@ -24,6 +28,8 @@ public sealed class PortableSmokeLauncher : IDisposable
 
     [StructLayout(LayoutKind.Sequential)]
     private struct SidAndAttributes { public IntPtr Sid; public uint Attributes; }
+    [StructLayout(LayoutKind.Sequential)]
+    private struct TokenDefaultDacl { public IntPtr acl; }
     [StructLayout(LayoutKind.Sequential)]
     private struct TokenGroups { public uint Count; public SidAndAttributes First; }
     [StructLayout(LayoutKind.Sequential)]
@@ -90,6 +96,8 @@ public sealed class PortableSmokeLauncher : IDisposable
     private static extern bool RevertToSelf();
     [DllImport("advapi32.dll", SetLastError = true)]
     private static extern bool GetTokenInformation(IntPtr token, int kind, IntPtr buffer, int length, out int needed);
+    [DllImport("advapi32.dll", SetLastError = true)]
+    private static extern bool SetTokenInformation(IntPtr token, int kind, ref TokenDefaultDacl info, int size);
     [DllImport("advapi32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
     private static extern bool LookupPrivilegeValue(string system, string name, out Luid value);
     [DllImport("advapi32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
@@ -182,7 +190,7 @@ public sealed class PortableSmokeLauncher : IDisposable
         IntPtr original = IntPtr.Zero, adminSid = IntPtr.Zero;
         try
         {
-            Require(OpenProcessToken(Process.GetCurrentProcess().Handle, TOKEN_ASSIGN_PRIMARY | TOKEN_DUPLICATE | TOKEN_IMPERSONATE | TOKEN_QUERY,
+            Require(OpenProcessToken(Process.GetCurrentProcess().Handle, TOKEN_ASSIGN_PRIMARY | TOKEN_DUPLICATE | TOKEN_IMPERSONATE | TOKEN_QUERY | TOKEN_ADJUST_DEFAULT,
                 out original), "Open own token");
             var admin = new SecurityIdentifier(WellKnownSidType.BuiltinAdministratorsSid, null);
             byte[] sid = new byte[admin.BinaryLength];
@@ -193,6 +201,9 @@ public sealed class PortableSmokeLauncher : IDisposable
                 new[] { new SidAndAttributes { Sid = adminSid } }, 0, IntPtr.Zero, 0, IntPtr.Zero, out token),
                 "Create same-user restricted token (no elevated fallback)");
             AssertRestricted(token);
+            DefaultDaclBefore = DescribeTokenDefaultDacl();
+            NormalizeRestrictedDefaultDacl();
+            AssertRestricted(token); // Default-object access must not restore privileges/groups.
             job = CreateJobObject(IntPtr.Zero, null);
             if (job == IntPtr.Zero) throw new Win32Exception(Marshal.GetLastWin32Error(), "Create owned-process job");
             var limits = new ExtendedLimit();
@@ -204,6 +215,84 @@ public sealed class PortableSmokeLauncher : IDisposable
         {
             if (original != IntPtr.Zero) CloseHandle(original);
             if (adminSid != IntPtr.Zero) Marshal.FreeHGlobal(adminSid);
+        }
+    }
+
+    private static RawAcl ReadDefaultDacl(IntPtr candidate)
+    {
+        IntPtr info = ReadToken(candidate, 6); // TokenDefaultDacl
+        try
+        {
+            IntPtr acl = Marshal.ReadIntPtr(info);
+            if (acl == IntPtr.Zero) return null;
+            int length = unchecked((ushort)Marshal.ReadInt16(acl, 2)); // ACL.AclSize
+            byte[] data = new byte[length];
+            Marshal.Copy(acl, data, 0, length);
+            return new RawAcl(data, 0);
+        }
+        finally { Marshal.FreeHGlobal(info); }
+    }
+
+    public string DescribeTokenDefaultDacl()
+    {
+        IntPtr info = ReadToken(token, 1); // TokenUser; never emit its SID.
+        try
+        {
+            var user = new SecurityIdentifier(Marshal.ReadIntPtr(info));
+            RawAcl acl = ReadDefaultDacl(token);
+            bool allowsUser = false, allowsSystem = false, allowsAdmin = false;
+            if (acl != null)
+                foreach (GenericAce entry in acl)
+                {
+                    var ace = entry as CommonAce;
+                    if (ace == null || ace.AceQualifier != AceQualifier.AccessAllowed) continue;
+                    allowsUser |= ace.SecurityIdentifier.Equals(user);
+                    allowsSystem |= ace.SecurityIdentifier.IsWellKnown(WellKnownSidType.LocalSystemSid);
+                    allowsAdmin |= ace.SecurityIdentifier.IsWellKnown(WellKnownSidType.BuiltinAdministratorsSid);
+                }
+            return "null=" + (acl == null) + "; user_allow=" + allowsUser +
+                "; system_allow=" + allowsSystem + "; administrators_allow=" + allowsAdmin;
+        }
+        finally { Marshal.FreeHGlobal(info); }
+    }
+
+    private void NormalizeRestrictedDefaultDacl()
+    {
+        // CreatePipe with NULL security attributes takes its default DACL from
+        // the creating token. LUA filtering can leave deny-only Administrators
+        // as the only matching write grant, preventing the pipe's client open.
+        // Change ONLY TokenDefaultDacl (6) on our new restricted token. The
+        // original token, token owner, existing objects and machine ACLs stay as-is.
+        // https://learn.microsoft.com/windows/win32/api/winnt/ns-winnt-token_default_dacl
+        // https://learn.microsoft.com/windows/win32/api/namedpipeapi/nf-namedpipeapi-createpipe
+        IntPtr userInfo = ReadToken(token, 1);
+        IntPtr buffer = IntPtr.Zero;
+        try
+        {
+            var user = new SecurityIdentifier(Marshal.ReadIntPtr(userInfo));
+            var system = new SecurityIdentifier(WellKnownSidType.LocalSystemSid, null);
+            var acl = new RawAcl(2, 2);
+            acl.InsertAce(0, new CommonAce(AceFlags.None, AceQualifier.AccessAllowed, 0x10000000, user, false, null));
+            acl.InsertAce(1, new CommonAce(AceFlags.None, AceQualifier.AccessAllowed, 0x10000000, system, false, null));
+            byte[] expected = new byte[acl.BinaryLength];
+            acl.GetBinaryForm(expected, 0);
+            buffer = Marshal.AllocHGlobal(expected.Length);
+            Marshal.Copy(expected, 0, buffer, expected.Length);
+            var info = new TokenDefaultDacl { acl = buffer };
+            Require(SetTokenInformation(token, 6, ref info, Marshal.SizeOf<TokenDefaultDacl>()),
+                "Set current-user and SYSTEM defaults on new restricted token only");
+            RawAcl actual = ReadDefaultDacl(token);
+            if (actual == null || actual.BinaryLength != expected.Length)
+                throw new InvalidOperationException("Restricted default DACL did not round-trip.");
+            byte[] observed = new byte[actual.BinaryLength];
+            actual.GetBinaryForm(observed, 0);
+            for (int i = 0; i < expected.Length; i++)
+                if (expected[i] != observed[i]) throw new InvalidOperationException("Unexpected restricted default DACL.");
+        }
+        finally
+        {
+            if (buffer != IntPtr.Zero) Marshal.FreeHGlobal(buffer);
+            Marshal.FreeHGlobal(userInfo);
         }
     }
 
