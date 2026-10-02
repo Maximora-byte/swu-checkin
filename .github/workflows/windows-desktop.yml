@@ -6,6 +6,8 @@ on:
       - "src/**"
       - "tests/**"
       - "packaging/windows/**"
+      - "packaging/license_inventory.py"
+      - "packaging/licenses/**"
       - "scripts/windows/build.ps1"
       - "scripts/windows/verify-install.ps1"
       - "scripts/windows/verify-portable.ps1"
@@ -13,6 +15,12 @@ on:
       - "uv.lock"
       - ".github/workflows/windows-desktop.yml"
   workflow_dispatch:
+  workflow_call:
+    inputs:
+      ref:
+        description: Exact commit to build and verify
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -28,7 +36,7 @@ jobs:
       - name: Check out requested revision
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          ref: ${{ inputs.ref || github.sha }}
           persist-credentials: false
 
       - name: Set up official Python with Tcl/Tk
@@ -69,19 +77,21 @@ jobs:
       - name: Upload unsigned portable ZIP and its checksum
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: swu-checkin-windows-portable-x64-${{ github.event.pull_request.head.sha || github.sha }}
+          name: swu-checkin-windows-portable-x64-${{ inputs.ref || github.sha }}
           path: |
             dist/windows/*-win-x64-Portable.zip
             dist/windows/*-win-x64-Portable.zip.sha256
             dist/windows/BUILD-INFO.json
             dist/windows/TOOLCHAIN.txt
+            dist/windows/LICENSE-INVENTORY.json
+            dist/windows/SHA256SUMS.txt
           if-no-files-found: error
           retention-days: 14
 
       - name: Upload unsigned installer, onedir bundle and checksums
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: swu-checkin-windows-x64-${{ github.event.pull_request.head.sha || github.sha }}
+          name: swu-checkin-windows-x64-${{ inputs.ref || github.sha }}
           path: |
             dist/windows/
             !dist/windows/*-win-x64-Portable.zip

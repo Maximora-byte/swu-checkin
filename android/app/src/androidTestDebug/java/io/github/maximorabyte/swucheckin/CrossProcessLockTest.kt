@@ -20,6 +20,7 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 
 @RunWith(AndroidJUnit4::class)
+// The private lock-probe service exists only in the debug build.
 class CrossProcessLockTest {
     @Test fun lockIsSharedAndProcessDeathReleasesIt() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext

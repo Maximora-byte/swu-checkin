@@ -116,6 +116,7 @@ print("Local task query: definite absence verified; no task created")
     $Installer = Join-Path $Dist "SWUCheckin-$Version-win-x64-Setup.exe"
     if (-not (Test-Path -LiteralPath $Installer -PathType Leaf)) { throw 'Installer was not produced.' }
     Copy-Item -LiteralPath (Join-Path $Metadata 'BUILD-INFO.json') -Destination $Dist
+    Copy-Item -LiteralPath (Join-Path $Metadata 'LICENSE-INVENTORY.json') -Destination $Dist
     Copy-Item -LiteralPath (Join-Path $Metadata 'TOOLCHAIN.txt') -Destination $Dist
     # The portable ZIP wraps the very same tested onedir app. It adds standalone
     # instructions/provenance and its own payload manifest without changing the

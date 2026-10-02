@@ -1,0 +1,231 @@
+{
+  "schema_version": 1,
+  "recorded_date": "2026-10-03",
+  "released": false,
+  "source_commit": "cf1b69eb3c9d31b17e8ce79fc4aaa406dbf93fc6",
+  "source_tree": "9c4c7c9928d4aa71aa7512683d38950fdb0e204d",
+  "source_subtrees": {
+    "android": "3db7278085da32316036eac4a150bd8a03bab148",
+    "src": "ea6cfc79e8a1726ff86e89d2ff4b19c067e131ac",
+    "scripts": "12dafd1ecb274b62b5c3a09c7d3d2df068fe1801",
+    "packaging": "43e8b83d82a52f61d52328f758e06bb131562862"
+  },
+  "ci": {
+    "run_id": 37031346637,
+    "passed": 1218,
+    "skipped": 1,
+    "ruff": true,
+    "format": true
+  },
+  "preflight": {
+    "run_id": 37031347112,
+    "passed": true,
+    "published": false,
+    "staged_files": 17,
+    "staged_artifact_id": 11237861712,
+    "staged_artifact_sha256": "9e79488768e2f1c00fa74331b43f6bd3a4f0dd6225e6f8e0ce6c2e8fd909014b",
+    "local_verification": "producer artifacts downloaded, original ZIP SHA256 checked; six packages independently restaged and verified; 17-file aggregate ZIP exceeds connector 512 MiB limit"
+  },
+  "assets": [
+    {
+      "name": "swu_checkin-2.1.0-py3-none-any.whl",
+      "sha256": "8902725325452137c8966e51d70ed3fbadc393329e2238dde5397d9fe4080009",
+      "size": 77250,
+      "platform": "python",
+      "kind": "wheel",
+      "version": "2.1.0",
+      "source_commit": "cf1b69eb3c9d31b17e8ce79fc4aaa406dbf93fc6"
+    },
+    {
+      "name": "swu_checkin-2.1.0.tar.gz",
+      "sha256": "78acaa5da258b8e83a5777ae5eca7b8dc21843082e8c9bfbb525164336310228",
+      "size": 560089,
+      "platform": "python",
+      "kind": "sdist",
+      "version": "2.1.0",
+      "source_commit": "cf1b69eb3c9d31b17e8ce79fc4aaa406dbf93fc6"
+    },
+    {
+      "name": "SWUCheckin-2.1.0-win-x64-Portable.zip",
+      "sha256": "0c027a13de6b121f7372f40c7824faac4d479054af35dcf166c58a1c241ea176",
+      "size": 170118741,
+      "platform": "windows-x64",
+      "kind": "portable",
+      "version": "2.1.0",
+      "source_commit": "cf1b69eb3c9d31b17e8ce79fc4aaa406dbf93fc6"
+    },
+    {
+      "name": "SWUCheckin-2.1.0-win-x64-Setup.exe",
+      "sha256": "8b1a3e25d73b2f16bef6a94f0a238ae9a292000ee3a4034150cfb7a4aeb01b60",
+      "size": 140976298,
+      "platform": "windows-x64",
+      "kind": "installer",
+      "version": "2.1.0",
+      "source_commit": "cf1b69eb3c9d31b17e8ce79fc4aaa406dbf93fc6"
+    },
+    {
+      "name": "SWUCheckin-2.1.0-macos15-arm64-preview.zip",
+      "sha256": "305665f62947c0f0f5a71270c8aa7db460287d390d7097310543adaf9cae8263",
+      "size": 168497543,
+      "platform": "macos-arm64",
+      "kind": "preview-app",
+      "version": "2.1.0",
+      "source_commit": "cf1b69eb3c9d31b17e8ce79fc4aaa406dbf93fc6"
+    },
+    {
+      "name": "SWUCheckin-2.1.0-macos15-x86_64-preview.zip",
+      "sha256": "156a17a72923bc8a1bcea6240657c50ad7d2b42d86898263f69f1c8f136e6895",
+      "size": 164800989,
+      "platform": "macos-x86_64",
+      "kind": "preview-app",
+      "version": "2.1.0",
+      "source_commit": "cf1b69eb3c9d31b17e8ce79fc4aaa406dbf93fc6"
+    }
+  ],
+  "supporting_files": {
+    "ASSET-MANIFEST.json": "1197d358b59810c41733e79f956b73a5c40f4d38e912f2caa66740c79148a7fd",
+    "LICENSE": "d224da08e70aca486397e23f6484e1a57eda50a2344d501eba39841102d321b1",
+    "macos-arm64-BUILD-INFO.json": "bc3187ff186581afa0422ceff55764169f3074ad38a2480f04f523a4ae7b8b02",
+    "macos-arm64-LICENSE-INVENTORY.json": "29a6e4d5e1e4ac5e4f316a24c0fafb2d68adcd65c5489c7ea5a26b96234e1d2f",
+    "macos-x86_64-BUILD-INFO.json": "6dc3462adcc42286411a157583c17a0864ec13eb297af530607cf66fc7c80e64",
+    "macos-x86_64-LICENSE-INVENTORY.json": "d01a9da1f707a2a46083e01d5dae18e0394a3629e754845d3b21aa066b4615ee",
+    "python-SOURCE-INFO.json": "5be7758467f6969f2c6ed85fdb96068ac20a383e1a8711010531044de6b1a081",
+    "RELEASE-NOTES.md": "6ed8ce9f9c5da87506f60795080113245eb6a999b7e1cf17d2061b9fb2984948",
+    "SHA256SUMS.txt": "c066fa6fcd9f375c880014147109f18db22892ff1e97522569e6e72823f78973",
+    "windows-x64-BUILD-INFO.json": "29f36b39ba2e2051a3558e5d70811737ccb41f57db710bd3bdcb991b54844e6d",
+    "windows-x64-LICENSE-INVENTORY.json": "542d5d1afad725f693dfe25fbe67a6070002fff66d3ff9cbf2daf90890d100f6"
+  },
+  "android": {
+    "application_id": "io.github.maximorabyte.swucheckin",
+    "version_name": "0.1.1-preview",
+    "version_code": 3,
+    "debuggable": false,
+    "apk_sha256": "c13751d0aa406b3fa516b54abe851c3167f9c64572d7b2066dbbb67e14e55937",
+    "certificate_sha256": "77ad72b44323fa7917470442e21fb258b5b8bc8a367e87c83ba6fa22d08f811a",
+    "provenance": {
+      "android_version": "0.1.1-preview",
+      "android_version_code": 3,
+      "preview": true,
+      "project_version": "2.1.0",
+      "schema_version": 1,
+      "signature": "persistent local protected RSA-4096 preview key",
+      "source_commit": "cf1b69eb3c9d31b17e8ce79fc4aaa406dbf93fc6",
+      "source_dirty": false,
+      "source_tree": "9c4c7c9928d4aa71aa7512683d38950fdb0e204d",
+      "uv_lock_sha256": "bb51ee11a2d04466a118d6f459fddc83cf28649cd474c23b2496f2cd43f10f8c",
+      "verification_scope": "synthetic acceptance; no school-account authentication or submission"
+    },
+    "native_16kb_alignment_count": 138,
+    "licenses": {
+      "license_assets": 78,
+      "maven_components": 101,
+      "native_files": 138,
+      "nested_notices": 14,
+      "python_distributions": 11,
+      "runtime_archives": 2
+    },
+    "emulator_acceptance": [
+      {
+        "device": {
+          "api": 24,
+          "abi": "x86_64",
+          "page_size": 4096,
+          "emulator": true
+        },
+        "tests": {
+          "fresh-install": 6,
+          "upgrade-account-seed": 1,
+          "upgrade-account-retained": 1,
+          "replacement-install": 6,
+          "cleared-data": 6
+        },
+        "passed": true,
+        "test_apk_sha256": "838f6b188e9e3acee60e847089404a8e2221a14e1e6d21482f8aa99a37642153",
+        "reports_sha256": {
+          "instrumentation-cleared-data.txt": "b26b3bbc63f3696e56c44b472e76ed785bad0857afb8d70eb5914b53fb2e1835",
+          "instrumentation-fresh-install.txt": "f5bdfbdb31e62380a25110d9dd042fd8039c7831c7b6e616bba1f495dd0ac761",
+          "instrumentation-replacement-install.txt": "7a62abac4e291613f8746f22728d48f567aa2b9a38b71883d374963b6a2b3e61",
+          "instrumentation-upgrade-account-retained.txt": "7f3934e3d893896c751464d774fdc5e6700ea969362badb2acb864ac16e6d3e5",
+          "instrumentation-upgrade-account-seed.txt": "e03cb0178ad30f2d7ffe7ea59076ced85b278b2a1e04e67ce2c9aef200f1f9d3"
+        }
+      },
+      {
+        "device": {
+          "api": 35,
+          "abi": "x86_64",
+          "page_size": 4096,
+          "emulator": true
+        },
+        "tests": {
+          "fresh-install": 6,
+          "upgrade-account-seed": 1,
+          "upgrade-account-retained": 1,
+          "replacement-install": 6,
+          "cleared-data": 6
+        },
+        "passed": true,
+        "test_apk_sha256": "838f6b188e9e3acee60e847089404a8e2221a14e1e6d21482f8aa99a37642153",
+        "reports_sha256": {
+          "instrumentation-cleared-data.txt": "429c60808e4547631b11974f6a20a25041f9732ce74944e63276379c9bb24b0d",
+          "instrumentation-fresh-install.txt": "e68b6ff3bf77e1ace66a02f4daf04352be52cfcca13c0c4784a2df1ad305af43",
+          "instrumentation-replacement-install.txt": "7808ebbd7f8f5c38d58befce2d203ba33fa3bb1408c28873fc97b53fe8312236",
+          "instrumentation-upgrade-account-retained.txt": "d16ebc0738fa6d20437c04be476d55173cbac39d40947cffbf8e4ca148350190",
+          "instrumentation-upgrade-account-seed.txt": "15b183712bc95f901c78a7b43410dcf145dacd8dd6c273ae24ae891397f8dead"
+        }
+      },
+      {
+        "device": {
+          "api": 35,
+          "abi": "x86_64",
+          "page_size": 16384,
+          "emulator": true
+        },
+        "tests": {
+          "fresh-install": 6,
+          "upgrade-account-seed": 1,
+          "upgrade-account-retained": 1,
+          "replacement-install": 6,
+          "cleared-data": 6
+        },
+        "passed": true,
+        "test_apk_sha256": "838f6b188e9e3acee60e847089404a8e2221a14e1e6d21482f8aa99a37642153",
+        "reports_sha256": {
+          "instrumentation-cleared-data.txt": "a3cf5d7c7552c70b2ffda865b2daef8d434fda71521afc8c5c1d8e2b8589cc00",
+          "instrumentation-fresh-install.txt": "a1426185eb1458691347c0508f53e9362031bf2a5efc902dff5ab34c0cf70d1b",
+          "instrumentation-replacement-install.txt": "901b8b40343dcd821c69f0f521ad78cd4ae6af593fcea100575da9fcff0f4815",
+          "instrumentation-upgrade-account-retained.txt": "d2162464c7502f704ebfbe652cad60f58196fdf59f9c725acbebc7210094b4b5",
+          "instrumentation-upgrade-account-seed.txt": "a34a51b6324c1b59ef478f2a3b4e9f09af83c8ab558d53505fdf8ad6ed630f5b"
+        }
+      }
+    ],
+    "total_passed": 60,
+    "backup": {
+      "private_material_outside_repository": true,
+      "cross_machine_restore": false,
+      "certificate_sha256": "77ad72b44323fa7917470442e21fb258b5b8bc8a367e87c83ba6fa22d08f811a",
+      "offline_copy": false,
+      "passed": true,
+      "scope": "protected same-computer same-Windows-user backup and actual recovered-key signing"
+    }
+  },
+  "historical_failures": [
+    {
+      "run_id": 37028970415,
+      "scope": "prior-source macOS runtime Tk lookup and API35/16KB ART JIT crash; original failed run retained"
+    },
+    {
+      "scope": "local current signed APK API35/16KB initial attempt: system_server input-method AdditionalSubtypeUtils NullPointerException; cleared-data instrumentation failed with DeadSystemException",
+      "failure_log_sha256": "2bf89db0f1284f8532c1816a864b8ba31bad20d0694ad4b47c10167266e0c975",
+      "retry": "same signed APK complete 20-test acceptance rerun after guest system recovery; original reports retained"
+    }
+  ],
+  "limitations": [
+    "Windows unsigned and clean Windows 10/11 standard-user acceptance pending",
+    "macOS ad-hoc signed, unnotarized and physical Mac clean-user acceptance pending",
+    "Android runtime here is x86_64 emulation; 16KB physical Android and real school account authentication/submission not tested",
+    "Android backup restoration tested on same computer/current Windows user only; offline custody and cross-machine recovery pending before public APK",
+    "same-version replacement is not arbitrary cross-version or old debug-package account migration",
+    "future main/tag assets must be rebuilt from their actual commit; these PR merge-source hashes must not be relabeled"
+  ],
+  "android_superseded_by": "v2.1.0-android-final-acceptance.json"
+}

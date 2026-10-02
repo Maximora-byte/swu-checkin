@@ -1,0 +1,132 @@
+{
+  "schema_version": 1,
+  "recorded_date": "2026-10-03",
+  "released": false,
+  "source_commit": "f62e76f9e3940de830d5cbaee89516e00fdbe89b",
+  "source_tree": "7679ef1fcf86227cb0f768729d96e91aefb3d9cd",
+  "source_subtrees": {
+    "android": "e57b24d291bad7a36fc1ae2701a49b16f79ec7c2",
+    "src": "ea6cfc79e8a1726ff86e89d2ff4b19c067e131ac",
+    "scripts": "12dafd1ecb274b62b5c3a09c7d3d2df068fe1801",
+    "packaging": "43e8b83d82a52f61d52328f758e06bb131562862"
+  },
+  "change_from_first_candidate": "diagnostic initial text now describes this page, removing incorrect claim that the APK cannot log in/check in; core, signing and dependencies unchanged",
+  "superseded_apk_sha256": "c13751d0aa406b3fa516b54abe851c3167f9c64572d7b2066dbbb67e14e55937",
+  "application_id": "io.github.maximorabyte.swucheckin",
+  "version_name": "0.1.1-preview",
+  "version_code": 3,
+  "debuggable": false,
+  "certificate_sha256": "77ad72b44323fa7917470442e21fb258b5b8bc8a367e87c83ba6fa22d08f811a",
+  "apk_sha256": "ab5eaf7b1e4f1ee1183ade9667d95e557a237ff7d4f91f0b86ac563ce250994a",
+  "provenance": {
+    "android_version": "0.1.1-preview",
+    "android_version_code": 3,
+    "preview": true,
+    "project_version": "2.1.0",
+    "schema_version": 1,
+    "signature": "persistent local protected RSA-4096 preview key",
+    "source_commit": "f62e76f9e3940de830d5cbaee89516e00fdbe89b",
+    "source_dirty": false,
+    "source_tree": "7679ef1fcf86227cb0f768729d96e91aefb3d9cd",
+    "uv_lock_sha256": "bb51ee11a2d04466a118d6f459fddc83cf28649cd474c23b2496f2cd43f10f8c",
+    "verification_scope": "synthetic acceptance; no school-account authentication or submission"
+  },
+  "native_16kb_alignment_count": 138,
+  "licenses": {
+    "license_assets": 78,
+    "maven_components": 101,
+    "native_files": 138,
+    "nested_notices": 14,
+    "python_distributions": 11,
+    "runtime_archives": 2
+  },
+  "emulator_acceptance": [
+    {
+      "device": {
+        "api": 24,
+        "abi": "x86_64",
+        "page_size": 4096,
+        "emulator": true
+      },
+      "passed": true,
+      "tests": {
+        "fresh-install": 6,
+        "upgrade-account-seed": 1,
+        "upgrade-account-retained": 1,
+        "replacement-install": 6,
+        "cleared-data": 6
+      },
+      "test_apk_sha256": "838f6b188e9e3acee60e847089404a8e2221a14e1e6d21482f8aa99a37642153",
+      "reports_sha256": {
+        "instrumentation-cleared-data.txt": "8b12eadca8b83e145689e8060174be9660815bf107952fd06c6cc97a5778d88a",
+        "instrumentation-fresh-install.txt": "bd9aeee5d34be7099662004eed3ec8e7b7830097e23d659a3db012b0b0e77d57",
+        "instrumentation-replacement-install.txt": "2db273e34ce3a4e92c0ac64289f6c5f3a22867df261d048ec485241aca49caa2",
+        "instrumentation-upgrade-account-retained.txt": "c9fd3a6853bd52d378f3a586e9951f51c21fb7ef8ffb2cb545d0bcef58664b35",
+        "instrumentation-upgrade-account-seed.txt": "e03cb0178ad30f2d7ffe7ea59076ced85b278b2a1e04e67ce2c9aef200f1f9d3"
+      }
+    },
+    {
+      "device": {
+        "api": 35,
+        "abi": "x86_64",
+        "page_size": 4096,
+        "emulator": true
+      },
+      "passed": true,
+      "tests": {
+        "fresh-install": 6,
+        "upgrade-account-seed": 1,
+        "upgrade-account-retained": 1,
+        "replacement-install": 6,
+        "cleared-data": 6
+      },
+      "test_apk_sha256": "838f6b188e9e3acee60e847089404a8e2221a14e1e6d21482f8aa99a37642153",
+      "reports_sha256": {
+        "instrumentation-cleared-data.txt": "f555230fda495dcba74036e73c3da3522db9208062ad8a5d86ff8869008d1c07",
+        "instrumentation-fresh-install.txt": "9d8903d2f040afc1470c8620957d694f3b8a1a58816a36b0e9520e110fb82e91",
+        "instrumentation-replacement-install.txt": "80db01176f6d5813acf79b1541f793700d937cb8b9d258df7325eed7583f39d7",
+        "instrumentation-upgrade-account-retained.txt": "de139831e071e9dc6755d895fe9b852d01b04b145f165719c53fea563d1f3004",
+        "instrumentation-upgrade-account-seed.txt": "989c0281eca7679139c15c2a077e00a8e57587ca1647ca1e04659e999e18086f"
+      }
+    },
+    {
+      "device": {
+        "api": 35,
+        "abi": "x86_64",
+        "page_size": 16384,
+        "emulator": true
+      },
+      "passed": true,
+      "tests": {
+        "fresh-install": 6,
+        "upgrade-account-seed": 1,
+        "upgrade-account-retained": 1,
+        "replacement-install": 6,
+        "cleared-data": 6
+      },
+      "test_apk_sha256": "838f6b188e9e3acee60e847089404a8e2221a14e1e6d21482f8aa99a37642153",
+      "reports_sha256": {
+        "instrumentation-cleared-data.txt": "8862cd1041dadbee72c7120d2221191688565f1708e38ec34e8b2dd9e6179e3d",
+        "instrumentation-fresh-install.txt": "c0fb4f796142f9b78e766f2d51cd63eba36c82b1ae5f0c3f0dc6e0c62e05e713",
+        "instrumentation-replacement-install.txt": "ea0d85541db90962995de607584d08e6a7c9a73ec8d00de523459dc099867104",
+        "instrumentation-upgrade-account-retained.txt": "081e53e02e15f3bd9b293f37cf3942ef9747456f3d67b284d3e0930664819384",
+        "instrumentation-upgrade-account-seed.txt": "49cb0d3673840fcbf25fd9e646fe19547291b7565a56ad9f51bd3712cd37d799"
+      }
+    }
+  ],
+  "total_passed": 60,
+  "backup": {
+    "private_material_outside_repository": true,
+    "cross_machine_restore": false,
+    "certificate_sha256": "77ad72b44323fa7917470442e21fb258b5b8bc8a367e87c83ba6fa22d08f811a",
+    "offline_copy": false,
+    "passed": true,
+    "scope": "protected same-computer same-Windows-user backup and actual recovered-key signing"
+  },
+  "limitations": [
+    "same-version synthetic account replacement only; no old debug/arbitrary cross-version migration",
+    "x86_64 emulator runtime here; physical 16KB Android and real school-account authentication/submission not tested",
+    "same-computer/current Windows user backup recovery verified; offline custody/cross-machine recovery pending before public APK",
+    "initial candidate failures retained in v2.1.0-acceptance.json; final APK passed all three complete rows without retry"
+  ]
+}

@@ -1,6 +1,6 @@
 # Windows 桌面预览版
 
-本页描述当前 `main` 的桌面预览功能；基础界面来自 [PR #33](https://github.com/Maximora-byte/swu-checkin/pull/33)，之后新增了独立免安装 ZIP 及验证。Windows x64 独立应用与安装包不需要使用者安装 Python、uv 或 OCR 模型。产物仍未签名，也尚未完成干净 Windows 10/11 标准用户验收。已发布 [v2.0.0](https://github.com/Maximora-byte/swu-checkin/releases/tag/v2.0.0) 包含 Windows 安装程序与原始 onedir ZIP；当前源码版本字符串仍为 `2.0.0`，但该 tag 之后的修改没有因此成为已发布功能。发布差异见 [发布评估](releases/release-readiness.md)，历史资产见 [v2.0.0 发布说明](releases/v2.0.0.md)。Python 分发包与桌面预览安装包是不同产物。
+本页描述当前源码的桌面预览；基础界面来自 [PR #33](https://github.com/Maximora-byte/swu-checkin/pull/33)，后续新增 Portable 和发布审核。Windows x64 应用不需要使用者安装 Python、uv 或 OCR 模型；仍未签名，干净 Windows 10/11 标准用户验收未完成。最新公开 [v2.0.0](https://github.com/Maximora-byte/swu-checkin/releases/tag/v2.0.0) 有安装程序与原始 onedir ZIP。当前源码已同步 **2.1.0 预发布候选**，新包需通过本轮构建/来源/许可与同源 stage，尚无新 tag/Release。见 [候选说明](releases/v2.1.0.md)、[发布准备](releases/release-readiness.md)及 [历史说明](releases/v2.0.0.md)。
 
 历史基础界面的验证记录：[Windows Server 2022 x64 构建与冒烟测试](https://github.com/Maximora-byte/swu-checkin/actions/runs/36897730511)、[合并后普通 CI](https://github.com/Maximora-byte/swu-checkin/actions/runs/36901319136)。当前功能合并前的 [Windows 构建与冒烟测试](https://github.com/Maximora-byte/swu-checkin/actions/runs/37019007437) 也已通过。每个记录只证明对应源码 commit 的检查结果，不构成学校认证、Windows 10/11 全面支持或未来候选 tag 资产的验证。
 
@@ -79,15 +79,16 @@
 - `SWUCheckin/`：完整冻结应用，内含自己的 `SHA256SUMS.txt`
 - `BUILD-INFO.json`：版本、Git commit、工作区是否脏、源码树摘要、uv.lock 摘要、Python 与全部已安装依赖版本
 - `TOOLCHAIN.txt`：uv、Inno Setup 版本与源码提交时间
+- `LICENSE-INVENTORY.json`：实际 CPython、Tcl/Tk、依赖分发包与 vendor 的原文位置、版本、来源和 SHA256；缺项使构建失败
 - `SHA256SUMS.txt`：按路径排序的文件 SHA256 清单（不包含其自身）
 
-源文件清单由 Git 跟踪文件和未忽略的新文件组成。摘要能区分本地未提交改动，但不是数字签名或可信发布证明。打包明确保留 MIT `LICENSE`、Python 许可、各依赖分发包提供的许可/NOTICE 与元数据。对外分发前仍需审查依赖和模型许可完整性。
+源文件清单由 Git 跟踪文件和未忽略的新文件组成；发行 stage 拒绝 `source_dirty=true`。摘要不是数字签名。新版打包保留项目 MIT、真实 CPython 3.13.15、Tcl/Tk 8.6.15、依赖与包内 vendor 的许可/NOTICE。资源在 `_internal/build-info/` 带逐文件清单，安装器与 Portable 使用同一冻结目录；构建和 stage 均核对实际字节，完整依赖/模型版本变化时须重新盘点。
 
 可用 `Get-FileHash -Algorithm SHA256 <安装包路径>` 与可信渠道提供的清单核对。构建固定依赖版本、排序清单、哈希种子及源码时间以提高可追溯性；操作系统、编译器、签名及压缩差异仍可能影响二进制，因此不声称跨机器逐字节可重现。
 
 ## CI 与离线冒烟测试
 
-[Windows desktop 工作流](../.github/workflows/windows-desktop.yml) 支持手动 `workflow_dispatch` 和相关文件变动的 `pull_request` 触发：Windows x64 构建，运行冻结 EXE 的 `--self-test`，再生成安装包与免安装 ZIP，先对解压 ZIP 执行非管理员受限 token/GUI/重开冒烟，再执行隔离安装/GUI/卸载冒烟测试，并上传保留 14 天的 Actions artifact。它不在普通 push 时自动触发；文档变动需看路径规则，`packaging/windows/**` 内的说明也会触发构建。它不发布 Release，也不注入学校账号 secret，不运行真实签到或生产任务。普通 CI 与 Release 工作流的职责见 [开发、CI 与发布](development.md)。
+[Windows desktop 工作流](../.github/workflows/windows-desktop.yml) 支持路径过滤 PR、手动运行和发布预检的 `workflow_call(ref)`：运行冻结 EXE 离线自测，生成 Setup/Portable，再验收受限 token 解压 GUI/重开及隔离安装/GUI/卸载，上传保留 14 天的 artifact。默认或调用 ref 均与实际 HEAD/文件名一致。它不单独发布、不注入学校 secret，也不执行真实签到；新版六包 Release 集须另过统一同源 stage。普通 CI 与发布职责见 [开发与发布](development.md)。
 
 `--self-test` 使用合成数据检查 Tk、OCR、时区、证书、DPAPI 往返和临时运行锁，并只读查询随机任务名以确认“确实不存在”；不读取账号或连接学校。构建在非零退出或 180 秒超时时失败。`scripts/windows/verify-install.ps1` 仅允许在一次性的 GitHub-hosted Windows runner 运行。它先调用独立的 `task_scheduler_smoke.py`：使用生产 XML 生成器，将动作替换为系统 `cmd.exe /d /c exit 0`，触发时间推迟至少六天，以随机 `SWUCheckin-CI-*` 名称注册无害任务，验证 COM 有效属性和 UTF-16 注册流程，然后删除并确认不存在；不执行该任务、不注册真实 `--scheduled` 任务。
 
@@ -108,7 +109,7 @@
 
 正式下载入口以本仓库 [Releases](https://github.com/Maximora-byte/swu-checkin/releases) 中实际列出的资产为准；Release 资产必须对应其说明中的 tag commit 与构建 run。若该版本未列出桌面资产，不要假设 Python 发布工作流已经生成 EXE。
 
-开发者也可从 [Actions](https://github.com/Maximora-byte/swu-checkin/actions/workflows/windows-desktop.yml) 手动选择受信任的 ref 构建。下载对应 run 的 `swu-checkin-windows-x64-<commit>` 或 `swu-checkin-windows-portable-x64-<commit>` artifact 后，检查 `BUILD-INFO.json` 的 commit、dirty 标记和校验清单。当前 Windows PR 工作流明确检出 PR 的 `head.sha`，artifact 名也使用该 SHA；手动 run 使用所选 ref 的 `github.sha`。不要将其他平台工作流的临时 merge-test SHA 套用到 Windows 资产。artifact 保留 14 天、可能需要 GitHub 登录，并不是永久发布地址。新 Release 必须从最终候选 tag 重新构建并核对，不能用同版本字符串的旧资产替代。
+开发者可从 [Actions](https://github.com/Maximora-byte/swu-checkin/actions/workflows/windows-desktop.yml) 手动选择受信任 ref。下载相应 `swu-checkin-windows-x64-<commit>` 或 `swu-checkin-windows-portable-x64-<commit>` 后，核对 BUILD-INFO 的 commit、dirty、版本及许可/哈希。当前 PR 默认使用临时 merge-test `github.sha`，发布预检用精确 `workflow_call(ref)`，artifact 名跟随实际来源；历史 head-SHA 构建仍按旧报告记录。artifact 保留 14 天，并非永久地址。最终发行须从所选已合入 main 的 commit/tag 重建或重新运行，不用旧包重命名，也不把 PR merge commit 改写为不同 main commit。
 
 ## 体积审查
 

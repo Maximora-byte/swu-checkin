@@ -1,12 +1,14 @@
-# Android 手动客户端（0.1.0 预览）
+# Android 手动客户端（0.1.1-preview 候选）
 
 Android 客户端已经接入仓库原有认证与签到核心。打开应用不会联网，也不会自动读取账号或签到。需要网络时由你主动点击查询、诊断或确认提交。
 
 ## 安装与使用
 
-最低 Android 7.0 / API24，只支持 `arm64-v8a` 和 `x86_64` 的 64 位设备。截至 2026-10-02，Android 已合入 `main`，尚无 Android Release 资产；最新 v2.0.0 不包含本客户端。当前安装包使用调试签名，属于手动预览。构建产物位于 `android/app/build/outputs/apk/debug/app-debug.apk`，云端可从成功的 [Android 工作流](https://github.com/Maximora-byte/swu-checkin/actions/workflows/android-feasibility.yml)下载 package artifact（保留 14 天）。仓库中不提交 APK 或签名私钥。
+最低 Android 7.0 / API24，只支持 `arm64-v8a` 和 `x86_64` 的 64 位设备。截至 2026-10-03，Android 尚无公开 Release 资产；最新 v2.0.0 不包含本客户端。当前准备 **0.1.1-preview / versionCode=3**：正式包名 `io.github.maximorabyte.swucheckin`，release 变体不允许调试，使用仓库外受保护的持久签名。它仍是预览，不代表真实学校账号或全部设备已经验收。
 
-package artifact 内的 `app-debug.apk` 是应用，`app-debug-androidTest.apk` 仅供开发验收；日常使用不用安装测试包。核对该运行的源码和 `SHA256SUMS`，不可把不同运行生成的 debug 包混用。当前 APK 对外分发前还需补齐仓库/Chaquopy 许可并核对运行时许可；新版发布计划见 [发布评估](releases/release-readiness.md)。
+云端 [Android 工作流](https://github.com/Maximora-byte/swu-checkin/actions/workflows/android-feasibility.yml)继续提供保留 14 天的 debug 验证 artifact。`app-debug.apk` 使用旧 `.feasibility` 包名与临时 debug 证书，版本带 `-debug`；测试 APK 只供开发验收，日常使用不用安装。持久签名候选来自 `android/app/build/outputs/apk/release/app-release.apk`，有独立的证书、来源与验收报告，不由 CI debug artifact 自动发布。核对具体包的 SHA256、内嵌来源、签名指纹与实际测试；不要混用不同运行的包。
+
+当前新增 `assets/licenses/` 内项目 MIT、Chaquopy、实际 CPython 3.13.9、运行库、Python/Maven 依赖与 vendor 的原文/notice及受审核的逐文件清单；APK 检查器要求实际内容和哈希一致，依赖版本变化必须更新清单。旧验收 debug 包仍保留其许可缺失记录，不作为新候选分发。整体计划见 [v2.1.0 候选说明](releases/v2.1.0.md)和 [发布准备](releases/release-readiness.md)。仓库不提交 APK、私钥或密码。
 
 1. 安装后打开 **SWU 查寝**，输入校园账号和密码。
 2. 点击 **查询今日状态**。出现验证码时，输入图片中的英文字母和数字；当前验证码与同一登录会话绑定，两分钟未填写会取消。
@@ -29,13 +31,47 @@ package artifact 内的 `app-debug.apk` 是应用，`app-debug-androidTest.apk` 
 
 ## 开发与验收
 
-构建命令与运行环境见 [Android 运行环境验收](android-feasibility.md)。保留原 applicationId `io.github.maximorabyte.swucheckin.feasibility` 以便覆盖安装；`versionCode=2`、`versionName=0.1.0-manual`。升级原可行性 APK 时，需使用相同调试签名；不同电脑/CI 的临时签名不一定相同。尚无需要迁移的旧版账号格式，也未声明任意历史版本的迁移兼容。
+构建命令与运行环境见 [Android 运行环境验收](android-feasibility.md)。release 使用正式包名 `io.github.maximorabyte.swucheckin`；debug 保留 `io.github.maximorabyte.swucheckin.feasibility`，两者可以共存。新正式包不是旧 debug 包的覆盖升级；账号密文与应用 ID/AAD、设备 Keystore 绑定，不自动复制或迁移。新包首次使用须重新输入账号，确认需要后再加密保存；旧包的账号可由用户在旧应用显式清除，验证器不会擅自删除。
 
-每个设备配置在首次安装、同版本覆盖安装、清数据三种状态下各运行七项真实 instrumentation：Python 核心/存储/时区、公共 HTTPS、跨进程锁、诊断按钮与重建、加密/篡改/密钥丢失、验证码取消/超时/旧答复，以及完整人工登录/查询/确认/服务端回读/后台取消界面流程。合成登录传输保留原 OAuth 检查，合成业务接口保留原签到核心；测试数据和替代传输只在测试包中，客户端 APK 不包含测试账号或学校接口替代实现。
+debug CI 每个设备在首次安装、同版本覆盖、清数据三种状态下各运行七项 instrumentation：Python 核心/存储/时区、公共 HTTPS、跨进程锁、诊断按钮与重建、加密/篡改/密钥丢失、验证码取消/超时/旧答复和完整人工操作流程，共 21 项/行。跨进程探针为 debug-only，不进入非调试 release 包。
+
+release 验收使用与应用相同持久证书的测试包，在一次性模拟器执行六项共享生产测试 × 三安装状态，另保存合成账号、覆盖安装后验证账号仍可解密，共 20 项/行。验证器拒绝已有正式包名或测试包的设备，测试不会处理用户现有账号。这只验证同版本、同证书重装和合成账号保持，不声称旧 debug 迁移、任意跨版本迁移或异机密钥恢复已完成。
+
+两种变体的合成登录保留原 OAuth 检查，合成业务保留原签到核心；测试数据和替代传输仅在测试 APK，客户端 APK 不含测试账号或学校接口替代实现。最终候选测试结果须按实际包记录，下面 0.1.0 的历史通过数不用于证明新包通过。
 
 设备验收脚本只操作本应用及测试包，并在卸载/清数据前检查已保存账号；发现账号或无法确认时拒绝继续。真实手机只收集本应用报告及环境检测页，一次性模拟器才允许完整系统日志。
 
 验收结果与包哈希记录在 PR 和交付报告。16 KB 真机与真实学校账号网络登录未验证；4 KB 真机或合成业务测试不能替代这些证据。真实学校账号验收须由账号持有人另行明确授权，不使用真实签到作为自动验收。
+
+### 持久签名构建与保管
+
+Windows 本机准备好官方工具链后，在仓库根目录执行：
+
+```powershell
+./scripts/android/build-signed-preview.ps1 -IncludeTests
+```
+
+首次创建 RSA-4096 PKCS12，后续复用同一密钥；不允许缺失一半的密钥/密码记录时悄悄换钥。默认位于 `%LOCALAPPDATA%\SWUCheckin\ReleaseSigning\Android`：`preview.p12` 存储加密私钥，密码由当前 Windows 用户 DPAPI 保护，专用目录 ACL 限制当前用户和 SYSTEM。脚本通过进程环境暂时传递密码，结束后清理环境；不向日志、Git 或 PR 暴露秘密。公钥证书可公开，当前持久证书 SHA256 为 `77ad72b44323fa7917470442e21fb258b5b8bc8a367e87c83ba6fa22d08f811a`；实际 APK 必须再次匹配这一指纹。
+
+公开 APK 前，维护者应完成密钥的受保护备份与保管方案；不要只把 DPAPI 密文复制到另一电脑后假定可解密，不要把私钥、明文密码或解密脚本作为 Release 资产。本轮已在仓库外建立受限 ACL 的本机备份，并从备份恢复密码/密钥实际签名，匹配同一公开证书。这只证明同电脑、同 Windows 用户恢复；离机副本保管和异机恢复尚未验证，公开 APK 前仍须完成。发行密钥没有配置到 CI。持久证书使后续同包名更新有连续身份，但最终跨版本更新仍须独立验收；丢失密钥不能通过换一个签名继续覆盖原应用。见 [Android 官方签名说明](https://developer.android.com/studio/publish/app-signing)和 [Microsoft DPAPI](https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.protecteddata?view=windowsdesktop-9.0)。
+
+### 0.1.1-preview 候选验证状态
+
+最终生产 APK 来源为 PR #45 的可追溯分支 commit `f62e76f9e3940de830d5cbaee89516e00fdbe89b`，源码树 `7679ef1fcf86227cb0f768729d96e91aefb3d9cd`。运行环境页已修正旧的“此 APK 不能登录或签到”文案，明确仅此页面不登录或提交；共享核心、签名和依赖没有变化。最终包重新完整验收，后续文档补充不改写其内嵌来源。非调试生产 APK 与同持久证书测试包已在下列环境完成验收：
+
+| 模拟器 | 实际页大小 | 首装 / 覆盖 / 清数据共享测试 | 合成账号保存 / 覆盖后解密 | 合计 |
+| --- | ---: | --- | --- | ---: |
+| 官方 API24 / x86_64 | 4096 | 6 / 6 / 6 passed | 1 / 1 passed | 20 |
+| 官方 API35 / x86_64 | 4096 | 6 / 6 / 6 passed | 1 / 1 passed | 20 |
+| 官方 API35 / x86_64 | 16384 | 6 / 6 / 6 passed | 1 / 1 passed | 20 |
+
+本机生产验收共 **60 项通过**，未使用真实学校账号。前一 `cf1b69e` 候选的 API35/16 KB 首次尝试在清数据阶段遇到 `system_server` 输入法服务 `AdditionalSubtypeUtils` 空指针崩溃，应用收到 `DeadSystemException`，该次仍记失败；保留原报告后，系统恢复，同一 APK 从首次安装完整重跑 20 项通过。此前云端旧源码的 ART JIT 崩溃也保留，不把一次重跑当作所有设备稳定的证明。文案修订后的最终 APK 在三组环境均一次完成 20 项，无重跑；两个候选的 60 项分别记录，不合计为一份包的 120 项。
+
+- 生产应用 SHA256：`ab5eaf7b1e4f1ee1183ade9667d95e557a237ff7d4f91f0b86ac563ce250994a`
+- 对应测试包 SHA256：`838f6b188e9e3acee60e847089404a8e2221a14e1e6d21482f8aa99a37642153`
+- 公开证书 SHA256：`77ad72b44323fa7917470442e21fb258b5b8bc8a367e87c83ba6fa22d08f811a`
+
+最终包的逐行测试身份、报告摘要及字节哈希见 [最终 Android 验收清单](releases/v2.1.0-android-final-acceptance.json)，前一候选及失败见 [初次验收清单](releases/v2.1.0-acceptance.json)。初次工程候选的 [发布预检 37031347112](https://github.com/Maximora-byte/swu-checkin/actions/runs/37031347112) 的三组 debug 验证另为 63 项通过；debug 和生产包分别记录，不累计冒充同一 APK 的测试数。发行构建要求干净工作区，内嵌 `assets/BUILD-INFO.json` 记录精确 commit/tree、项目与 Android 版本、锁文件摘要；验证器反查所选源码，拒绝不一致。`verify_signed_apk.py` 还检查非 debuggable、实际许可、证书、全部 ELF LOAD 与 16 KB ZIP 对齐；signed 构建和 debug CI 核对 Maven runtime 依赖集。`verify_release_device.py` 执行上述 20 项/行，并将 instrumentation 非零退出视为失败，不因打印 OK 忽略。尚未公开发布 APK。
 
 ### 2026-10-02 功能版验收记录
 
@@ -57,4 +93,4 @@ package artifact 内的 `app-debug.apk` 是应用，`app-debug-androidTest.apk` 
 - 云端应用 SHA256：`8e45db8ff150da14284deb9dfaeb98b6afff7be68c9276ef0ce961bff6a579b0`
 - 云端测试包 SHA256：`c4bdbeef16ff3d02156b795a1447bb9499dd77bf95e463ceb10bffbad26bf741`
 
-这些哈希只适用于该次构建；独立构建因工具链和临时签名可能不同。当前没有以真实学校账号登录或执行实际签到的验收证据，也没有 16 KB 真机或正式签名发布证据。
+这些哈希只适用于历史 0.1.0-manual / `.feasibility` debug 构建；独立构建因工具链和临时签名可能不同。其许可缺失曾作为发布阻塞记录，新的许可与持久签名不能改变旧文件内容。真实学校账号登录/实际签到、16 KB 真机和公开签名发布仍无验收证据。

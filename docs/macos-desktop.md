@@ -1,6 +1,6 @@
 # macOS 桌面预览版
 
-这是已经合并到当前 `main` 的 macOS 手动桌面预览，不属于已发布的 [v2.0.0](https://github.com/Maximora-byte/swu-checkin/releases/tag/v2.0.0) 资产。目前 macOS 工作流只上传限时 Actions artifact，不自动创建 Release；尚无 macOS Release 资产、Developer ID 签名或公证。它不创建后台任务、开机启动项或修改学校接口。下一版发布条件见 [发布评估](releases/release-readiness.md)。使用者仍须真实在寝并遵守学校规则；程序不测量 GPS，使用学校返回的寝室信息不等于证明人在寝。
+这是 macOS 手动桌面预览，不属于已发布的 [v2.0.0](https://github.com/Maximora-byte/swu-checkin/releases/tag/v2.0.0) 资产。当前源码准备 2.1.0 Pre-release，macOS 构建新增版号、真实运行库/依赖版权清单和同源发布审核；尚无 macOS Release 资产、Developer ID 签名或公证。独立 workflow 只上传限时 artifact，Release 预检成功后可将两架构 ZIP 纳入候选六包集，当前不创建 tag/Release。它不创建后台任务、开机启动项或修改学校接口。见 [候选说明](releases/v2.1.0.md)与 [发布准备](releases/release-readiness.md)。使用者仍须真实在寝并遵守规则；程序不测量 GPS，也不证明本人在寝。
 
 ## 支持范围与交付
 
@@ -11,7 +11,7 @@
 - 不提供自动签到或只读定时：`--scheduled` 在 macOS 直接拒绝，不读取账号、不访问学校
 - macOS 桌面与 CLI 使用同一个 `formal_execution` 入口及默认跨进程锁。自定义了不同 `SWUDK_LOCK_FILE` 的入口不在同一锁域
 
-在本仓库 [macOS desktop preview workflow](https://github.com/Maximora-byte/swu-checkin/actions/workflows/macos-desktop.yml) 的成功 PR run 中选取匹配架构的 artifact。每个 artifact 包含 `.app` ZIP、`BUILD-INFO.json` 与 `SHA256SUMS.txt`；保留 14 天，GitHub 可能要求登录后下载。检查提交 SHA、架构、实际 OS 和自测记录。不存在成功 artifact 时，不能视为已交付该架构。
+在本仓库 [macOS desktop preview workflow](https://github.com/Maximora-byte/swu-checkin/actions/workflows/macos-desktop.yml)的成功运行中选取匹配架构的 artifact。新版 ZIP 为 `SWUCheckin-2.1.0-macos15-<架构>-preview.zip`，带 `BUILD-INFO.json`、`LICENSE-INVENTORY.json` 与 `SHA256SUMS.txt`；保留 14 天，可能要求登录。PR/手动默认 `github.sha`，发布预检通过 `workflow_call(ref)` 指定同一精确 SHA。检查实际 commit、版本、架构、OS 与自测记录；不存在新版成功 artifact 时，不能视为该架构已交付。
 
 当前功能合并前的 [双架构原生构建与验证](https://github.com/Maximora-byte/swu-checkin/actions/runs/37019008388) 已通过；覆盖两个 runner 的单元测试、生产依赖审计、合成钥匙串项与冻结应用离线自测。该 PR 工作流默认检出 GitHub 的临时 merge-test commit，不能只看 PR head 或版本字符串判断产物来源；应以 `BUILD-INFO.json` 和 run 记录为准。它证明对应源码上的云端验证，不能充当未来新 tag 的发布构建或真实 Mac 验收。
 
@@ -41,6 +41,8 @@ PYTHON=python3 ./scripts/macos/build.sh
 ```
 
 构建严格使用 `uv.lock`，业务核心不变。官方 ONNX Runtime 1.30.0 不提供 Intel macOS wheel；仅 Darwin/x86_64 使用最后提供 CPython 3.13 Intel wheel 的 1.23.2，其他平台仍保持现有 1.30.0。新增的该分支依赖须通过各原生 job 的生产依赖漏洞审计，不以降级掩盖不可用状态。PyInstaller 6.16.0 与构建依赖固定在脚本中。不能在 Linux/Windows 交叉构建此 `.app`；各架构的原生 OCR/numpy/ONNX Runtime 扩展必须真实可安装和加载。
+
+新版包在 `Contents/Resources/` 保留项目 MIT，`build-info/` 保留来源、实际 CPython 3.13.15、Tcl/Tk 8.6.18、依赖分发包与包内 vendor 的原文及逐文件哈希。许可目录与对应文件必须直接可读，不能以软链接遗漏材料；缺项或哈希不一致使构建失败。资源在签名前冻结，签名后不改 `.app`。公开 ZIP 的审核再次比较包内外来源/许可字节；源码里的清单不代替实际两架构包检查。
 
 CI 单独执行 `packaging/macos/keychain_smoke.py`，在 runner 默认钥匙串建立独立随机命名的**合成测试项**，验证新增、读取、更新、删除、缺失；不修改/解锁钥匙串，也不访问生产应用项。锁定或不可用会明确失败。此脚本仅接受一次性 GitHub macOS runner；本地构建不运行它，构建元数据如实记录该项是否执行。构建脚本随后运行冻结 `.app` 的 `--self-test`：实际创建 Tk 窗口、检查初始空账号与无后台调度、加载 OCR 模型进行合成图片推理、验证 TLS 信任资源、时区和运行锁。该冻结自测本身不访问钥匙串或学校。构建还验证 Mach-O 架构、ad-hoc 签名完整性以及拒绝 `--scheduled`。
 

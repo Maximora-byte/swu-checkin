@@ -51,4 +51,7 @@ android/.gradle/
 android/local.properties
 *.jks
 *.keystore
+*.p12
+*.pfx
+*.dpapi
 .local-tools/

@@ -60,9 +60,9 @@ uv lock --check
 
 这些测试使用合成数据或模拟接口，不需要真实学校账号。`probe` / `doctor` / `setup` 会访问学校服务，`run` 或无参数 CLI 会正式签到，不能拿它们代替离线测试。
 
-普通 CI 包括 `linux-quality`、`windows-quality`、`package-quality`，由 `quality` 汇总三个结果；另有 actionlint、systemd 单元校验、Unix DAC 权限测试、Windows PowerShell/DPAPI、跨进程锁、wheel/sdist 安装 smoke 和生产依赖漏洞审计。Windows desktop、macOS desktop preview 与 Android feasibility 是独立的路径过滤工作流，不属于 `quality` 的依赖；是否触发以各 workflow 的实际路径规则为准。纯文档 PR 仍运行普通 CI，不能用普通 CI 的绿色结果替代平台构建。请不要通过删除或跳过安全测试使 PR 通过，也不要把没执行的平台检查记作通过。
+普通 CI 包括 `linux-quality`、`windows-quality`、`package-quality`，由 `quality` 汇总三个结果；另有 actionlint、systemd 单元校验、Unix DAC 权限测试、Windows PowerShell/DPAPI、跨进程锁、wheel/sdist 安装 smoke 和生产依赖漏洞审计。原生工作流独立支持路径过滤 PR/手动运行与 `workflow_call`；Release 预检按精确同一 SHA 调用 Windows、macOS 和 Android，审核实际安装包及许可来源。它们仍不属于普通 `quality` 的依赖；是否触发以各 workflow 的实际路径规则为准。PR 预检不发布且不接触发行签名秘密。请勿删除或跳过安全测试，也不要把未执行的平台检查记作通过。
 
-当前已发布版本与 `main` 的新增功能、发布前门槛见 [发布准备评估](docs/releases/release-readiness.md)。已发布 tag 和资产不可用不同代码重新打包覆盖；文档更新或版本号相同不表示新的安装包已经发布。
+当前候选源码为 **2.1.0**，最新公开版本仍为 v2.0.0；[候选说明](docs/releases/v2.1.0.md)和 [发布准备](docs/releases/release-readiness.md)记录具体范围与证据。三段数字版本配合 GitHub Pre-release 属性使用，不能直接改为 `2.1.0rc1` 后假设 Windows 安装器仍接受。版本、锁文件、内嵌许可证或签名变化均须审核变化后的实际包。已发布 tag 和资产不可用不同代码重新打包覆盖。
 
 ## 行为准则
 

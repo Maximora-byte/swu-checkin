@@ -8,7 +8,7 @@ import subprocess
 import tarfile
 import tempfile
 import zipfile
-from pathlib import Path
+from pathlib import Path, PurePosixPath, PureWindowsPath
 
 _FORBIDDEN_PARTS = frozenset({".git", ".pytest_cache", ".venv", "__pycache__", "secrets"})
 _FORBIDDEN_NAMES = frozenset({".env", "auth-token-cache", "credentials.env", "notify.env", "status.json"})
@@ -23,16 +23,45 @@ def _single_artifact(dist: Path, pattern: str, label: str) -> Path:
 
 
 def _verify_archive_members(artifact: Path, members: list[str]) -> None:
+    canonical_names: set[str] = set()
     for name in members:
-        path = Path(name)
-        if path.is_absolute() or ".." in path.parts:
-            raise RuntimeError(f"unsafe archive path in {artifact.name}")
+        path = safe_archive_path(artifact, name)
+        canonical = str(path).casefold()
+        if canonical in canonical_names:
+            raise RuntimeError(f"duplicate portable archive path in {artifact.name}")
+        canonical_names.add(canonical)
+        parts = tuple(part.casefold() for part in path.parts)
         if (
-            _FORBIDDEN_PARTS.intersection(path.parts)
-            or path.name in _FORBIDDEN_NAMES
-            or path.suffix in _FORBIDDEN_SUFFIXES
+            _FORBIDDEN_PARTS.intersection(parts)
+            or path.name.casefold() in _FORBIDDEN_NAMES
+            or path.suffix.casefold() in _FORBIDDEN_SUFFIXES
         ):
             raise RuntimeError(f"forbidden private artifact content in {artifact.name}")
+
+
+def safe_archive_path(artifact: Path, name: str) -> PurePosixPath:
+    """Check portable archive names independently of the verifier's host OS.
+
+    Wheels and sdists use POSIX separators. Reject Windows roots, drive-relative
+    names and alternate separators too: those acquire different meanings when an
+    archive is opened on Windows. Colons also create NTFS alternate data streams.
+    """
+    path = PurePosixPath(name)
+    windows_path = PureWindowsPath(name)
+    if (
+        not name
+        or any(ord(char) < 32 or ord(char) == 127 for char in name)
+        or "\\" in name
+        or ":" in name
+        or path.is_absolute()
+        or windows_path.drive
+        or windows_path.root
+        or ".." in path.parts
+        or path == PurePosixPath(".")
+        or any(part.endswith((".", " ")) for part in path.parts)
+    ):
+        raise RuntimeError(f"unsafe archive path in {artifact.name}")
+    return path
 
 
 def _verify_archives(wheel: Path, sdist: Path) -> None:
@@ -41,8 +70,12 @@ def _verify_archives(wheel: Path, sdist: Path) -> None:
         if bad_member is not None:
             raise RuntimeError(f"wheel member failed CRC validation: {bad_member}")
         _verify_archive_members(wheel, archive.namelist())
+        if any((entry.external_attr >> 16) & 0o170000 == 0o120000 for entry in archive.infolist()):
+            raise RuntimeError(f"wheel contains symbolic links: {wheel.name}")
     with tarfile.open(sdist, mode="r:gz") as archive:
         _verify_archive_members(sdist, archive.getnames())
+        if any(not (entry.isfile() or entry.isdir()) for entry in archive.getmembers()):
+            raise RuntimeError(f"sdist contains links or special files: {sdist.name}")
 
 
 def _smoke_install(artifact: Path, expected_version: str, uv: str, label: str) -> None:

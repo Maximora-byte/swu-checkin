@@ -91,6 +91,14 @@ jobs:
         shell: pwsh
         run: .\tests\windows\test_windows_scripts.ps1 -WindowsIntegration
 
+      - name: Android 签名保管 ACL 检查（PowerShell 5.1）
+        shell: powershell
+        run: .\tests\windows\test_android_signing.ps1
+
+      - name: Android 签名保管 ACL 检查（PowerShell 7）
+        shell: pwsh
+        run: .\tests\windows\test_android_signing.ps1
+
       - name: 验证 locked 非 editable 安装
         shell: powershell
         run: |

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import re
 import tomllib
 from pathlib import Path
 
@@ -14,7 +15,7 @@ def project_version(pyproject: Path) -> str:
     if not isinstance(project, dict):
         raise ValueError("pyproject.toml is missing [project]")
     version = project.get("version")
-    if not isinstance(version, str) or not version:
+    if not isinstance(version, str) or not re.fullmatch(r"\d+\.\d+\.\d+", version):
         raise ValueError("pyproject.toml project.version is invalid")
     return version
 
@@ -29,12 +30,12 @@ def main() -> int:
     parser.add_argument("--pyproject", type=Path, default=Path("pyproject.toml"))
     parser.add_argument("--tag", help="release tag such as v1.1.0")
     args = parser.parse_args()
-    version = project_version(args.pyproject)
-    if args.tag is not None:
-        try:
+    try:
+        version = project_version(args.pyproject)
+        if args.tag is not None:
             verify_release_tag(args.tag, version)
-        except ValueError as error:
-            parser.error(str(error))
+    except ValueError as error:
+        parser.error(str(error))
     print(version)
     return 0
 

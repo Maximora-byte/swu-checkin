@@ -56,7 +56,7 @@ sudo env UV_PYTHON_INSTALL_DIR=/opt/swu-checkin-python \
 
 ## 2. 安装稳定 release
 
-以下使用已发布的 [`v2.0.0`](https://github.com/Maximora-byte/swu-checkin/releases/tag/v2.0.0) 作为安装示例。当前 `main` 仍声明版本 `2.0.0`，但包含该 tag 之后的修复和新前端；它与已发布资产不是同一 revision。部署后续版本前先在 [Releases](https://github.com/Maximora-byte/swu-checkin/releases) 确认 tag、CI 与资产，再将 `release_tag` 替换为所选 tag，并使用该 tag 的完整代码、文档、锁文件与 units。新增能力与发布门槛见 [发布准备评估](docs/releases/release-readiness.md)；不要仅凭版本号判断发布状态。
+以下使用最新公开的 [`v2.0.0`](https://github.com/Maximora-byte/swu-checkin/releases/tag/v2.0.0) 作为稳定安装示例。当前源码已同步为 **2.1.0 预发布候选**，尚未创建新 tag/Release，不直接替换此处生产安装标签。后续部署先在 [Releases](https://github.com/Maximora-byte/swu-checkin/releases) 确认实际 tag、完整 CI、资产与限制，再将 `release_tag` 替换为所选版本，并使用该 tag 的完整代码、文档、锁文件与 units。候选预检不连接学校、不自动启用任务，也不能替代部署后的只读检查；差异见 [发布准备](docs/releases/release-readiness.md)。
 
 ```bash
 release_tag=v2.0.0
