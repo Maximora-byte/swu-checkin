@@ -2,6 +2,7 @@
 
 import os
 import re
+import shutil
 import subprocess
 import textwrap
 from pathlib import Path
@@ -20,8 +21,17 @@ def _script(name: str) -> str:
 
 
 def _run(script: str, env: dict[str, str]) -> subprocess.CompletedProcess[str]:
+    # On Windows, CreateProcess may resolve system32/bash.exe (the WSL launcher)
+    # before PATH, which drops the synthetic environment passed to this test.
+    bash = shutil.which("bash")
+    if os.name == "nt":
+        git = shutil.which("git")
+        git_bash = Path(git).resolve().parent.parent / "bin" / "bash.exe" if git else None
+        bash = str(git_bash) if git_bash is not None and git_bash.is_file() else None
+    if bash is None:
+        raise RuntimeError("Bash (Git for Windows on Windows) is required for workflow shell acceptance")
     return subprocess.run(
-        ["bash", "-e", "-o", "pipefail", "-c", script],
+        [bash, "-e", "-o", "pipefail", "-c", script],
         env={**os.environ, **env},
         capture_output=True,
         text=True,
