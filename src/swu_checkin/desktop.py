@@ -1,11 +1,13 @@
-"""Chinese Windows desktop entry point; launching never submits a check-in."""
+"""Chinese desktop entry point; launching never submits a check-in."""
 
 from __future__ import annotations
 
 import argparse
 import queue
+import sys
 import threading
 from collections.abc import Callable, Sequence
+from dataclasses import dataclass
 from typing import Any
 
 from .desktop_errors import ERROR_MESSAGES, DesktopError, DesktopErrorCode
@@ -19,7 +21,27 @@ SCHEDULE_CONFIRMATION = (
     + LOCATION_WARNING
     + "\n\n确认授权自动签到？"
 )
-SAFE_ERROR = "操作未完成。请检查网络、账号、Windows 权限或本地配置后重试；未显示敏感诊断信息。"
+SAFE_ERROR = "操作未完成。请检查网络、账号、系统权限或本地配置后重试；未显示敏感诊断信息。"
+
+
+@dataclass(frozen=True)
+class DesktopPresentation:
+    native_quit_command: str | None = None
+    scheduling: bool = True
+    explicit_credentials: bool = False
+    font_family: str = "Microsoft YaHei UI"
+    credential_notice: str = "只有点击“保存账号”才会保存；使用 Windows 当前用户加密保护。"
+    saved_notice: str = "账号已由 Windows 当前用户加密保存；尚未验证登录。"
+
+
+MACOS_PRESENTATION = DesktopPresentation(
+    native_quit_command="::tk::mac::Quit",
+    scheduling=False,
+    explicit_credentials=True,
+    font_family="PingFang SC",
+    credential_notice="账号默认仅在内存中；只有点击“保存账号”才存入 macOS 钥匙串。令牌仅保存在本次窗口内存。",
+    saved_notice="账号已保存到 macOS 钥匙串；尚未验证登录。",
+)
 
 
 class DesktopController:
@@ -74,11 +96,14 @@ def describe_result(value: object) -> str:
 
 
 class DesktopApp:
-    def __init__(self, root: Any, backend: Any) -> None:
-        # Headless --self-test and --scheduled never import Tk or open a window.
+    presentation = DesktopPresentation()
+
+    def __init__(self, root: Any, backend: Any, presentation: DesktopPresentation | None = None) -> None:
+        # The normal GUI and macOS offline self-test use this same window.
         import tkinter as tk
         from tkinter import messagebox, ttk
 
+        self.presentation = presentation or self.presentation
         self.root = root
         self.backend = backend
         self.dialogs = messagebox
@@ -87,10 +112,10 @@ class DesktopApp:
         root.title("西南大学寝室签到助手")
         root.geometry("720x720")
         root.minsize(680, 660)
-        root.protocol("WM_DELETE_WINDOW", self.close)
+        self._register_close_handlers()
         panel = ttk.Frame(root, padding=20)
         panel.pack(fill="both", expand=True)
-        ttk.Label(panel, text="西南大学寝室签到助手", font=("Microsoft YaHei UI", 17, "bold")).pack(anchor="w")
+        ttk.Label(panel, text="西南大学寝室签到助手", font=(self.presentation.font_family, 17, "bold")).pack(anchor="w")
         ttk.Label(panel, text="打开软件不会联网或提交签到。请先检测，再按需手动执行。", wraplength=620).pack(
             anchor="w", pady=(6, 12)
         )
@@ -119,42 +144,65 @@ class DesktopApp:
             button = ttk.Button(buttons, text=text, command=command)
             button.pack(side="left", padx=(0, 6))
             self.controls.append(button)
-        ttk.Label(panel, text="只有点击“保存账号”才会保存；使用 Windows 当前用户加密保护。", wraplength=620).pack(
-            anchor="w"
-        )
-        schedule = ttk.LabelFrame(panel, text="Windows 每日计划任务（默认关闭）", padding=10)
-        schedule.pack(fill="x", pady=12)
-        self.schedule = tk.BooleanVar(value=False)
-        self.schedule_mode = tk.StringVar(value="probe")
-        self.mode_controls: list[Any] = []
-        for text, mode in (("只读检测（不提交）", "probe"), ("自动签到（会提交）", "checkin")):
-            control = ttk.Radiobutton(schedule, text=text, variable=self.schedule_mode, value=mode)
-            control.pack(anchor="w")
-            self.controls.append(control)
-            self.mode_controls.append(control)
-        self.schedule_toggle = ttk.Checkbutton(
-            schedule, text="启用每日计划任务", variable=self.schedule, command=self.change_schedule
-        )
-        self.schedule_toggle.pack(anchor="w", pady=(5, 0))
-        self.controls.append(self.schedule_toggle)
-        self.schedule_status = tk.StringVar(value="计划任务状态未知（正在读取本地状态）")
-        ttk.Label(schedule, textvariable=self.schedule_status).pack(anchor="w")
-        ttk.Label(
-            schedule,
-            text="北京时间每日 21:15 / 21:45；电脑须开机联网且用户已登录。睡眠 / 关机不保证运行。\n"
-            "切换模式前请先关闭任务，再选择模式并重新启用。计划任务需要先保存账号。",
-            wraplength=640,
-        ).pack(anchor="w", pady=(5, 0))
+        if self.presentation.explicit_credentials:
+            keychain_buttons = ttk.Frame(panel)
+            keychain_buttons.pack(fill="x", pady=(0, 8))
+            for text, command in (("读取已存账号", self.load_credentials), ("清除已存账号…", self.delete_credentials)):
+                button = ttk.Button(keychain_buttons, text=text, command=command)
+                button.pack(side="left", padx=(0, 6))
+                self.controls.append(button)
+        ttk.Label(panel, text=self.presentation.credential_notice, wraplength=620).pack(anchor="w")
+        if self.presentation.scheduling:
+            schedule = ttk.LabelFrame(panel, text="Windows 每日计划任务（默认关闭）", padding=10)
+            schedule.pack(fill="x", pady=12)
+            self.schedule = tk.BooleanVar(value=False)
+            self.schedule_mode = tk.StringVar(value="probe")
+            self.mode_controls: list[Any] = []
+            for text, mode in (("只读检测（不提交）", "probe"), ("自动签到（会提交）", "checkin")):
+                control = ttk.Radiobutton(schedule, text=text, variable=self.schedule_mode, value=mode)
+                control.pack(anchor="w")
+                self.controls.append(control)
+                self.mode_controls.append(control)
+            self.schedule_toggle = ttk.Checkbutton(
+                schedule, text="启用每日计划任务", variable=self.schedule, command=self.change_schedule
+            )
+            self.schedule_toggle.pack(anchor="w", pady=(5, 0))
+            self.controls.append(self.schedule_toggle)
+            self.schedule_status = tk.StringVar(value="计划任务状态未知（正在读取本地状态）")
+            ttk.Label(schedule, textvariable=self.schedule_status).pack(anchor="w")
+            ttk.Label(
+                schedule,
+                text="北京时间每日 21:15 / 21:45；电脑须开机联网且用户已登录。睡眠 / 关机不保证运行。\n"
+                "切换模式前请先关闭任务，再选择模式并重新启用。计划任务需要先保存账号。",
+                wraplength=640,
+            ).pack(anchor="w", pady=(5, 0))
+        else:
+            ttk.Label(
+                panel,
+                text="macOS 预览版：仅支持手动操作；不创建后台任务或登录启动项。\n"
+                "未提供 Developer ID 签名和 Apple 公证；仍需真实 Mac 干净用户验收。",
+                wraplength=640,
+            ).pack(anchor="w", pady=12)
         self.progress = tk.StringVar(value="就绪（未联网）")
         ttk.Label(panel, textvariable=self.progress).pack(anchor="w", pady=(0, 5))
-        self.output = tk.Text(panel, height=9, wrap="word", state="disabled", font=("Microsoft YaHei UI", 10))
+        self.output = tk.Text(panel, height=9, wrap="word", state="disabled", font=(self.presentation.font_family, 10))
         self.output.pack(fill="both", expand=True)
         self.schedule_state_known = False
         self.current_schedule_mode: str | None = None
         self._restore_local_state()
         root.after(100, self._poll)
 
+    def _register_close_handlers(self) -> None:
+        self.root.protocol("WM_DELETE_WINDOW", self.close)
+        if self.presentation.native_quit_command:
+            # macOS menu/Dock Quit otherwise exits without WM_DELETE_WINDOW.
+            self.root.createcommand(self.presentation.native_quit_command, self.close)
+
     def _restore_local_state(self) -> None:
+        if self.presentation.explicit_credentials:
+            self.append("未读取钥匙串；如需使用已存账号，请点击“读取已存账号”。")
+            return
+
         def load() -> tuple[tuple[str, str] | None, str | None]:
             return self.backend.load_credentials(), self.backend.schedule_mode()
 
@@ -174,6 +222,8 @@ class DesktopApp:
         self.run("读取本地配置（不联网）", load, restored)
 
     def _sync_schedule(self) -> None:
+        if not self.presentation.scheduling:
+            return
         if not self.schedule_state_known:
             self.schedule_status.set("计划任务状态未知：无法确认计划任务状态")
             self.schedule_toggle.configure(state="disabled")
@@ -227,9 +277,41 @@ class DesktopApp:
 
         def save() -> str:
             self.backend.save_credentials(*credentials)
-            return "账号已由 Windows 当前用户加密保存；尚未验证登录。"
+            return self.presentation.saved_notice
 
         self.run("保存账号", save)
+
+    def load_credentials(self) -> None:
+        if self.controller.busy or not self.presentation.explicit_credentials:
+            return
+
+        def loaded(success: bool, value: Any) -> None:
+            if success:
+                if value is not None:
+                    self.username.set(value[0])
+                    self.password.set(value[1])
+                self.append("已读取钥匙串账号（未联网）。" if value is not None else "钥匙串中尚无已存账号。")
+
+        self.run("读取钥匙串账号（不联网）", self.backend.load_credentials, loaded)
+
+    def delete_credentials(self) -> None:
+        if self.controller.busy or not self.presentation.explicit_credentials:
+            return
+        if not self.dialogs.askyesno(
+            "清除已存账号",
+            "从 macOS 钥匙串清除此应用保存的账号，并清空当前窗口账号与内存令牌？",
+            parent=self.root,
+            default="no",
+        ):
+            return
+
+        def removed(success: bool, _value: Any) -> None:
+            if success:
+                self.username.set("")
+                self.password.set("")
+                self.append("已清除本应用的已存账号、当前输入与内存令牌。")
+
+        self.run("清除已存账号", self.backend.delete_credentials, removed)
 
     def diagnose(self) -> None:
         if self.controller.busy or not (credentials := self._credentials()):
@@ -269,6 +351,8 @@ class DesktopApp:
         self.run("读取本地状态", self.backend.status_text)
 
     def change_schedule(self) -> None:
+        if not self.presentation.scheduling:
+            return
         if self.controller.busy or not self.schedule_state_known:
             self._sync_schedule()
             return
@@ -332,10 +416,21 @@ def main(argv: Sequence[str] | None = None) -> int:
     modes.add_argument("--scheduled", action="store_true", help="运行已明确启用的计划任务")
     modes.add_argument("--self-test", action="store_true", help="仅验证离线依赖，不读取账号或连接学校")
     args = parser.parse_args(argv)
-    from .desktop_backend import DesktopBackend
+    presentation = DesktopPresentation()
+    if sys.platform == "darwin":
+        from .macos_backend import MacOSBackend
+
+        if args.scheduled:
+            return 1
+        backend_factory = MacOSBackend
+        presentation = MACOS_PRESENTATION
+    else:
+        from .desktop_backend import DesktopBackend
+
+        backend_factory = DesktopBackend
 
     try:
-        backend = DesktopBackend()
+        backend = backend_factory()
         if args.self_test:
             return backend.self_test()
         if args.scheduled:
@@ -343,7 +438,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         import tkinter as tk
 
         root = tk.Tk()
-        DesktopApp(root, backend)
+        if sys.platform == "darwin":
+            DesktopApp(root, backend, presentation)
+        else:
+            DesktopApp(root, backend)
         root.mainloop()
         return 0
     except Exception as error:

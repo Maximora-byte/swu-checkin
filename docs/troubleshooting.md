@@ -142,3 +142,11 @@ Get-ScheduledTask -TaskName "SWUCheckin-Daily"
 Issue 至少包含版本或 commit SHA、系统与 Python 版本、部署方式、业务状态码、exit code、命令模式、稳定复现步骤，以及固定阶段、字段名/类型、HTTP 状态或异常类型等脱敏信息。
 
 提交入口：[Maximora-byte/swu-checkin/issues](https://github.com/Maximora-byte/swu-checkin/issues)。
+
+## macOS 预览与钥匙串
+
+- 启动不会读取已存账号；须显式点击“读取已存账号”
+- 钥匙串取消、锁定、拒绝或不可用是本地存储状态，不代表学校账号错误；不会回退到明文保存。清除时失败不会宣称已删除
+- token 仅在窗口进程内存；正式结果位于 `~/Library/Application Support/SWUCheckin/status.json`
+- 没有后台任务、开机自启或自动签到；`--scheduled` 不受支持
+- 未签名身份/未公证警告不应通过关闭系统保护绕过；具体系统与架构、CI artifact、官方安全链接见 [macOS 桌面指南](macos-desktop.md)

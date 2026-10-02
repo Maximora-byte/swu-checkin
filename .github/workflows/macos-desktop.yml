@@ -1,0 +1,75 @@
+name: macOS desktop preview
+
+on:
+  pull_request:
+    paths:
+      - "src/**"
+      - "tests/**"
+      - "packaging/macos/**"
+      - "scripts/macos/**"
+      - "docs/macos-desktop.md"
+      - "pyproject.toml"
+      - "uv.lock"
+      - ".github/workflows/macos-desktop.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  macos-desktop:
+    name: macos-desktop-${{ matrix.arch }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            arch: arm64
+            python_arch: arm64
+          - runner: macos-15-intel
+            arch: x86_64
+            python_arch: x64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 35
+    steps:
+      - name: Check out requested revision
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - name: Set up official Python with Tcl/Tk
+        uses: actions/setup-python@e797f83bcb11b83ae66e0230d6156d7c80228e7c # v6.0.0
+        with:
+          python-version: '3.13.15'
+          architecture: ${{ matrix.python_arch }}
+      - name: Set up pinned uv
+        uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        with:
+          version: '0.12.15'
+          enable-cache: false
+      - name: Check native architecture and run unit tests
+        env:
+          EXPECTED_ARCH: ${{ matrix.arch }}
+        run: |
+          python -c 'import os, platform, tkinter; assert platform.machine() == os.environ["EXPECTED_ARCH"]; tkinter.Tcl()'
+          uv sync --locked --all-groups --python "$(command -v python)"
+          uv run --locked pytest -q
+      - name: Audit platform-selected production dependencies
+        run: |
+          uv export --locked --no-dev --no-emit-project --format requirements-txt \
+            | uv run --locked pip-audit -r /dev/stdin
+      - name: Check native Keychain using one synthetic item
+        run: |
+          uv run --locked python packaging/macos/keychain_smoke.py
+          echo 'SWU_KEYCHAIN_SMOKE_PASSED=true' >> "$GITHUB_ENV"
+      - name: Build app and run native offline smoke
+        env:
+          PYTHON: python
+        run: ./scripts/macos/build.sh
+      - name: Upload unnotarized preview and evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: swu-checkin-macos-${{ matrix.arch }}-${{ github.sha }}
+          path: |
+            dist/macos/*-preview.zip
+            dist/macos/BUILD-INFO.json
+            dist/macos/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 14

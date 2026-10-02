@@ -168,3 +168,7 @@ Release 自身不会重跑普通 CI 的所有平台/systemd/DAC/漏洞审计 job
 PR 描述应区分“已通过”“平台跳过”“因环境无法运行”和“未执行”，并记录 commit 与工作流 run。不要硬编码测试数量或把历史构建的绿色结果当成本次 revision 的验证。
 
 文档改动至少检查仓库内相对链接、命令与当前参数、稳定 tag/`main` 的差异、只读/正式模式说明以及敏感示例。跨平台安装、任务注册、卸载、权限或发布流程改动应执行对应平台验证，并保留安全失败路径测试；不要只测成功路径。
+
+## macOS 桌面预览验证
+
+[macOS 指南](macos-desktop.md) 说明原生 arm64/x86_64 CI、Keychain 合成测试、冻结 GUI/OCR smoke 和未公证交付限制。共享 `desktop_operations.py` 负责正式/只读服务调用与运行锁；`desktop_backend.py` 保留 Windows DPAPI/Task Scheduler，`macos_backend.py` 提供内存 token 与显式 Keychain 操作。业务核心和 CLI 不变。macOS 构建同 Windows desktop 一样是独立路径过滤工作流，不属于普通 `quality` 汇总；两个架构的成功结果须单独检查。
