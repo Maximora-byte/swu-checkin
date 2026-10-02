@@ -41,6 +41,15 @@ public sealed class PortableSmokeLauncher : IDisposable
         public ushort showWindow, reserved2Size;
         public IntPtr reserved2, stdInput, stdOutput, stdError;
     }
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    private struct StartupInfoEx { public StartupInfo startup; public IntPtr attributes; }
+    [StructLayout(LayoutKind.Sequential)]
+    private struct SecurityAttributes
+    {
+        public int length;
+        public IntPtr descriptor;
+        [MarshalAs(UnmanagedType.Bool)] public bool inherit;
+    }
     [StructLayout(LayoutKind.Sequential)]
     private struct ProcessInformation { public IntPtr process, thread; public uint processId, threadId; }
     [StructLayout(LayoutKind.Sequential)]
@@ -86,7 +95,17 @@ public sealed class PortableSmokeLauncher : IDisposable
     [DllImport("advapi32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
     private static extern bool CreateProcessAsUser(IntPtr token, string application, StringBuilder command,
         IntPtr processAttributes, IntPtr threadAttributes, bool inheritHandles, uint flags,
-        IntPtr environment, string directory, ref StartupInfo startup, out ProcessInformation process);
+        IntPtr environment, string directory, ref StartupInfoEx startup, out ProcessInformation process);
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    private static extern IntPtr CreateFile(string name, uint access, uint share,
+        ref SecurityAttributes security, uint disposition, uint flags, IntPtr template);
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool InitializeProcThreadAttributeList(IntPtr attributes, int count, uint flags, ref UIntPtr size);
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool UpdateProcThreadAttribute(IntPtr attributes, uint flags, IntPtr kind,
+        IntPtr value, UIntPtr size, IntPtr previous, IntPtr returned);
+    [DllImport("kernel32.dll")]
+    private static extern void DeleteProcThreadAttributeList(IntPtr attributes);
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
     private static extern IntPtr CreateJobObject(IntPtr attributes, string name);
     [DllImport("kernel32.dll", SetLastError = true)]
@@ -254,15 +273,37 @@ public sealed class PortableSmokeLauncher : IDisposable
         IntPtr environmentBlock = Marshal.StringToHGlobalUni(block.ToString());
         ProcessInformation info = new ProcessInformation();
         Process process = null;
-        bool resumed = false;
+        IntPtr nullStream = IntPtr.Zero, attributes = IntPtr.Zero, handleList = IntPtr.Zero;
+        bool attributesInitialized = false, resumed = false;
         try
         {
             // NULL inherits the runner's existing desktop/window station;
             // never assume the hosted runner uses winsta0\default or edit its ACL.
-            var startup = new StartupInfo { cb = Marshal.SizeOf<StartupInfo>() };
+            var startup = new StartupInfoEx();
+            startup.startup.cb = Marshal.SizeOf<StartupInfoEx>();
+            // Valid NUL stdio avoids stale parent handles when Python launches
+            // its read-only PowerShell subprocess. Inherit exactly this handle;
+            // no runner, token, process, pipe, or job handle can leak to the child.
+            var security = new SecurityAttributes { length = Marshal.SizeOf<SecurityAttributes>(), inherit = true };
+            nullStream = CreateFile("NUL", 0xc0000000, 3, ref security, 3, 0, IntPtr.Zero);
+            if (nullStream == new IntPtr(-1)) throw new Win32Exception(Marshal.GetLastWin32Error(), "Open synthetic NUL stdio");
+            UIntPtr size = UIntPtr.Zero;
+            InitializeProcThreadAttributeList(IntPtr.Zero, 1, 0, ref size);
+            if (size == UIntPtr.Zero) throw new Win32Exception(Marshal.GetLastWin32Error(), "Measure inherited-handle allowlist");
+            attributes = Marshal.AllocHGlobal(checked((int)size.ToUInt64()));
+            Require(InitializeProcThreadAttributeList(attributes, 1, 0, ref size), "Initialize inherited-handle allowlist");
+            attributesInitialized = true;
+            handleList = Marshal.AllocHGlobal(IntPtr.Size);
+            Marshal.WriteIntPtr(handleList, nullStream);
+            Require(UpdateProcThreadAttribute(attributes, 0, new IntPtr(0x00020002), // PROC_THREAD_ATTRIBUTE_HANDLE_LIST
+                handleList, new UIntPtr((uint)IntPtr.Size), IntPtr.Zero, IntPtr.Zero), "Allow only synthetic NUL inheritance");
+            startup.attributes = attributes;
+            startup.startup.flags = 0x100; // STARTF_USESTDHANDLES
+            startup.startup.stdInput = startup.startup.stdOutput = startup.startup.stdError = nullStream;
             var command = new StringBuilder("\"" + executable + "\"" + (arguments == "" ? "" : " " + arguments));
-            Require(CreateProcessAsUser(token, executable, command, IntPtr.Zero, IntPtr.Zero, false,
-                CREATE_SUSPENDED | CREATE_UNICODE_ENVIRONMENT, environmentBlock, directory, ref startup, out info),
+            Require(CreateProcessAsUser(token, executable, command, IntPtr.Zero, IntPtr.Zero, true,
+                CREATE_SUSPENDED | CREATE_UNICODE_ENVIRONMENT | 0x00080000, // EXTENDED_STARTUPINFO_PRESENT
+                environmentBlock, directory, ref startup, out info),
                 "Start restricted process (no elevated fallback)");
             Require(AssignProcessToJobObject(job, info.process), "Track all descendants in owned job");
             IntPtr actualToken;
@@ -284,6 +325,10 @@ public sealed class PortableSmokeLauncher : IDisposable
             if (!resumed && process != null) process.Dispose();
             if (info.thread != IntPtr.Zero) CloseHandle(info.thread);
             if (info.process != IntPtr.Zero) CloseHandle(info.process);
+            if (attributesInitialized) DeleteProcThreadAttributeList(attributes);
+            if (attributes != IntPtr.Zero) Marshal.FreeHGlobal(attributes);
+            if (handleList != IntPtr.Zero) Marshal.FreeHGlobal(handleList);
+            if (nullStream != IntPtr.Zero && nullStream != new IntPtr(-1)) CloseHandle(nullStream);
             Marshal.FreeHGlobal(environmentBlock);
         }
     }

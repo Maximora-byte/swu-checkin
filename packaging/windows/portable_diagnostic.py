@@ -95,6 +95,22 @@ def classify_command(result) -> dict[str, object]:
     }
 
 
+def classify_exception(error: Exception) -> dict[str, object]:
+    kind = type(error).__name__
+    result: dict[str, object] = {"exception_type": kind if kind in SAFE_ERROR_TYPES else "OTHER"}
+    if isinstance(error, OSError):
+        result["winerror"] = getattr(error, "winerror", None)
+    frames = []
+    trace = error.__traceback__
+    while trace is not None:
+        name = trace.tb_frame.f_code.co_name
+        if name in {"_get_handles", "_make_inheritable", "_execute_child"}:
+            frames.append(name)
+        trace = trace.tb_next
+    result["subprocess_frames"] = frames
+    return result
+
+
 def absent_task() -> None:
     from swu_checkin.desktop_backend import DesktopBackend
 
@@ -129,10 +145,7 @@ def absent_task() -> None:
         try:
             details[name] = classify_command(invoke(script))
         except Exception as error:
-            kind = type(error).__name__
-            details[name] = {"exception_type": kind if kind in SAFE_ERROR_TYPES else "OTHER"}
-            if isinstance(error, OSError):
-                details[name]["winerror"] = getattr(error, "winerror", None)
+            details[name] = classify_exception(error)
 
     record_probe("powershell", "[Console]::Out.Write('SWU_RESTRICTED_PS_OK'); exit 0")
     # Fixed strings and HRESULTs only. No identity value, username, task output,
@@ -163,10 +176,7 @@ catch {
         try:
             result = original(executable, arguments)
         except Exception as error:
-            kind = type(error).__name__
-            details["production_query"] = {"exception_type": kind if kind in SAFE_ERROR_TYPES else "OTHER"}
-            if isinstance(error, OSError):
-                details["production_query"]["winerror"] = getattr(error, "winerror", None)
+            details["production_query"] = classify_exception(error)
             raise
         details["production_query"] = classify_command(result)
         return result

@@ -144,7 +144,8 @@ def test_diagnostic_does_not_replace_frozen_acceptance_or_hardcode_desktop():
     assert "ProbeWritableDirectory" in launcher
     assert "RevertToSelf()" in launcher
     assert 'desktop = @"winsta0' not in launcher
-    assert "new StartupInfo { cb = Marshal.SizeOf<StartupInfo>() }" in launcher
+    assert "var startup = new StartupInfoEx();" in launcher
+    assert "startup.startup.cb = Marshal.SizeOf<StartupInfoEx>();" in launcher
 
 
 def test_command_diagnostics_do_not_emit_arbitrary_output():
@@ -171,3 +172,15 @@ def test_partial_diagnostics_are_emitted_before_original_failure():
     emission = source.index('Write-Host "Restricted diagnostic: $_"')
     assert source.index("finally {", source.index("$FrozenFailure = $_")) < emission
     assert emission < source.index("throw $FrozenFailure")
+
+
+def test_restricted_launcher_inherits_only_explicit_nul_stdio():
+    source = LAUNCHER.read_text(encoding="utf-8")
+    assert 'CreateFile("NUL", 0xc0000000, 3, ref security, 3, 0, IntPtr.Zero)' in source
+    assert "PROC_THREAD_ATTRIBUTE_HANDLE_LIST" in source
+    assert "Marshal.WriteIntPtr(handleList, nullStream)" in source
+    assert "startup.startup.stdInput = startup.startup.stdOutput = startup.startup.stdError = nullStream" in source
+    assert "EXTENDED_STARTUPINFO_PRESENT" in source
+    assert source.index("UpdateProcThreadAttribute(attributes, 0") < source.index("Require(CreateProcessAsUser(token")
+    assert "DeleteProcThreadAttributeList(attributes)" in source
+    assert "GetStdHandle" not in source
