@@ -65,7 +65,7 @@ def metadata(root: Path, output: Path) -> None:
         StringStruct('ProductVersion', {version!r})
       ])]), VarFileInfo([VarStruct('Translation', [1033, 1200])])])
     """
-    (output / "VERSION-INFO.txt").write_text(version_resource, encoding="utf-8")
+    (output / "VERSION-INFO.txt").write_text(version_resource.strip() + "\n", encoding="utf-8")
     collect(root, output, distributions)
     verify(output)
 
