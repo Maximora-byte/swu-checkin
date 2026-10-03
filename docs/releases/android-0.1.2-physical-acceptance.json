@@ -1,0 +1,204 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-03",
+  "scope": "Exact persistent-signed 0.1.2 APK; synthetic authentication and school transport; real public HTTPS; no school-account login or actual submission",
+  "device": {
+    "manufacturer": "vivo",
+    "model": "V2405A",
+    "android_version": "16",
+    "api": 36,
+    "abi": "arm64-v8a",
+    "page_size": 4096,
+    "emulator": false
+  },
+  "apk": {
+    "sha256": "280c750adeb4c67485f0f03b1296d01bba4bf09896e8c4787d6011a8e0326a47",
+    "test_apk_sha256": "c5a6a170ee4db01d036ac617fe86380c8316563b60ea2ecec57ee56c46cbe41f",
+    "size_bytes": 43456550,
+    "certificate_sha256": "77ad72b44323fa7917470442e21fb258b5b8bc8a367e87c83ba6fa22d08f811a",
+    "application_id": "io.github.maximorabyte.swucheckin",
+    "version_name": "0.1.2-preview",
+    "version_code": 4,
+    "debuggable": false,
+    "provenance": {
+      "android_version": "0.1.2-preview",
+      "android_version_code": 4,
+      "preview": true,
+      "project_version": "2.1.0",
+      "schema_version": 1,
+      "signature": "persistent local protected RSA-4096 preview key",
+      "source_commit": "ed60fb577e50a0f9aa4db9df6d05c8592bbfbabc",
+      "source_dirty": false,
+      "source_tree": "7157e7974a79cb996375153cb38512ef23956524",
+      "uv_lock_sha256": "dca1ad1720fbc4badd824859be2e318d3375cb8ed91e3c17b12e56ffadae998b",
+      "verification_scope": "synthetic acceptance; no school-account authentication or submission"
+    },
+    "source_subtrees": {
+      "android": "657f6669ee4c053ebafe361d742f373c32fe5fd3",
+      "src": "ea6cfc79e8a1726ff86e89d2ff4b19c067e131ac",
+      "scripts/android": "f026b7107cada7cfa4ff7daf7f30ebcc0b8433d2",
+      "packaging/android": "4fc45376597e4df3057ab1841002d2b1dd0a5e52",
+      "uv.lock": "887ee658450f398db959d5460863b7c0f6a7670a"
+    }
+  },
+  "source_runtime_matches_merged_main": "ab2f13341034df7f85ec36b97ce7f68c9ddb92c9",
+  "production_acceptance": {
+    "passed": true,
+    "tests": {
+      "fresh-install": 6,
+      "upgrade-account-seed": 1,
+      "upgrade-account-retained": 1,
+      "replacement-install": 6,
+      "cleared-data": 6
+    },
+    "tests_passed": 20,
+    "attempts": 1,
+    "evidence": [
+      {
+        "file": ".local-tools/evidence/android-ui-physical-api36-4096/result.json",
+        "sha256": "6f1d5639117ec09fc9f7b625d55d045d1f20a71de21ae9e3c2b180f59fa33f51"
+      },
+      {
+        "file": ".local-tools/evidence/android-ui-physical-api36-4096/device.json",
+        "sha256": "26eb33ba48ed4b00b4a05724e3f5fbd8819e5172e32e6960d67c90078ce49396"
+      },
+      {
+        "file": ".local-tools/evidence/android-ui-physical-api36-4096/apk-checksums.json",
+        "sha256": "ce0274055cbd8dea3b02b8ed86275765236f690cfcc31c4fd2edcd731a74437f"
+      },
+      {
+        "file": ".local-tools/evidence/android-ui-physical-api36-4096/installed-apk-sha256.txt",
+        "sha256": "6bb0ca48617437e893e5244939c091b3241c10c596b06ec61be76d549cacd076"
+      },
+      {
+        "file": ".local-tools/evidence/android-ui-physical-api36-4096/instrumentation-fresh-install.txt",
+        "sha256": "4a34db7d86ad8fe554964a6ddaf4af036cd0503791d2d753a2030b85b537c845"
+      },
+      {
+        "file": ".local-tools/evidence/android-ui-physical-api36-4096/instrumentation-upgrade-account-seed.txt",
+        "sha256": "9f0be9d31d72bbe0f9638a5851ea9838ab6a58fcb5294c368e9dc192802657b1"
+      },
+      {
+        "file": ".local-tools/evidence/android-ui-physical-api36-4096/instrumentation-upgrade-account-retained.txt",
+        "sha256": "913cddaa7723a3796af61bf9bbb54345abce86288888cee69630a4b51f29131c"
+      },
+      {
+        "file": ".local-tools/evidence/android-ui-physical-api36-4096/instrumentation-replacement-install.txt",
+        "sha256": "e723f1eddaa798e958f95b68d3d2c12279aff7b9aeb2ae46ec0e65845c5b3b5b"
+      },
+      {
+        "file": ".local-tools/evidence/android-ui-physical-api36-4096/instrumentation-cleared-data.txt",
+        "sha256": "00de1d6ca5ed7b0f6fd41b5ca73103235c207e20ce5b7569917cdd7ffd996206"
+      },
+      {
+        "file": ".local-tools/evidence/android-ui-physical-api36-4096/production-environment-ui.xml",
+        "sha256": "e4f6727f77baaadc4133ceac9233a43998151d78a0aac83f6ef4719cc67a545f"
+      },
+      {
+        "file": ".local-tools/evidence/android-ui-physical-api36-4096/production-environment.png",
+        "sha256": "8d854e16ba9cb133019a4f79a216b9558267567e1fb367eeb84ad6cf78c75645"
+      },
+      {
+        "file": ".local-tools/evidence/android-ui-physical-api36-4096/app-test-logcat.txt",
+        "sha256": "fbc4094c17845528bc0a03d9a478df90837ae3e6bda735e8b3a4989eb40ca06b"
+      }
+    ]
+  },
+  "visual_acceptance": {
+    "passed": true,
+    "debug_apk_sha256": "9c3036a36bd3b391d69883e06cc456eee083454c414a362c8c47caeb62c948ef",
+    "scope": "Synthetic debug-only UI rendering on the same phone; production FLAG_SECURE remains enabled",
+    "cases": [
+      {
+        "name": "light-empty",
+        "state": "empty",
+        "dark": false,
+        "font_scale": "1.0",
+        "screenshot_sha256": "7fa7c478a4cbcf0c29c5f6310ed58aef344961ba33035af928779540d871f54d"
+      },
+      {
+        "name": "light-pending",
+        "state": "pending",
+        "dark": false,
+        "font_scale": "1.0",
+        "screenshot_sha256": "e05926f352f55d7ca680bab2733ad26c02cf6317168a09c20e98843d336d1922"
+      },
+      {
+        "name": "dark-pending",
+        "state": "pending",
+        "dark": true,
+        "font_scale": "1.0",
+        "screenshot_sha256": "e517e13291c022dadc87e1e51ba468ba2180bad9bc6cdb0cf6bad965ef1484e4"
+      },
+      {
+        "name": "light-complete",
+        "state": "complete",
+        "dark": false,
+        "font_scale": "1.0",
+        "screenshot_sha256": "362f2041f8a3bc733dabe4c5c876d857b562780b9b572bd1a7c2891fb2568299"
+      },
+      {
+        "name": "light-error",
+        "state": "error",
+        "dark": false,
+        "font_scale": "1.0",
+        "screenshot_sha256": "79e9855a5957a9ec4361c2e18902c71faf7afed9ce9c3fb534bac14624c4c4c2"
+      },
+      {
+        "name": "light-busy",
+        "state": "busy",
+        "dark": false,
+        "font_scale": "1.0",
+        "screenshot_sha256": "5437ff1d6527474a22d87b221ec37868db78cb8c20553532fa2816d914102212"
+      },
+      {
+        "name": "large-font",
+        "state": "pending",
+        "dark": false,
+        "font_scale": "1.5",
+        "screenshot_sha256": "343b64ed0a0f517fe321bf9c437e54fd3b786e9cadf8bb490bcb7df2f9cca960"
+      }
+    ],
+    "extra_checks": {
+      "passed": true,
+      "large_font_controls": [
+        "读取账号",
+        "清除账号",
+        "查询今日状态",
+        "手动签到"
+      ],
+      "real_soft_keyboard": "shown when synthetic account field tapped; dismissed with back",
+      "font_scale_restored": "1.0",
+      "no_school_requests": true
+    },
+    "evidence": [
+      {
+        "file": ".local-tools/evidence/android-ui-physical-visual/result.json",
+        "sha256": "88cbc481b7402b2b1a37304c301bd98d2e2698ef20ef619e3dc15a0ebe4da14d"
+      },
+      {
+        "file": ".local-tools/evidence/android-ui-physical-extra/result.json",
+        "sha256": "808fa8f673d93d6a2b4f386725150fb8b3bd8b2f15227a0d0d9ee1095d037073"
+      },
+      {
+        "file": ".local-tools/evidence/android-ui-physical-extra/large-font-controls.png",
+        "sha256": "5a181cc4a6690dfa04ceb4c601504308b506ab90aefa35e7005545d271464739"
+      }
+    ]
+  },
+  "data_handling": {
+    "production_install": "Production and production-test package absent, including retained data, before first installation; only the newly installed synthetic production data was cleared",
+    "previous_debug_app": "Updated in place with same debug certificate; never uninstalled or cleared",
+    "previous_debug_account_marker": "account.enc and account.enc.bak absent before and after; no real account was read",
+    "phone_logs": "Only ManualUiTest and FeasibilityUiTest tags; no full system logs",
+    "screenshots": "Raw phone screenshots remain local; not checked into Git or uploaded",
+    "cleanup": "Production instrumentation package removed; production 0.1.2 homepage opened; original font scale 1.0 restored"
+  },
+  "limitations": [
+    "Only this physical vivo V2405A Android 16 / arm64-v8a / 4096-byte page-size device was tested",
+    "No real school-account authentication or actual check-in submission",
+    "No 16 KB physical-device acceptance",
+    "Phone account-retention proof covers same-version reinstall with synthetic credentials; cross-version proof remains emulator-only",
+    "Off-machine protected signing-key custody and restore remain required before public APK distribution"
+  ]
+}

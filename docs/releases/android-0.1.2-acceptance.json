@@ -315,11 +315,25 @@
     ]
   },
   "limitations": [
-    "No physical-device acceptance for this new UI APK",
+    "Physical UI APK acceptance covers only vivo V2405A / Android 16 / arm64-v8a / 4 KB; no general all-device claim",
     "No real school-account authentication or submission",
     "No 16 KB physical-device acceptance",
     "Cross-version proof covers only this 0.1.1 to 0.1.2 synthetic account pair",
     "Off-machine protected signing-key custody and restore remain required before public APK distribution"
   ],
-  "published": false
+  "published": false,
+  "physical_acceptance": {
+    "device": {
+      "manufacturer": "vivo",
+      "model": "V2405A",
+      "android_version": "16",
+      "api": 36,
+      "abi": "arm64-v8a",
+      "page_size": 4096,
+      "emulator": false
+    },
+    "production_tests_passed": 20,
+    "passed": true,
+    "separate_receipt": "android-0.1.2-physical-acceptance.json"
+  }
 }
