@@ -1,13 +1,13 @@
-# SWU 查寝打卡（Maximora 独立维护版）
+# SWU 查寝打卡（MatchAll 独立维护版）
 
 [![CI](https://github.com/Maximora-byte/swu-checkin/actions/workflows/ci.yml/badge.svg)](https://github.com/Maximora-byte/swu-checkin/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/Maximora-byte/swu-checkin)](https://github.com/Maximora-byte/swu-checkin/releases/latest)
 [![License](https://img.shields.io/github/license/Maximora-byte/swu-checkin)](LICENSE)
 
-西南大学钉钉查寝工具，提供 Python CLI、Windows / macOS 桌面预览版、Android 手动客户端、Windows 脚本计划任务、GitHub Actions 和受限 systemd timer 部署。各入口共用认证与签到业务核心。
+西南大学钉钉查寝工具，提供 Python CLI、Windows 桌面版 / macOS 桌面预览版、Android 手动客户端、Windows 脚本计划任务、GitHub Actions 和受限 systemd timer 部署。各入口共用认证与签到业务核心。
 
 > [!IMPORTANT]
-> 这是由 [Maximora-byte](https://github.com/Maximora-byte) 独立维护的非官方社区项目，源自 [Sorynthia/swu-checkin](https://github.com/Sorynthia/swu-checkin)。本仓库保留原项目署名与 MIT 许可证，但路线、发布和支持均由当前仓库独立负责；它不代表西南大学、钉钉或原上游作者。
+> 这是由 [MatchAll](https://github.com/Maximora-byte) 独立维护的非官方社区项目，源自 [Sorynthia/swu-checkin](https://github.com/Sorynthia/swu-checkin)。本仓库保留原项目署名与 MIT 许可证，但路线、发布和支持均由当前仓库独立负责；它不代表西南大学、钉钉或原上游作者。
 
 ## 为什么维护这个版本
 
@@ -22,21 +22,21 @@
 
 ## 版本与下载
 
-截至 2026-10-03，最新稳定版本是 [v2.0.0](https://github.com/Maximora-byte/swu-checkin/releases/tag/v2.0.0)，提供 Python wheel/sdist、Windows x64 安装包和完整 onedir ZIP。当前源码为 **2.1.0 预发布版**，新增 macOS、Android、新版 Portable ZIP 和 Actions 修复；预发布流程及实际下载见 [v2.1.0 发布页](https://github.com/Maximora-byte/swu-checkin/releases/tag/v2.1.0)，旧资产保持原样。
+当前发行系列为 **v2.1.1**，开发者与发行者为 **MatchAll**。下载和校验文件见 [v2.1.1 发布页](https://github.com/Maximora-byte/swu-checkin/releases/tag/v2.1.1)。Windows x64 安装器和免安装 ZIP 内置 Python、OCR 与全部运行资源；Android **1.0.0 / versionCode=5** 可直接安装，不需要开发环境。macOS 15 两架构仍提供未公证的预览附件。旧版 v2.1.0 Pre-release 及历史资产保持原样。
 
-发布预检现可从 PR 或手动运行，以同一源码构建并审核 Python、Windows 与 macOS 用户包；只有受校验的 tag push 才创建明确标记的 Pre-release。Android CI debug 包仅供验证，持久签名候选 APK 单独审核。本轮只读预检和六包校验已通过；持久签名 Android 候选在三组模拟器共通过 60 项生产验收，精确来源及哈希见 [验收清单](docs/releases/v2.1.0-acceptance.json)。变化与限制见 [v2.1.0 候选说明](docs/releases/v2.1.0.md)和 [发布准备](docs/releases/release-readiness.md)。下载时核对实际资产、源码 commit、签名与 SHA256；Actions artifact 保留 14 天。
+安装入口：Android 下载 `SWUCheckin-1.0.0-android.apk`；Windows 下载 `SWUCheckin-2.1.1-win-x64-Setup.exe`，或完整解压 `SWUCheckin-2.1.1-win-x64-Portable.zip`。首次打开后自行输入校园账号并先做只读查询；默认不会签到或启用后台任务。版本范围、升级与校验见 [v2.1.1 说明](docs/releases/v2.1.1.md)。
 
-## Windows desktop preview
+## Windows 桌面版
 
 桌面功能已通过 [PR #33](https://github.com/Maximora-byte/swu-checkin/pull/33) 合入 `main`：中文窗口、当前用户 DPAPI 保存、只读检测、确认后的手动签到，以及默认关闭的可选定时任务。Windows x64 安装包内置 Python 与运行所需资源，使用者无需另装 Python、uv 或 OCR 模型。
 
-Windows 桌面产物仍是未签名预览版。已发布范围与升级说明见 [v2.0.0 发布说明](docs/releases/v2.0.0.md)，当前源码的新增变化见 [发布评估](docs/releases/release-readiness.md)。Windows Server 2022 x64 CI 已覆盖冻结自测、安装、GUI 关闭重开、卸载，以及独立无害计划任务的注册/查询/删除；尚未完成干净 Windows 10/11 标准用户验收。使用步骤与限制见 [桌面版与构建指南](docs/windows-desktop.md)。
+Windows 桌面版仍未获得 Authenticode 签名，系统可能显示下载或安装提示。冻结自测、安装/GUI/卸载及免安装验证由 Windows 原生工作流执行；干净 Windows 10/11 实机覆盖仍有限，具体证据见该版本发布报告。使用步骤见 [桌面版指南](docs/windows-desktop.md)。
 
 本工具使用学校记录的寝室坐标，不测量实际 GPS，技术提交成功不证明人在寝。仅在本人确实在寝并符合学校规则时使用正式签到；自动模式必须单独授权，不满足条件时提前停用。
 
 ### Windows 免安装 ZIP
 
-已有 v2.0.0 的完整 onedir ZIP 可全部解压后运行 `SWUCheckin/SWUCheckin.exe`。新的构建同时生成明确命名的 `*-win-x64-Portable.zip`，内附中文使用说明、来源信息及校验清单；无需安装程序、Python、uv 或管理员权限。免安装只涵盖程序文件，DPAPI 账号数据仍保存在当前用户目录，不承诺跨电脑迁移。下载、升级和计划任务路径注意事项见 [免安装版指南](docs/windows-portable.md)。新构建先提供 Actions 预览 artifact，实际 Release 资产以发布页为准。
+下载当前版 `*-win-x64-Portable.zip` 后，全部解压并运行 `SWUCheckin/SWUCheckin.exe`。ZIP 内附中文说明、来源与校验清单；无需 Python、uv 或管理员权限。账号数据仍保存在当前用户目录，免安装不代表跨电脑账号迁移。升级时关闭窗口，保持任务引用的目录不变。见 [免安装指南](docs/windows-portable.md)。
 
 ## macOS desktop preview
 
@@ -44,15 +44,15 @@ Windows 桌面产物仍是未签名预览版。已发布范围与升级说明见
 
 ## 选择运行方式
 
-Android **0.1.1-preview** 候选支持校园账号登录、人工验证码、可选加密保存、只读查询与诊断，以及明确确认后的单次手动签到。启动不联网，没有后台自动签到。最低 Android 7.0，仅支持 64 位设备；新增独立包名和持久签名的非调试构建，保留 CI debug 验证。安装、旧预览共存、账号重输和验收范围见 [Android 客户端指南](docs/android-client.md)。尚无公开 Android Release 资产。
+Android **1.0.0** 支持校园账号登录、人工验证码、可选加密保存、只读查询与诊断，以及明确确认后的单次手动签到。开发者显示为 MatchAll，采用原创图标和浅深色卡片界面；最低 Android 7.0，仅支持 arm64-v8a / x86_64。持久签名正式包沿用原包名，可从 0.1.2-preview 直接覆盖升级。安装与验收范围见 [Android 指南](docs/android-client.md)。
 
 | 场景 | 推荐方式 | 特点 |
 | --- | --- | --- |
 | 先确认账号和接口是否可用 | [本地 CLI](docs/quickstart.md) | 最快；先 `setup` / `probe`，再决定是否正式运行 |
 | 长期在线 Linux 主机 | [systemd 部署](DEPLOYMENT.md) | 时间稳定、权限隔离、双次 timer、可选 Telegram 汇总 |
-| 想使用 Windows 中文窗口 | [桌面预览版](docs/windows-desktop.md) | 独立 EXE；默认不联网、不启用任务；未签名，下载以 Releases 资产为准 |
+| 想使用 Windows 中文窗口 | [桌面版](docs/windows-desktop.md) | 独立 EXE；默认不联网、不启用任务；未签名，下载以 Releases 资产为准 |
 | 想使用 macOS 中文窗口 | [macOS 手动预览](docs/macos-desktop.md) | 原生分架构 .app；可选钥匙串、内存 token；无后台任务、未公证 |
-| 想在 Android 手机手动使用 | [Android 手动预览](docs/android-client.md) | 人工验证码、可选密钥库加密保存、先查询再确认提交；无后台任务 |
+| 想在 Android 手机手动使用 | [Android 手动客户端](docs/android-client.md) | 人工验证码、可选密钥库加密保存、先查询再确认提交；无后台任务 |
 | 已使用 Windows Python 脚本部署 | [Windows 脚本指南](docs/windows.md) | 需要 uv/Python；安装诊断成功后会启用正式定时任务 |
 | 没有自己的服务器 | [GitHub Actions](GITHUB_ACTIONS.md) | 配置简单，但 cron 可能排队延迟，不保证准点 |
 

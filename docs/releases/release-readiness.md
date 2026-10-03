@@ -1,5 +1,7 @@
 # v2.1.0 发布准备（2026-10-03）
 
+> 本页保留 v2.1.0 发布准备时的历史判断与证据。当前 v2.1.1、MatchAll 和 Android 1.0.0 的发行范围见 [新版说明](v2.1.1.md)，不把本页旧限制或旧包通过数改写为新版结果。
+
 本轮预发布工程门槛已通过，采用 **数字版本 2.1.0 + GitHub Pre-release** 发行流程。实际发布与下载状态见 [v2.1.0 发布页](https://github.com/Maximora-byte/swu-checkin/releases/tag/v2.1.0)，来源、run 与哈希以该次 tag 构建的公开清单为准。最新稳定版仍是 [v2.0.0](https://github.com/Maximora-byte/swu-checkin/releases/tag/v2.0.0)，其源码 `ccedc7b642f6391d86ba7ddfc7e42e69467c2e64` 和历史资产保持原样。Windows/macOS 保留预览声明；Android 持久签名候选单独审验，离机签名保管未完成前不公开 APK。
 
 ## 候选范围与精确来源

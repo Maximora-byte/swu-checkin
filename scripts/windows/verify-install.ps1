@@ -12,6 +12,7 @@ if ($env:OS -ne 'Windows_NT' -or $env:GITHUB_ACTIONS -ne 'true' -or
 }
 $Root = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 $BuildPython = Join-Path $Root 'build\windows\venv\Scripts\python.exe'
+$BuildInfo = Get-Content -LiteralPath (Join-Path $Root 'dist\windows\BUILD-INFO.json') -Raw | ConvertFrom-Json
 & $BuildPython (Join-Path $Root 'packaging\windows\task_scheduler_smoke.py')
 if ($LASTEXITCODE -ne 0) { throw 'Harmless Task Scheduler registration smoke failed.' }
 if ([string]::IsNullOrWhiteSpace($Installer)) {
@@ -99,6 +100,10 @@ try {
     }
     Assert-NoDesktopTask
 
+    $Registration = Get-ItemProperty -LiteralPath $RegistryKeys[0]
+    if ($Registration.Publisher -ne 'MatchAll' -or $Registration.DisplayVersion -ne $BuildInfo.application_version) {
+        throw 'Installed publisher or version metadata mismatch.'
+    }
     $SelfTest = Start-OwnedProcess $App @('--self-test')
     Wait-OwnedProcess $SelfTest 180 'Installed offline self-test including definite-absent local task query'
 
@@ -112,7 +117,7 @@ try {
             $Gui.Refresh()
             if ($Gui.HasExited) { throw 'The default GUI exited before presenting its window.' }
             if ($Gui.MainWindowHandle -ne [IntPtr]::Zero -and $Gui.Responding -and
-                $Gui.MainWindowTitle -eq '西南大学寝室签到助手') {
+                $Gui.MainWindowTitle -eq "SWU 查寝 $($BuildInfo.application_version) · MatchAll") {
                 $WindowReady = $true
                 break
             }

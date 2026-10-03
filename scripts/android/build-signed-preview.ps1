@@ -88,7 +88,7 @@ try {
         & (Join-Path $env:JAVA_HOME 'bin/keytool.exe') -genkeypair -keystore $keyFile -storetype PKCS12 `
             -storepass:env SWU_ANDROID_KEYSTORE_PASSWORD -keypass:env SWU_ANDROID_KEYSTORE_PASSWORD `
             -alias $aliasName -keyalg RSA -keysize 4096 -sigalg SHA256withRSA -validity 36500 `
-            -dname 'CN=SWUCheckin Preview,OU=Community,O=Maximora-byte,C=CN' -noprompt
+            -dname 'CN=SWUCheckin,OU=Community,O=MatchAll,C=CN' -noprompt
         if ($LASTEXITCODE -ne 0) { throw 'Persistent preview key generation failed.' }
     } else {
         $passwordBytes = [Security.Cryptography.ProtectedData]::Unprotect([IO.File]::ReadAllBytes($passwordFile), $null, [Security.Cryptography.DataProtectionScope]::CurrentUser)
@@ -122,7 +122,7 @@ try {
         --java (Join-Path $env:JAVA_HOME 'bin/java.exe') --certificate $certificateFile `
         --output (Join-Path $projectRoot 'android/app/build/outputs/release-verification.json')
     if ($LASTEXITCODE -ne 0) { throw 'Final signed preview source, licensing or signature gate failed.' }
-    Write-Output 'Persistent signed preview built and verified. No release has been published.'
+    Write-Output 'Persistent signed Android package built and verified. No release has been published.'
 } finally {
     foreach ($name in $savedSigningEnvironment.Keys) {
         [Environment]::SetEnvironmentVariable($name, $savedSigningEnvironment[$name], 'Process')

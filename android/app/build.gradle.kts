@@ -23,12 +23,12 @@ android {
         applicationId = "io.github.maximorabyte.swucheckin"
         minSdk = 24
         targetSdk = 36
-        versionCode = 4
-        versionName = "0.1.2-preview"
+        versionCode = 5
+        versionName = "1.0.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         ndk { abiFilters += listOf("arm64-v8a", "x86_64") }
     }
-    buildFeatures { compose = true }
+    buildFeatures { compose = true; buildConfig = true }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17

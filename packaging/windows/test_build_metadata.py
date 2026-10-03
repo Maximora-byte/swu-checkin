@@ -1,5 +1,6 @@
 """Offline checks for the packaging provenance/checksum helper."""
 
+import ast
 import hashlib
 import importlib.util
 import json
@@ -35,6 +36,8 @@ def test_metadata_records_dirty_source_without_contents(tmp_path, monkeypatch):
     (python_home / "LICENSE.txt").write_text("Python license", encoding="utf-8")
     monkeypatch.setattr(helper.sys, "base_prefix", str(python_home))
     monkeypatch.setattr(helper.importlib.metadata, "distributions", lambda: [])
+    # Keep the native OS probe outside this fixture's mocked subprocess calls.
+    monkeypatch.setattr(helper.platform, "machine", lambda: "AMD64")
     # License collection is independently exercised against original wheel
     # notices. This source-provenance fixture has no installed native runtime.
     monkeypatch.setattr(
@@ -56,6 +59,8 @@ def test_metadata_records_dirty_source_without_contents(tmp_path, monkeypatch):
     assert info["uv_lock_sha256"] == hashlib.sha256(b"locked").hexdigest()
     assert "private source content" not in json.dumps(info)
     assert (output / "PYTHON-LICENSE.txt").read_text(encoding="utf-8") == "Python license"
+    # PyInstaller evaluates the whole file as one expression, including whitespace.
+    ast.parse((output / "VERSION-INFO.txt").read_text(encoding="utf-8"), mode="eval")
     first_hash = info["source_tree_sha256"]
     (root / "example.py").write_bytes(b"changed")
     helper.metadata(root, output)

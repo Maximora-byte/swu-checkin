@@ -1,6 +1,6 @@
 # SWU OAuth login discovery
 
-This document follows the current 2.1.0 pre-release candidate source. No new tag or Release has been created; the latest public release remains v2.0.0. The release preflight uses synthetic authentication and does not establish live school-account compatibility. See [candidate notes](releases/v2.1.0.md) and [release readiness](releases/release-readiness.md) for package provenance, signatures and pending acceptance.
+This document follows the 2.1.1 source maintained by MatchAll. See [release notes](releases/v2.1.1.md). On 2026-10-03 the account owner reported successful read-only Android school authentication/query with no current check-in task. This report does not establish real submission or all-device compatibility; CI authentication uses synthetic fixtures.
 
 > This document describes the authentication implementation independently maintained in [Maximora-byte/swu-checkin](https://github.com/Maximora-byte/swu-checkin). It is not an SWU protocol specification and is not maintained by the original upstream project. Report regressions to the [current repository issue tracker](https://github.com/Maximora-byte/swu-checkin/issues) with structural, redacted evidence only.
 

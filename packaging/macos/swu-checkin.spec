@@ -50,6 +50,6 @@ app = BUNDLE(
         "CFBundleVersion": version,
         "NSHighResolutionCapable": True,
         "LSMinimumSystemVersion": "15.0",
-        "NSHumanReadableCopyright": "MIT; see bundled LICENSE",
+        "NSHumanReadableCopyright": "Developed by MatchAll; MIT, original copyright retained in bundled LICENSE",
     },
 )

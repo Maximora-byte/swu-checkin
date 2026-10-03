@@ -92,6 +92,34 @@ def test_release_workflow_enforces_tag_commit_on_main():
     assert "Tagged commit is not contained in origin/main; refusing release." in workflow
 
 
+@pytest.mark.parametrize("channel", ["stable", "prerelease", "invalid"])
+def test_release_channel_is_explicit_and_validated(tmp_path: Path, channel: str):
+    path = _pyproject(tmp_path)
+    with path.open("a", encoding="utf-8") as output:
+        output.write(f'\n[tool.swu-checkin.release]\nchannel = "{channel}"\n')
+    completed = subprocess.run(
+        [sys.executable, str(VERIFY_TAG), "--pyproject", str(path), "--channel"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if channel == "invalid":
+        assert completed.returncode != 0
+        assert "release channel" in completed.stderr
+    else:
+        assert completed.returncode == 0
+        assert completed.stdout.strip() == channel
+
+
+def test_stable_release_stays_draft_until_persistent_android_package_is_reviewed():
+    workflow = RELEASE_WORKFLOW.read_text(encoding="utf-8")
+    publish = _workflow_job(workflow, "publish")
+    assert 'if [[ "$RELEASE_CHANNEL" == stable ]]' in publish
+    stable = publish.split('if [[ "$RELEASE_CHANNEL" == stable ]]', 1)[1].split("else", 1)[0]
+    assert "--verify-tag --draft --latest=false" in stable
+    assert "--prerelease" not in stable
+
+
 def test_release_workflow_separates_build_and_publish_permissions():
     workflow = RELEASE_WORKFLOW.read_text(encoding="utf-8")
     build = _workflow_job(workflow, "build-verify", "windows")

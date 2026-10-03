@@ -187,6 +187,8 @@ try {
     }
     if (-not (Test-Path -LiteralPath (Join-Path $AppDir '_internal') -PathType Container)) { throw 'Portable runtime is missing.' }
     Assert-PayloadChecksums $AppDir
+    $BuildInfo = Get-Content -LiteralPath (Join-Path $AppDir 'BUILD-INFO.json') -Raw | ConvertFrom-Json
+    if ($BuildInfo.developer -ne 'MatchAll') { throw 'Portable package developer metadata mismatch.' }
     $Before = Get-PayloadSnapshot $AppDir
     Add-Type -Path (Join-Path $Root 'packaging\windows\portable_smoke_launcher.cs')
     $Launcher = [PortableSmokeLauncher]::new()
@@ -249,7 +251,7 @@ try {
             $Gui.Refresh()
             if ($Gui.HasExited) { throw 'Default portable GUI exited before presenting its window.' }
             if ($Gui.MainWindowHandle -ne [IntPtr]::Zero -and $Gui.Responding -and
-                $Gui.MainWindowTitle -eq '西南大学寝室签到助手') {
+                $Gui.MainWindowTitle -eq "SWU 查寝 $($BuildInfo.application_version) · MatchAll") {
                 $WindowReady = $true
                 break
             }

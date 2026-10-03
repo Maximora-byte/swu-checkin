@@ -37,6 +37,7 @@ jobs:
       contents: read
     outputs:
       version: ${{ steps.version.outputs.version }}
+      channel: ${{ steps.version.outputs.channel }}
     steps:
       - name: Check out exact source, including PR merge revision
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
@@ -69,12 +70,14 @@ jobs:
         id: version
         run: |
           project_version="$(uv run --locked python scripts/release/verify_release_tag.py)"
+          release_channel="$(uv run --locked python scripts/release/verify_release_tag.py --channel)"
           if [[ "$GITHUB_EVENT_NAME" == push && "$GITHUB_REF" == refs/tags/* ]]; then
             uv run --locked python scripts/release/verify_release_tag.py --tag "$GITHUB_REF_NAME"
           fi
           test -s "docs/releases/v${project_version}.md"
           echo "PROJECT_VERSION=$project_version" >> "$GITHUB_ENV"
           echo "version=$project_version" >> "$GITHUB_OUTPUT"
+          echo "channel=$release_channel" >> "$GITHUB_OUTPUT"
 
       - name: Run full Python quality gates and production audit
         run: |
@@ -177,12 +180,15 @@ jobs:
       - name: Audit exact versions, source, checksums and bundled licenses
         env:
           PROJECT_VERSION: ${{ needs.build-verify.outputs.version }}
+          RELEASE_CHANNEL: ${{ needs.build-verify.outputs.channel }}
         run: |
+          stage_flags=()
+          if [[ "$RELEASE_CHANNEL" == stable ]]; then stage_flags+=(--stable); fi
           python3 scripts/release/stage_assets.py \
             --python-dist incoming/python --windows-dir incoming/windows \
             --macos-arm64-dir incoming/macos-arm64 --macos-x86-64-dir incoming/macos-x86_64 \
             --version "$PROJECT_VERSION" --commit "$GITHUB_SHA" \
-            --notes "docs/releases/v${PROJECT_VERSION}.md" --output staged-release
+            --notes "docs/releases/v${PROJECT_VERSION}.md" --output staged-release "${stage_flags[@]}"
 
       - name: Upload reviewable release set and complete checksum manifest
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -207,10 +213,11 @@ jobs:
           name: release-staged-${{ github.sha }}
           path: dist
 
-      - name: Verify final bytes and create an immutable explicit Pre-release
+      - name: Verify final bytes and create a preview or a stable release draft
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
+          RELEASE_CHANNEL: ${{ needs.build-verify.outputs.channel }}
         run: |
           cd dist
           sha256sum -c SHA256SUMS.txt
@@ -223,6 +230,12 @@ jobs:
             echo "Release $GITHUB_REF_NAME already exists; refusing to overwrite immutable artifacts." >&2
             exit 1
           fi
-          gh release create "$GITHUB_REF_NAME" "${assets[@]}" \
-            --verify-tag --prerelease --latest=false \
-            --title "$GITHUB_REF_NAME preview" --notes-file RELEASE-NOTES.md
+          if [[ "$RELEASE_CHANNEL" == stable ]]; then
+            gh release create "$GITHUB_REF_NAME" "${assets[@]}" \
+              --verify-tag --draft --latest=false \
+              --title "$GITHUB_REF_NAME · MatchAll" --notes-file RELEASE-NOTES.md
+          else
+            gh release create "$GITHUB_REF_NAME" "${assets[@]}" \
+              --verify-tag --prerelease --latest=false \
+              --title "$GITHUB_REF_NAME preview" --notes-file RELEASE-NOTES.md
+          fi

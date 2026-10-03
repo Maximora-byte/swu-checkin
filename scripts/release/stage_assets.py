@@ -59,19 +59,23 @@ def _verify_checksums(root: Path) -> set[str]:
     return seen
 
 
-def _provenance(root: Path, version: str, commit: str, architecture: str, platform: str) -> dict:
+def _provenance(
+    root: Path, version: str, commit: str, architecture: str, platform: str, prerelease: bool = True
+) -> dict:
     info = _json(root / "BUILD-INFO.json")
     if (
         info.get("application_version") != version
         or info.get("source_commit") != commit
         or info.get("source_dirty") is not False
         or info.get("architecture") != architecture
-        or info.get("preview") is not True
+        or info.get("preview") is not (prerelease or platform == "macos")
     ):
         raise ValueError(f"{platform} package version, source, architecture or preview provenance mismatch")
+    if not prerelease and info.get("developer") != "MatchAll":
+        raise ValueError(f"{platform} developer provenance mismatch")
     if platform == "windows":
         if info.get("signature") != "unsigned":
-            raise ValueError("Windows preview must explicitly disclose its unsigned state")
+            raise ValueError("Windows package must explicitly disclose its unsigned state")
     elif info.get("signature") != "ad-hoc; no Developer ID" or info.get("notarized") is not False:
         raise ValueError("macOS preview must explicitly disclose ad-hoc signing and no notarization")
     return info
@@ -159,6 +163,8 @@ def stage_assets(
     notes: Path,
     repository_license: Path,
     output: Path,
+    *,
+    prerelease: bool = True,
 ) -> dict:
     if not re.fullmatch(r"\d+\.\d+\.\d+", version) or not re.fullmatch(r"[0-9a-f]{40}", commit):
         raise ValueError("an exact numeric release version and source commit are required")
@@ -175,7 +181,7 @@ def stage_assets(
     ]
     _verify_python_metadata(selected[0][0], selected[1][0], version, repository_license.read_bytes())
     windows_checksums = _verify_checksums(windows)
-    windows_info = _provenance(windows, version, commit, "AMD64", "windows")
+    windows_info = _provenance(windows, version, commit, "AMD64", "windows", prerelease)
     portable = _single(windows, f"SWUCheckin-{version}-win-x64-Portable.zip")
     _verify_zip_licenses(portable, windows, "SWUCheckin/_internal/build-info/", repository_license.read_bytes())
     installer = _single(windows, f"SWUCheckin-{version}-win-x64-Setup.exe")
@@ -190,7 +196,7 @@ def stage_assets(
     )
     for arch, root in (("arm64", macos_arm64), ("x86_64", macos_x86_64)):
         checksums = _verify_checksums(root)
-        info = _provenance(root, version, commit, arch, "macos")
+        info = _provenance(root, version, commit, arch, "macos", prerelease)
         archive = _single(root, f"SWUCheckin-{version}-macos15-{arch}-preview.zip")
         if not {archive.name, "BUILD-INFO.json", "LICENSE-INVENTORY.json"} <= checksums:
             raise ValueError("producer manifest does not cover all macOS release inputs")
@@ -227,12 +233,13 @@ def stage_assets(
         "schema_version": 1,
         "version": version,
         "source_commit": commit,
-        "prerelease": True,
+        "prerelease": prerelease,
+        "developer": "MatchAll",
         "assets": assets,
         "omitted": {"android": "CI APK uses a temporary debug key; separately reviewed persistent-signature candidate"},
         "limitations": [
             "Windows is unsigned; macOS is ad-hoc signed and unnotarized",
-            "native clean-user acceptance and real school-account validation remain incomplete",
+            "macOS remains preview; physical Mac clean-user acceptance is incomplete",
         ],
     }
     (output / "ASSET-MANIFEST.json").write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
@@ -252,6 +259,7 @@ def main() -> int:
     parser.add_argument("--notes", type=Path, required=True)
     parser.add_argument("--repository-license", type=Path, default=Path("LICENSE"))
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--stable", action="store_true", help="stage stable Windows/Python with macOS previews")
     args = parser.parse_args()
     result = stage_assets(
         args.python_dist,
@@ -263,6 +271,7 @@ def main() -> int:
         args.notes,
         args.repository_license,
         args.output,
+        prerelease=not args.stable,
     )
     print(
         json.dumps(

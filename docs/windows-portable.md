@@ -1,4 +1,4 @@
-# Windows 免安装预览版
+# Windows 免安装版
 
 免安装版是现有桌面应用的完整 **onedir ZIP**：全部解压后，双击 `SWUCheckin/SWUCheckin.exe` 即可打开中文窗口，不需要安装程序、Python、uv、OCR 模型或管理员权限。它与安装版使用相同的冻结 EXE 与业务核心，未增加新的签到入口。不要只复制 EXE，也不要从压缩包预览中运行。
 
@@ -6,13 +6,13 @@
 
 ## 下载、校验与启动
 
-1. 从本仓库 [Releases](https://github.com/Maximora-byte/swu-checkin/releases) 选择实际列出的资产，并核对来源。当前最新已发布版本为 [v2.0.0](https://github.com/Maximora-byte/swu-checkin/releases/tag/v2.0.0)；当前 `main` 中新增的明确命名 `Portable.zip` 尚未作为新 Release 资产发布。新版本条件见 [发布评估](releases/release-readiness.md)
+1. 从本仓库 [Releases](https://github.com/Maximora-byte/swu-checkin/releases) 选择实际列出的资产，并核对来源。当前版为 [v2.1.1](https://github.com/Maximora-byte/swu-checkin/releases/tag/v2.1.1)，选择 `SWUCheckin-2.1.1-win-x64-Portable.zip`
 2. 新构建文件名为 `SWUCheckin-<版本>-win-x64-Portable.zip`。Actions 下载可能还包一层 artifact ZIP：先解压外层，再完整解压这个 `Portable.zip`
 3. 用 PowerShell `Get-FileHash -Algorithm SHA256 '下载目录\SWUCheckin-<版本>-win-x64-Portable.zip'` 对照同一 portable artifact 的 `*-Portable.zip.sha256`（完整分发目录的 `SHA256SUMS.txt` 也包含该 ZIP）；同时核对 `BUILD-INFO.json` 的源码 commit。哈希只验证完整性，不能替代数字签名或可信来源
 4. 右键 ZIP 选择“全部解压缩”，放到当前用户可访问的本地目录，例如 `文档\SWU Checkin\`。目录可以有空格和中文
 5. 双击解压目录中的 `SWUCheckin.exe`。默认仅恢复本地状态，不联网、登录、提交签到或新建计划任务。先阅读包内 `README-PORTABLE.txt`
 
-已发布 [v2.0.0](https://github.com/Maximora-byte/swu-checkin/releases/tag/v2.0.0) 的 `SWUCheckin-2.0.0-win-x64.zip` 是完整 onedir，旧名称/内容不变，再分发须保留该 Release 单独提供的 Tcl 许可。当前源码已同步 2.1.0，候选 `SWUCheckin-2.1.0-win-x64-Portable.zip` 内附说明、来源及逐文件校验，并补齐真实 Python/Tcl/Tk、依赖和 vendor 原文；构建直接验收 ZIP 解压内容。尚无新 tag/Release，最终包仍须核对自己的 BUILD-INFO commit、版本和许可清单，不只凭文件名确认来源。
+当前发行文件为 `SWUCheckin-2.1.1-win-x64-Portable.zip`，下载见 [v2.1.1](https://github.com/Maximora-byte/swu-checkin/releases/tag/v2.1.1)。完整 ZIP 内附来源信息、项目及第三方许可与逐文件校验。旧版文件和许可要求按原发行说明保留；最终包以自身 BUILD-INFO 的版本、源码与 SHA256 为准。
 
 GitHub 自动生成的 `Source code (zip)` 是源码，不是免安装程序。安装程序 `*-Setup.exe`、Python wheel/sdist、Actions 外层 ZIP 与内部 `*-Portable.zip` 是不同文件。
 
@@ -53,7 +53,7 @@ DPAPI、显式保存、只读探测、正式签到确认和错误处理均沿用
 
 [Windows desktop 工作流](../.github/workflows/windows-desktop.yml) 在**安装程序运行前**执行 `verify-portable.ps1`，直接验收新 ZIP。脚本仅允许运行在一次性 GitHub-hosted Windows runner：使用非管理员受限进程 token，隔离用户数据目录，移除 Python/uv/虚拟环境的路径与配置，将 ZIP 解压到含中文和空格的目录，运行冻结离线自测、默认 GUI 关闭/重开/关闭，并核对文件哈希、无新增任务/安装登记/快捷方式、无用户数据持久写入、无遗留自有进程。它不创建测试账号，也不改动现有文件、桌面或设备的 ACL/安全设置；仅为新建的 CI 测试 token 初始化当前用户与 SYSTEM 的默认对象 ACL，不增加权限组或特权，不使用学校账号或调用学校接口。
 
-受限 token 检查是 CI 无管理员权限模拟，不是干净 Windows 10/11 实机验收。安装/卸载和无害任务专项仍独立，Portable 测试不注册任务。新版工作流支持发布预检按精确同一 SHA 调用，再由 stage 对 ZIP 内外来源/许可/哈希审核；PR/手动运行不发布。Actions artifact 保留 14 天，不等同永久 Release；候选说明见 [v2.1.0](releases/v2.1.0.md)。
+受限 token 检查是 CI 无管理员权限模拟，不是干净 Windows 10/11 实机验收。安装/卸载和无害任务专项仍独立，Portable 测试不注册任务。新版工作流支持发布预检按精确同一 SHA 调用，再由 stage 对 ZIP 内外来源/许可/哈希审核；PR/手动运行不发布。Actions artifact 保留 14 天，不等同永久 Release；版本说明见 [v2.1.1](releases/v2.1.1.md)。
 
 ## 待人工验收
 

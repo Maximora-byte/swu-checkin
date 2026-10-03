@@ -33,6 +33,7 @@ def metadata(root: Path, output: Path) -> None:
     commit = git("rev-parse", "HEAD")
     info = {
         "application_version": version,
+        "developer": "MatchAll",
         "source_commit": commit,
         "commit": commit,
         "source_dirty": bool(git("status", "--porcelain")),
