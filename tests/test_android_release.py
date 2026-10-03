@@ -31,14 +31,14 @@ def test_release_acceptance_preserves_existing_data(text, code):
 
 def test_release_manifest_rejects_debug_and_old_versions():
     manifest = (
-        "package: name='io.github.maximorabyte.swucheckin' versionCode='4' versionName='0.1.2-preview'\n"
+        "package: name='io.github.maximorabyte.swucheckin' versionCode='5' versionName='1.0.0'\n"
         "sdkVersion:'24'\ntargetSdkVersion:'36'\n"
     )
     verify_manifest(manifest)
     verify_manifest(manifest.replace("sdkVersion:", "minSdkVersion:"))
     with pytest.raises(ValueError):
         verify_manifest(manifest + "minSdkVersion:'23'\n")
-    for bad in (manifest + "application-debuggable", manifest.replace("versionCode='4'", "versionCode='3'")):
+    for bad in (manifest + "application-debuggable", manifest.replace("versionCode='5'", "versionCode='4'")):
         with pytest.raises(ValueError):
             verify_manifest(bad)
 
@@ -148,7 +148,7 @@ def test_signed_preview_rejects_source_changes_after_metadata_generation(tmp_pat
     certificate.write_bytes(b"fixture DER certificate")
     cert_digest = hashlib.sha256(certificate.read_bytes()).hexdigest()
     manifest = (
-        "package: name='io.github.maximorabyte.swucheckin' versionCode='4' versionName='0.1.2-preview'\n"
+        "package: name='io.github.maximorabyte.swucheckin' versionCode='5' versionName='1.0.0'\n"
         "sdkVersion:'24'\ntargetSdkVersion:'36'\n"
     )
     native = bytearray(120)
@@ -160,9 +160,11 @@ def test_signed_preview_rejects_source_changes_after_metadata_generation(tmp_pat
         "source_commit": commit,
         "source_tree": tree,
         "source_dirty": False,
-        "project_version": "2.1.0",
-        "android_version": "0.1.2-preview",
-        "android_version_code": 4,
+        "project_version": "2.1.1",
+        "android_version": "1.0.0",
+        "android_version_code": 5,
+        "developer": "MatchAll",
+        "preview": False,
         "uv_lock_sha256": hashlib.sha256(lock.read_bytes()).hexdigest(),
     }
     apk = tmp_path / "fixture.apk"

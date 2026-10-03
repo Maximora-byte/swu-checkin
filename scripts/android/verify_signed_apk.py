@@ -19,8 +19,8 @@ else:
 
 APP_ID = "io.github.maximorabyte.swucheckin"
 ROOT = Path(__file__).resolve().parents[2]
-VERSION_NAME = "0.1.2-preview"
-VERSION_CODE = 4
+VERSION_NAME = "1.0.0"
+VERSION_CODE = 5
 
 
 def verify_elf(data: bytes) -> None:
@@ -105,9 +105,11 @@ def verify(args: argparse.Namespace) -> dict:
             provenance.get("source_commit") != commit
             or provenance.get("source_tree") != tree
             or provenance.get("source_dirty") is not False
-            or provenance.get("project_version") != "2.1.0"
+            or provenance.get("project_version") != "2.1.1"
             or provenance.get("android_version") != VERSION_NAME
             or provenance.get("android_version_code") != VERSION_CODE
+            or provenance.get("developer") != "MatchAll"
+            or provenance.get("preview") is not False
             or provenance.get("uv_lock_sha256") != hashlib.sha256((ROOT / "uv.lock").read_bytes()).hexdigest()
         ):
             raise ValueError("signed preview source or version does not match reviewed checkout")

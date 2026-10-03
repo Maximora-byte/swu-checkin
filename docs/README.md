@@ -21,12 +21,13 @@
 - [维护与项目归属](../MAINTAINERS.md)
 - [v2.0.0 发布说明](releases/v2.0.0.md)：已发布资产、升级与该版本限制
 - [v2.1.0 预发布说明](releases/v2.1.0.md)：版本变化、交付资产和未完成的用户验收
-- [新版本发布评估](releases/release-readiness.md)：当前源码变化、平台验证和发布待办
+- [v2.1.1 正式发行说明](releases/v2.1.1.md)：MatchAll、Android 1.0.0、安装与升级
+- [历史预发布评估](releases/release-readiness.md)：当前源码变化、平台验证和发布待办
 - [开发、CI 与发布](development.md)：代码结构、离线测试、质量门禁与不同产物
 - [贡献指南](../CONTRIBUTING.md)
 
-截至 2026-10-03，最新稳定版本为 [v2.0.0](https://github.com/Maximora-byte/swu-checkin/releases/tag/v2.0.0)，包含 Python 分发包和 Windows 桌面预览资产。当前源码为 **2.1.0 Pre-release**，交付范围与实际下载见 [v2.1.0 发布页](https://github.com/Maximora-byte/swu-checkin/releases/tag/v2.1.0)。新增 macOS、Android、Windows Portable 和发布预检应按实际源码、构建报告与资产核对，不能视为旧发布版已提供。
+当前发行系列为 [v2.1.1](https://github.com/Maximora-byte/swu-checkin/releases/tag/v2.1.1)，开发者统一为 MatchAll，交付 Python、Windows x64 与 Android 1.0.0；macOS 15 两架构继续作为预览附件。旧版发行和验收记录保留原始来源，不将旧报告当作当前包的证明。
 
-Windows 仍未签名且缺少干净 Windows 10/11 标准用户验收；macOS 为 ad-hoc 签名、未公证预览。Android 0.1.1-preview 新增独立包名与持久签名的非调试候选，CI 临时 debug 包继续只供验证；真实学校账号及 16 KB 真机未验证。自动发布暂存六个 Python/Windows/macOS 用户包，Android APK 单独审验。本轮多平台预检、六包实际校验和持久签名 APK 的 60 项模拟器验收均已通过，见 [验收清单](releases/v2.1.0-acceptance.json)。具体支持和签名保管边界见平台指南与发布准备。
+Windows 仍未获得 Authenticode 签名；macOS 为 ad-hoc 签名、未公证预览。Android 正式包使用受保护的持久密钥，CI debug 包只供测试。用户已于 2026-10-03 反馈真实学校账号查询成功，显示“今日状态暂无签到任务”；这是本人只读操作反馈，不包含实际签到或 16 KB 真机验证。每个最终包的来源、签名和测试以发布资产中的报告为准。
 
 所有文档均以所在 commit/tag 的代码为准。部署时不要把不同版本的 README、`uv.lock`、Windows 脚本或 systemd unit 混合使用。

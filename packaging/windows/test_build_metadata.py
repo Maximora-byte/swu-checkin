@@ -35,6 +35,8 @@ def test_metadata_records_dirty_source_without_contents(tmp_path, monkeypatch):
     (python_home / "LICENSE.txt").write_text("Python license", encoding="utf-8")
     monkeypatch.setattr(helper.sys, "base_prefix", str(python_home))
     monkeypatch.setattr(helper.importlib.metadata, "distributions", lambda: [])
+    # Keep the native OS probe outside this fixture's mocked subprocess calls.
+    monkeypatch.setattr(helper.platform, "machine", lambda: "AMD64")
     # License collection is independently exercised against original wheel
     # notices. This source-provenance fixture has no installed native runtime.
     monkeypatch.setattr(

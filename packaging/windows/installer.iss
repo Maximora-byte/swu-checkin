@@ -14,7 +14,9 @@
 AppId={{C5B931AB-AF09-44E4-877C-4C60C4F1B419}
 AppName=SWU Checkin
 AppVersion={#AppVersion}
-AppPublisher=Maximora-byte/swu-checkin contributors
+AppPublisher=MatchAll
+VersionInfoCompany=MatchAll
+VersionInfoDescription=SWU Checkin Installer
 AppPublisherURL=https://github.com/Maximora-byte/swu-checkin
 DefaultDirName={localappdata}\Programs\SWUCheckin
 DefaultGroupName=SWU Checkin

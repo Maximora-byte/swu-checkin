@@ -1,6 +1,6 @@
 # 快速上手
 
-本文面向当前 `main` 的 Python CLI，覆盖安装、只读验证、正式运行和升级。Windows 用户可选 [桌面预览版](windows-desktop.md) 或 [免安装 ZIP](windows-portable.md)，无需执行这里的 uv/Python 步骤。macOS 与 Android 分别见 [macOS 桌面预览](macos-desktop.md) 和 [Android 手动客户端](android-client.md)；它们的预览验证不等于已进入稳定 Release。自动化部署可选择 [systemd](../DEPLOYMENT.md)、[Windows 脚本](windows.md) 或 [GitHub Actions](../GITHUB_ACTIONS.md)；启用前先确认本人在寝且符合学校规则。
+本文面向当前源码的 Python CLI。Windows 用户可选 [桌面版](windows-desktop.md) 或 [免安装 ZIP](windows-portable.md)，Android 用户可直接安装 [Android 客户端](android-client.md)，无需执行 uv/Python 步骤。macOS 继续为 [桌面预览](macos-desktop.md)。自动化部署见 [systemd](../DEPLOYMENT.md)、[Windows 脚本](windows.md) 或 [GitHub Actions](../GITHUB_ACTIONS.md)。
 
 ## 1. 准备环境
 
@@ -16,7 +16,7 @@ cd swu-checkin
 uv sync --locked --no-dev --python 3.13
 ```
 
-上例使用当前默认分支。需要已发布 Python 稳定版时，从 [Releases](https://github.com/Maximora-byte/swu-checkin/releases) 选择 tag，执行 `git checkout <tag>`，并改读该 tag 的文档。[v2.0.0](https://github.com/Maximora-byte/swu-checkin/releases/tag/v2.0.0) 仍是最新稳定版本，包含 Python 包和 Windows x64 未签名桌面预览。当前源码为 **2.1.0 预发布版**，包含后续修复和平台功能；预览资产及具体来源见 [v2.1.0 发布页](https://github.com/Maximora-byte/swu-checkin/releases/tag/v2.1.0)，不作为稳定版。见 [版本说明](releases/v2.1.0.md)与 [发布准备](releases/release-readiness.md)。
+上例使用当前默认分支。要使用本次发行，执行 `git checkout v2.1.1`，并使用同一 tag 的文档与 `uv.lock`；发行文件见 [v2.1.1](https://github.com/Maximora-byte/swu-checkin/releases/tag/v2.1.1)。Python 项目版本为 2.1.1，Android 独立版本为 1.0.0。macOS 附件仍为预览，Windows 尚未获得 Authenticode 签名。
 
 `uv sync --locked` 会严格使用检出版本的 `uv.lock`。如果锁文件与项目元数据不一致，命令会失败，而不是悄悄更新依赖。
 

@@ -25,18 +25,29 @@ def verify_release_tag(tag: str, version: str) -> None:
         raise ValueError(f"release tag {tag!r} does not match project version {version!r}")
 
 
+def release_channel(pyproject: Path) -> str:
+    with pyproject.open("rb") as source:
+        payload = tomllib.load(source)
+    channel = payload.get("tool", {}).get("swu-checkin", {}).get("release", {}).get("channel", "prerelease")
+    if channel not in ("stable", "prerelease"):
+        raise ValueError("release channel must be stable or prerelease")
+    return channel
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--pyproject", type=Path, default=Path("pyproject.toml"))
     parser.add_argument("--tag", help="release tag such as v1.1.0")
+    parser.add_argument("--channel", action="store_true", help="print the validated release channel")
     args = parser.parse_args()
     try:
         version = project_version(args.pyproject)
+        channel = release_channel(args.pyproject)
         if args.tag is not None:
             verify_release_tag(args.tag, version)
     except ValueError as error:
         parser.error(str(error))
-    print(version)
+    print(channel if args.channel else version)
     return 0
 
 

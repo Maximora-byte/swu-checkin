@@ -50,7 +50,7 @@ class CheckinActivity : ComponentActivity() {
                     if (usage) AlertDialog(
                         onDismissRequest = { usage = false },
                         icon = { SwuIcon(R.drawable.ic_info) }, title = { Text("使用前请了解") },
-                        text = { Text("查询和只读诊断不会提交签到。\n\n手动签到会沿用学校返回的宿舍坐标，不读取手机 GPS，也不能证明本人在寝。请只在本人在寝且符合学校规定时提交。\n\n账号保存使用本设备的加密密钥；关闭保存或清除账号会删除已保存记录。") },
+                        text = { Text("开发者：MatchAll\n版本：${BuildConfig.VERSION_NAME}\n\n查询和只读诊断不会提交签到。\n\n手动签到会沿用学校返回的宿舍坐标，不读取手机 GPS，也不能证明本人在寝。请只在本人在寝且符合学校规定时提交。\n\n账号保存使用本设备的加密密钥；关闭保存或清除账号会删除已保存记录。") },
                         confirmButton = { TextButton(onClick = { usage = false }) { Text("知道了") } },
                     )
                     if (confirming) AlertDialog(

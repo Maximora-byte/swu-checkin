@@ -20,6 +20,9 @@ def git(root: Path, *args: str) -> str:
 
 def metadata(root: Path, output: Path) -> None:
     output.mkdir(parents=True, exist_ok=True)
+    project = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))
+    version = project["project"]["version"]
+    channel = project.get("tool", {}).get("swu-checkin", {}).get("release", {}).get("channel", "prerelease")
     distributions = sorted(importlib.metadata.distributions(), key=lambda d: d.metadata["Name"].lower())
     source_hash = hashlib.sha256()
     names = (
@@ -34,9 +37,8 @@ def metadata(root: Path, output: Path) -> None:
         if path.is_file():
             source_hash.update(name.encode() + b"\0" + hashlib.sha256(path.read_bytes()).digest())
     info = {
-        "application_version": tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))["project"][
-            "version"
-        ],
+        "application_version": version,
+        "developer": "MatchAll",
         "source_commit": git(root, "rev-parse", "HEAD"),
         "source_tree": git(root, "rev-parse", "HEAD^{tree}"),
         "source_dirty": bool(git(root, "status", "--porcelain")),
@@ -45,10 +47,25 @@ def metadata(root: Path, output: Path) -> None:
         "python": platform.python_version(),
         "architecture": platform.machine(),
         "signature": "unsigned",
-        "preview": True,
+        "preview": channel != "stable",
         "dependencies": {d.metadata["Name"]: d.version for d in distributions},
     }
     (output / "BUILD-INFO.json").write_text(json.dumps(info, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    numeric_version = tuple(int(part) for part in version.split(".")) + (0,)
+    version_resource = f"""VSVersionInfo(
+      ffi=FixedFileInfo(filevers={numeric_version!r}, prodvers={numeric_version!r},
+        mask=0x3f, flags=0x0, OS=0x40004, fileType=0x1, subtype=0x0, date=(0, 0)),
+      kids=[StringFileInfo([StringTable('040904B0', [
+        StringStruct('CompanyName', 'MatchAll'),
+        StringStruct('FileDescription', 'SWU Checkin'),
+        StringStruct('FileVersion', {version!r}),
+        StringStruct('InternalName', 'SWUCheckin'),
+        StringStruct('OriginalFilename', 'SWUCheckin.exe'),
+        StringStruct('ProductName', 'SWU Checkin'),
+        StringStruct('ProductVersion', {version!r})
+      ])]), VarFileInfo([VarStruct('Translation', [1033, 1200])])])
+    """
+    (output / "VERSION-INFO.txt").write_text(version_resource, encoding="utf-8")
     collect(root, output, distributions)
     verify(output)
 

@@ -23,10 +23,11 @@ def metadata() -> dict:
         "source_dirty": False,
         "project_version": tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))["project"]["version"],
         "uv_lock_sha256": hashlib.sha256((ROOT / "uv.lock").read_bytes()).hexdigest(),
-        "android_version": "0.1.2-preview",
-        "android_version_code": 4,
-        "preview": True,
-        "signature": "persistent local protected RSA-4096 preview key",
+        "android_version": "1.0.0",
+        "android_version_code": 5,
+        "developer": "MatchAll",
+        "preview": False,
+        "signature": "persistent local protected RSA-4096 key",
         "verification_scope": "synthetic acceptance; no school-account authentication or submission",
     }
 

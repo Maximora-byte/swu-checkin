@@ -1,13 +1,14 @@
 [project]
 name = "swu-checkin"
-version = "2.1.0"
+version = "2.1.1"
 description = "西南大学钉钉查寝自动打卡脚本"
 readme = "README.md"
 requires-python = ">=3.13"
 license = { text = "MIT" }
 authors = [
-    { name = "Sorynthia" }
+    { name = "MatchAll" }
 ]
+maintainers = [{ name = "MatchAll" }]
 dependencies = [
     "requests>=2.28.0",
     "beautifulsoup4>=4.11.0",
@@ -35,6 +36,10 @@ swu-checkin-notify = "swu_checkin.notify:main"
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+[tool.swu-checkin.release]
+channel = "stable"
+developer = "MatchAll"
 
 [tool.hatchling.build.targets.wheel]
 packages = ["src/swu_checkin"]

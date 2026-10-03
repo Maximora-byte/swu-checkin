@@ -40,6 +40,7 @@ exe = EXE(
     [],
     exclude_binaries=True,
     name="SWUCheckin",
+    version=str(root / "build/windows/metadata/VERSION-INFO.txt"),
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,

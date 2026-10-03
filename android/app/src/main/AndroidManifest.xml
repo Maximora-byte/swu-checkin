@@ -11,6 +11,7 @@
         android:supportsRtl="true"
         android:theme="@android:style/Theme.Material.Light.NoActionBar"
         android:usesCleartextTraffic="false">
+        <meta-data android:name="io.github.maximorabyte.swucheckin.DEVELOPER" android:value="MatchAll" />
         <activity android:name=".MainActivity" android:exported="true" />
         <activity android:name=".CheckinActivity" android:exported="true" android:windowSoftInputMode="adjustResize">
             <intent-filter>

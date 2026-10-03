@@ -4,14 +4,12 @@
 
 ## 1. 版本与分发边界
 
-最新稳定版本是 [`v2.0.0`](https://github.com/Maximora-byte/swu-checkin/releases/tag/v2.0.0)。当前源码采用 **v2.1.0 Pre-release**，实际发行与下载见 [v2.1.0 发布页](https://github.com/Maximora-byte/swu-checkin/releases/tag/v2.1.0)：
+当前发行系列为 [`v2.1.1`](https://github.com/Maximora-byte/swu-checkin/releases/tag/v2.1.1)，开发者为 MatchAll。Python/Windows 版本 2.1.1，Android 1.0.0 / code5；macOS 15 两架构继续为预览。见 [本次说明](releases/v2.1.1.md)。
 
-- `pyproject.toml`、`swu_checkin.__version__` 与 `uv.lock` 的项目版本已同步为 `2.1.0`；候选范围见 [v2.1.0 说明](releases/v2.1.0.md)，历史交付见 [v2.0.0 说明](releases/v2.0.0.md)
-- 旧 [`v1.1.5`](https://github.com/Maximora-byte/swu-checkin/releases/tag/v1.1.5) 只提供 Python `.whl` 与 `.tar.gz`，不含桌面功能
-- `v2.0.0` 提供 Python 分发包及 Windows 桌面资产；其发布资产不会随 `main` 更新。`main` 后续增加人工验证码接入、Actions 统一结果门禁、Windows Portable ZIP/计划任务验证、macOS 手动预览和 Android 手动客户端
-- 实际发布状态与可下载资产以 [GitHub Releases](https://github.com/Maximora-byte/swu-checkin/releases) 为准。版本号或源码说明不证明已经完成发布；Release 应记录 tag commit、对应 CI run 与资产来源
-- Windows 产物仍为未签名预览版；已做 GitHub-hosted Windows Server 2022 x64 构建/安装和 Portable smoke，干净 Windows 10/11 x64 标准用户验收仍未完成
-- macOS 两个原生架构预览纳入 tag 发布集，采用 ad-hoc 签名，未经 Developer ID 签名或公证；Android 新增独立包名、持久签名的非调试候选，同时保留 CI 临时 debug 验证。Android APK 暂不公开
+- pyproject.toml、包内 __version__ 与 uv.lock 的项目版本同步为 2.1.1；Android 独立版本为 1.0.0 / code5。
+- Windows 安装器 Publisher、冻结 EXE 公司信息和桌面窗口，Android 使用说明/清单和包内来源，以及 macOS 应用信息均显示 MatchAll。
+- 原始 LICENSE、第三方许可、仓库地址、应用 ID 和持久签名不因开发者显示名变更而重写。
+- Windows 仍未获得 Authenticode 签名，macOS 未公证且保留 preview；支持边界按平台指南说明。
 
 GitHub Release 资产、临时 Actions artifact 和源码 checkout 是不同交付物。不要用历史资产或旧 commit 的绿色结果证明当前源码可交付；后续版本必须选择新的 tag，协调版本、对应构建和发布门槛。Windows、macOS、Android 的具体边界分别见[桌面版指南](windows-desktop.md)、[macOS 指南](macos-desktop.md)和 [Android 指南](android-client.md)。
 
@@ -150,11 +148,11 @@ uv run --locked python scripts/release/verify_artifacts.py \
 3. 同一精确 SHA 通过 `workflow_call(ref)` 调用 Windows、macOS 两架构和 Android 三组模拟器验证；不注入学校账号或发行签名秘密
 4. `release-stage-assets` 等待上述全部成功，核对 wheel/sdist 实际元数据、原生包内外版本/来源、producer SHA、项目 MIT 与逐项许可哈希；拒绝脏来源、旧包重命名、不完整许可和错误预览签名声明
 5. 生成保留 14 天的 `release-staged-<SHA>`：六个用户包、各平台来源/许可清单、`ASSET-MANIFEST.json`、MIT、固定发行说明和整体 `SHA256SUMS.txt`
-6. 仅 tag push 的 `release-publish` 取得 `contents: write`；它不 checkout 或执行项目代码，仅下载同一次 run 的暂存集，复核最终哈希/数量，并以 `--verify-tag --prerelease --latest=false --notes-file` 创建 Pre-release。已有同名 Release 拒绝覆盖；不上传 PyPI
+6. 仅 tag push 的 `release-publish` 取得 `contents: write`；它不 checkout 或执行项目代码，仅下载同一次 run 的暂存集，复核最终哈希/数量。prerelease 创建非 latest 预发布；stable 创建非 latest 草稿，待维护者加入持久签名 Android 包和报告、复核后公开。已有同名 Release 拒绝覆盖；不上传 PyPI
 
 自动暂存的六个用户包是 Python wheel/sdist、Windows x64 Setup/Portable、macOS 15 arm64/x86_64 preview ZIP；Actions 外层 artifact ZIP 不作为用户安装包。Android CI 使用临时 debug 证书，只证明对应包的运行，不公开为 Release APK。本机持久签名 APK、公开证书、来源与许可/验收报告单独准备；公开前仍需完成该资产的审核和签名保管。本轮 [预检 37031347112](https://github.com/Maximora-byte/swu-checkin/actions/runs/37031347112) 已完成全部平台构建、三组 debug 运行验证和 17 文件暂存；六个实际用户包也已独立下载复核。持久签名 APK 另通过 60 项生产模拟器验收。来源、哈希、保留的失败和边界见 [发布准备](releases/release-readiness.md)及 [验收清单](releases/v2.1.0-acceptance.json)。
 
-本轮使用数字 `2.1.0` 配合 GitHub Pre-release 属性，保留 Windows 安装器的三段数字要求；不是 Python `2.1.0rc1`。Android 独立使用 `versionName=0.1.1-preview` / `versionCode=3`。当前只完成发布准备，不创建 tag/Release，也不移动已发布 tag。预检的临时 merge-test commit 与合并后 main commit 可能不同；最终发行须按选定 main/tag commit 重建或重新运行，不能仅凭源码树相同改写产物来源。
+本轮使用数字 2.1.1 配合配置 channel="stable"；Android 使用 versionName=1.0.0 / versionCode=5。stable tag 自动建立草稿，待同源持久签名 Android APK 和逐项验收加入并核对后公开、设为 latest；prerelease 仍明确非 latest。Android CI debug 不作为公开 APK。历史 tag/资产不移动，最终包须按所选 main/tag commit 构建，不能仅凭源码树相同改写来源。
 
 Android 已新增项目、Chaquopy、Python 和依赖的版权原文与许可清单，APK 检查器要求内嵌原文/hash 完整；桌面构建同样收集实际 CPython、Tcl/Tk、依赖和包内 vendor 的材料。每次最终包仍须执行实际检查，源码有原文不能代替包内完整性验证。旧 debug APK 的许可缺失仍按历史记录保留，不能因源码补齐后把旧包直接公开。
 

@@ -10,6 +10,7 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from typing import Any
 
+from . import __version__
 from .desktop_errors import ERROR_MESSAGES, DesktopError, DesktopErrorCode
 from .models import CheckinResult
 
@@ -109,13 +110,14 @@ class DesktopApp:
         self.dialogs = messagebox
         self.controller = DesktopController()
         self.controls: list[Any] = []
-        root.title("西南大学寝室签到助手")
+        root.title(f"SWU 查寝 {__version__} · MatchAll")
         root.geometry("720x720")
         root.minsize(680, 660)
         self._register_close_handlers()
         panel = ttk.Frame(root, padding=20)
         panel.pack(fill="both", expand=True)
         ttk.Label(panel, text="西南大学寝室签到助手", font=(self.presentation.font_family, 17, "bold")).pack(anchor="w")
+        ttk.Label(panel, text=f"开发者：MatchAll  ·  版本：{__version__}").pack(anchor="w", pady=(4, 0))
         ttk.Label(panel, text="打开软件不会联网或提交签到。请先检测，再按需手动执行。", wraplength=620).pack(
             anchor="w", pady=(6, 12)
         )

@@ -1,6 +1,6 @@
 # macOS 桌面预览版
 
-这是 macOS 手动桌面预览，不属于已发布的 [v2.0.0](https://github.com/Maximora-byte/swu-checkin/releases/tag/v2.0.0) 资产。当前源码为 2.1.0 Pre-release，macOS 构建新增版号、真实运行库/依赖版权清单和同源发布审核；两架构 ZIP 的实际下载见 [v2.1.0 发布页](https://github.com/Maximora-byte/swu-checkin/releases/tag/v2.1.0)，仍无 Developer ID 签名或公证。独立 workflow 上传限时 artifact，tag 发布流程审核两架构 ZIP 后纳入六包集。它不创建后台任务、开机启动项或修改学校接口。见 [版本说明](releases/v2.1.0.md)与 [发布准备](releases/release-readiness.md)。使用者仍须真实在寝并遵守规则；程序不测量 GPS，也不证明本人在寝。
+这是 MatchAll 维护的 macOS 15 手动桌面预览，项目版本 **2.1.1**。Apple Silicon 和 Intel ZIP 见 [v2.1.1](https://github.com/Maximora-byte/swu-checkin/releases/tag/v2.1.1)，文件名保留 `preview`。采用 ad-hoc 签名，没有 Developer ID 或苹果公证；即使所属 Release 为正式版，macOS 附件仍是预览，首次打开可能受 Gatekeeper 限制。它不创建后台任务或修改学校接口。见 [版本说明](releases/v2.1.1.md)。
 
 ## 支持范围与交付
 
@@ -11,7 +11,7 @@
 - 不提供自动签到或只读定时：`--scheduled` 在 macOS 直接拒绝，不读取账号、不访问学校
 - macOS 桌面与 CLI 使用同一个 `formal_execution` 入口及默认跨进程锁。自定义了不同 `SWUDK_LOCK_FILE` 的入口不在同一锁域
 
-在本仓库 [macOS desktop preview workflow](https://github.com/Maximora-byte/swu-checkin/actions/workflows/macos-desktop.yml)的成功运行中选取匹配架构的 artifact。新版 ZIP 为 `SWUCheckin-2.1.0-macos15-<架构>-preview.zip`，带 `BUILD-INFO.json`、`LICENSE-INVENTORY.json` 与 `SHA256SUMS.txt`；保留 14 天，可能要求登录。PR/手动默认 `github.sha`，发布预检通过 `workflow_call(ref)` 指定同一精确 SHA。检查实际 commit、版本、架构、OS 与自测记录；不存在新版成功 artifact 时，不能视为该架构已交付。
+在本仓库 [macOS desktop preview workflow](https://github.com/Maximora-byte/swu-checkin/actions/workflows/macos-desktop.yml)的成功运行中选取匹配架构的 artifact。新版 ZIP 为 `SWUCheckin-2.1.1-macos15-<架构>-preview.zip`，带 `BUILD-INFO.json`、`LICENSE-INVENTORY.json` 与 `SHA256SUMS.txt`；保留 14 天，可能要求登录。PR/手动默认 `github.sha`，发布预检通过 `workflow_call(ref)` 指定同一精确 SHA。检查实际 commit、版本、架构、OS 与自测记录；不存在新版成功 artifact 时，不能视为该架构已交付。
 
 当前功能合并前的 [双架构原生构建与验证](https://github.com/Maximora-byte/swu-checkin/actions/runs/37019008388) 已通过；覆盖两个 runner 的单元测试、生产依赖审计、合成钥匙串项与冻结应用离线自测。该 PR 工作流默认检出 GitHub 的临时 merge-test commit，不能只看 PR head 或版本字符串判断产物来源；应以 `BUILD-INFO.json` 和 run 记录为准。它证明对应源码上的云端验证，不能充当未来新 tag 的发布构建或真实 Mac 验收。
 

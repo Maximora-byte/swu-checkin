@@ -140,6 +140,50 @@ def test_preflight_stages_user_packages_and_full_provenance_without_debug_apk(st
         assert asset["sha256"] == stager.sha256(output / asset["name"])
 
 
+def _stable_native_inputs(inputs: dict) -> None:
+    for key in ("windows", "macos_arm64", "macos_x86_64"):
+        root = inputs[key]
+        info = json.loads((root / "BUILD-INFO.json").read_bytes())
+        info.update(developer="MatchAll", preview=key != "windows")
+        provenance = _write_json(root / "BUILD-INFO.json", info)
+        archive_path = next(root.glob("*.zip"))
+        with zipfile.ZipFile(archive_path) as archive:
+            content = {entry.filename: archive.read(entry) for entry in archive.infolist()}
+        name = next(name for name in content if name.endswith("BUILD-INFO.json"))
+        content[name] = provenance
+        with zipfile.ZipFile(archive_path, "w") as archive:
+            for name, data in content.items():
+                archive.writestr(name, data)
+        _checksum(root)
+
+
+def test_stable_staging_preserves_macos_preview_restrictions(stager, inputs: dict):
+    _stable_native_inputs(inputs)
+    result = stager.stage_assets(**inputs, prerelease=False)
+    assert result["prerelease"] is False
+    assert result["developer"] == "MatchAll"
+    assert all(
+        asset["provenance"]["preview"] is False for asset in result["assets"] if asset["platform"] == "windows-x64"
+    )
+    assert all(
+        asset["provenance"]["preview"] is True for asset in result["assets"] if asset["platform"].startswith("macos")
+    )
+    stager._verify_checksums(inputs["output"])
+
+
+@pytest.mark.parametrize("field,value", [("preview", True), ("developer", "Other")])
+def test_stable_staging_rejects_preview_or_incorrect_developer(stager, inputs: dict, field: str, value):
+    _stable_native_inputs(inputs)
+    root = inputs["windows"]
+    info = json.loads((root / "BUILD-INFO.json").read_bytes())
+    info[field] = value
+    _write_json(root / "BUILD-INFO.json", info)
+    _checksum(root)
+    with pytest.raises(ValueError, match="provenance mismatch"):
+        stager.stage_assets(**inputs, prerelease=False)
+    assert not inputs["output"].exists()
+
+
 @pytest.mark.parametrize(
     ("field", "value"),
     [("source_commit", "b" * 40), ("application_version", "2.0.0"), ("source_dirty", True), ("signature", "unknown")],

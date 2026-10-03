@@ -96,13 +96,17 @@ print("Local task query: definite absence verified; no task created")
     if (-not (Test-Path -LiteralPath $App -PathType Leaf)) { throw 'Frozen application was not produced.' }
     # Start-Process -PassThru avoids the windowed-executable asynchronous exit-code
     # behavior of PowerShell. This exercises only synthetic offline resources.
-    $Smoke = Start-Process -FilePath $App -ArgumentList '--self-test' -PassThru
+    $Smoke = Start-Process -FilePath $App -ArgumentList '--self-test' -WindowStyle Hidden -PassThru
     if (-not $Smoke.WaitForExit(180000)) {
         $Smoke.Kill()
         throw 'Frozen offline self-test timed out.'
     }
     $Smoke.Refresh()
     if ($Smoke.ExitCode -ne 0) { throw "Frozen offline self-test failed (exit $($Smoke.ExitCode))." }
+    $VersionInfo = [Diagnostics.FileVersionInfo]::GetVersionInfo($App)
+    if ($VersionInfo.CompanyName -ne 'MatchAll' -or $VersionInfo.ProductVersion -ne $Version) {
+        throw 'Frozen application developer or version metadata mismatch.'
+    }
     & $BuildPython packaging/windows/build_metadata.py manifest `
         (Join-Path $Dist 'SWUCheckin') (Join-Path $Dist 'SWUCheckin\SHA256SUMS.txt')
     Assert-Exit 'Application checksum manifest'

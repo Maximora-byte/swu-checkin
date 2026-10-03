@@ -2,7 +2,7 @@
 
 ## 维护者
 
-`Maximora-byte/swu-checkin` 由 [@Maximora-byte](https://github.com/Maximora-byte) 独立维护。
+`Maximora-byte/swu-checkin` 由 [MatchAll（@Maximora-byte）](https://github.com/Maximora-byte) 独立维护。
 
 - 权威仓库：<https://github.com/Maximora-byte/swu-checkin>
 - Issue：<https://github.com/Maximora-byte/swu-checkin/issues>
@@ -20,12 +20,11 @@
 
 ## 版本与交付渠道
 
-- 截至 2026-10-02，最新已发布 [v2.0.0](https://github.com/Maximora-byte/swu-checkin/releases/tag/v2.0.0) 包含 Python wheel/sdist、Windows x64 安装包和完整 onedir ZIP，源码 commit 为 `ccedc7b642f6391d86ba7ddfc7e42e69467c2e64`；该版本说明见 [发布说明](docs/releases/v2.0.0.md)
-- 当前源码已同步 Python 版本 **2.1.0**，准备明确标记的 GitHub Pre-release；尚无新 tag 或 Release。新增 macOS 手动预览、Android 客户端、Windows Portable、验证码提供器与 Actions 结果修复；范围见 [候选说明](docs/releases/v2.1.0.md)，证据与门槛见 [发布准备](docs/releases/release-readiness.md)
-- 原生平台 Actions artifacts 保留 14 天；Windows 未签名，macOS ad-hoc 签名且未公证。Android 区分 CI 临时 debug 验证包和本机受保护持久签名候选，签名私钥与密码不进仓库/PR。构建机 smoke 不替代真实用户环境验收，合成业务测试不替代真实学校账号测试
-- 普通 CI 的 `quality` 汇总 Linux、Windows 脚本/运行时与 Python 打包检查；桌面安装包构建单独运行。具体命令、触发条件和发布权限边界见 [开发与发布](docs/development.md)
+- 当前发行系列为 **v2.1.1**，Python/Windows 项目版本 2.1.1，Android 1.0.0；软件开发者和发行者统一为 MatchAll。仓库名、包名与原有签名身份保持连续；原始 MIT 版权与第三方署名保留。说明见 [v2.1.1](docs/releases/v2.1.1.md)。
+- macOS 附件继续为 ad-hoc 签名、未公证预览。Windows 尚未获得 Authenticode 签名。Android CI debug 包仅供测试；正式分发使用仓库外受保护的持久签名。
+- 原生平台 Actions artifacts 保留 14 天；旧 tag 和 Release 资产不随 main 更新。各版本证据以对应来源与实际文件为准。
 
-Release 工作流在 PR/手动运行时以只读权限完成 Python 与各原生平台预检，以同一源码 SHA 审核实际用户包、来源、哈希和内嵌许可；不发布、不读取签名秘密。只有 `v*` tag push 会进入写权限的发布 job：要求 tag 精确匹配数字项目版本、commit 已包含在 `main`、全部构建与暂存门禁成功，并拒绝覆盖已有 Release。使用固定说明创建 Pre-release（不会设为 latest），自动资产范围为 Python wheel/sdist、Windows installer/Portable、macOS 两架构 ZIP；Android CI debug APK 不公开，持久签名候选另行审核。必须保留历史 tag/资产，最终候选合入后仍须核对选定 commit 的实际产物。Android 密钥保管与受保护备份由发布维护者负责；本机 DPAPI 保存不等于异机恢复已验收。
+Release 工作流在 PR/手动运行时只读预检同一源码的 Python 和原生平台包，不读取发行密钥。仅 v* tag push 可创建发行：数字版本必须匹配，commit 必须已在 main，所有构建和暂存门禁成功，拒绝覆盖已有版本。[tool.swu-checkin.release] 明确渠道；prerelease 创建非 latest 预发布，stable 先创建草稿。维护者随后加入同源持久签名 Android APK、证书和验收报告，验证完整资产与哈希后才公开草稿并设为 latest。签名私钥和任何密码不属于发行资产，离机备份采用独立密码保护的 PKCS12，不依赖原电脑 DPAPI。
 
 ## 项目性质
 
