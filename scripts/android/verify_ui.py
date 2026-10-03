@@ -5,7 +5,7 @@ from pathlib import Path
 from xml.etree import ElementTree
 
 APP_ID = "io.github.maximorabyte.swucheckin.feasibility"
-REQUIRED_TEXT = {"Android / Python 3.13 可行性验证", "验证离线运行环境", "验证公共 HTTPS（python.org）"}
+REQUIRED_TEXT = {"运行环境", "检查本地环境", "检查网络连接"}
 
 
 def verify(text: str, *, app_id: str = APP_ID) -> None:

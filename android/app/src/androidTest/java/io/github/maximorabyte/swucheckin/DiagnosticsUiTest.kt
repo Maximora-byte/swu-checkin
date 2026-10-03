@@ -6,6 +6,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.json.JSONObject
 import org.junit.Assert.assertTrue
@@ -30,9 +31,9 @@ class DiagnosticsUiTest {
 
     @Test fun diagnosticButtonsAndRecreation() {
         Log.i("FeasibilityUiTest", "activity ready; checking title")
-        compose.onNodeWithText("Android / Python 3.13 可行性验证").assertIsDisplayed()
+        compose.onNodeWithText("运行环境").assertIsDisplayed()
         Log.i("FeasibilityUiTest", "clicking offline probe")
-        compose.onNodeWithText("验证离线运行环境").performClick()
+        compose.onNodeWithText("检查本地环境").performClick()
         compose.waitUntil(timeoutMillis = 120_000) { !ProbeRunner.busy && ProbeRunner.result.startsWith("{") }
         val offline = JSONObject(ProbeRunner.result)
         assertTrue(offline.toString(), offline.getBoolean("passed"))
@@ -40,14 +41,17 @@ class DiagnosticsUiTest {
 
         Log.i("FeasibilityUiTest", "recreating activity")
         compose.activityRule.scenario.recreate()
-        compose.onNodeWithText(ProbeRunner.result).assertIsDisplayed()
-        compose.onNodeWithText("验证公共 HTTPS（python.org）").assertIsEnabled().performClick()
+        compose.onNodeWithText("本地检测通过").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("查看技术报告").performScrollTo().performClick()
+        compose.onNodeWithText(ProbeRunner.result).performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("检查网络连接").performScrollTo().assertIsEnabled().performClick()
         Log.i("FeasibilityUiTest", "waiting for verified HTTPS")
         compose.waitUntil(timeoutMillis = 120_000) { !ProbeRunner.busy }
         val online = JSONObject(ProbeRunner.result)
         assertTrue(online.toString(), online.getBoolean("passed"))
         assertTrue(online.getBoolean("https"))
-        compose.onNodeWithText("验证离线运行环境").assertIsEnabled()
+        compose.onNodeWithText("本地与网络检测通过").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("检查本地环境").assertIsEnabled()
         Log.i("FeasibilityUiTest", "completed")
     }
 }

@@ -19,8 +19,8 @@ else:
 
 APP_ID = "io.github.maximorabyte.swucheckin"
 ROOT = Path(__file__).resolve().parents[2]
-VERSION_NAME = "0.1.1-preview"
-VERSION_CODE = 3
+VERSION_NAME = "0.1.2-preview"
+VERSION_CODE = 4
 
 
 def verify_elf(data: bytes) -> None:
@@ -73,8 +73,8 @@ def verify(args: argparse.Namespace) -> dict:
     badging = run(tools / "aapt2.exe", "dump", "badging", args.apk)
     verify_manifest(badging)
     manifest = run(tools / "aapt2.exe", "dump", "xmltree", args.apk, "--file", "AndroidManifest.xml")
-    if "LockProbeService" in manifest:
-        raise ValueError("debug lock probe service in production APK")
+    if any(component in manifest for component in ("LockProbeService", "DesignPreviewActivity")):
+        raise ValueError("debug component in production APK")
     signature = run(
         args.java, "-jar", tools / "lib" / "apksigner.jar", "verify", "--verbose", "--print-certs", args.apk
     )

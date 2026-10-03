@@ -1,10 +1,10 @@
-# Android 手动客户端（0.1.1-preview 候选）
+# Android 手动客户端（0.1.2-preview 候选）
 
 Android 客户端已经接入仓库原有认证与签到核心。打开应用不会联网，也不会自动读取账号或签到。需要网络时由你主动点击查询、诊断或确认提交。
 
 ## 安装与使用
 
-最低 Android 7.0 / API24，只支持 `arm64-v8a` 和 `x86_64` 的 64 位设备。截至 2026-10-03，Android 尚无公开 Release 资产；最新 v2.0.0 不包含本客户端。当前准备 **0.1.1-preview / versionCode=3**：正式包名 `io.github.maximorabyte.swucheckin`，release 变体不允许调试，使用仓库外受保护的持久签名。它仍是预览，不代表真实学校账号或全部设备已经验收。
+最低 Android 7.0 / API24，只支持 `arm64-v8a` 和 `x86_64` 的 64 位设备。截至 2026-10-03，Android 尚无公开 APK；[v2.1.0 Pre-release](https://github.com/Maximora-byte/swu-checkin/releases/tag/v2.1.0) 公开 Python、Windows 和 macOS 用户包。当前 Android 源码为 **0.1.2-preview / versionCode=4**，新增卡片界面、浅深色主题与原创矢量图标；正式包名仍为 `io.github.maximorabyte.swucheckin`，release 不允许调试，并复用仓库外受保护的持久签名。它仍是预览，不代表真实学校账号或全部设备已经验收。界面变化与范围见 [0.1.2 说明](releases/android-0.1.2-ui.md)。
 
 云端 [Android 工作流](https://github.com/Maximora-byte/swu-checkin/actions/workflows/android-feasibility.yml)继续提供保留 14 天的 debug 验证 artifact。`app-debug.apk` 使用旧 `.feasibility` 包名与临时 debug 证书，版本带 `-debug`；测试 APK 只供开发验收，日常使用不用安装。持久签名候选来自 `android/app/build/outputs/apk/release/app-release.apk`，有独立的证书、来源与验收报告，不由 CI debug artifact 自动发布。核对具体包的 SHA256、内嵌来源、签名指纹与实际测试；不要混用不同运行的包。
 
@@ -21,9 +21,9 @@ Android 客户端已经接入仓库原有认证与签到核心。打开应用不
 
 ## 账号与取消
 
-默认不保存账号密码。勾选 **在此设备加密保存账号与密码** 后，下一次主动操作前使用 AndroidKeyStore 的 AES-256-GCM 加密保存到应用私有 `noBackupFilesDir`；随机 IV、认证标签和应用/格式绑定可检测修改。密钥不能导出，没有明文降级。令牌只保存在进程内存，并校验所属身份；账号或密码变化会清除旧会话。
+默认不保存账号密码。开启 **记住账号** 后，下一次主动操作前使用 AndroidKeyStore 的 AES-256-GCM 加密保存到应用私有 `noBackupFilesDir`；随机 IV、认证标签和应用/格式绑定可检测修改。密钥不能导出，没有明文降级。令牌只保存在进程内存，并校验所属身份；账号或密码变化会清除旧会话。
 
-**读取已保存账号**由你主动触发；**清除账号**删除密钥、加密记录和会话。关闭保存选项也会删除加密记录。账号界面禁止系统截图/录屏，不把密码或验证码写入 Activity 保存状态、日志或错误消息。旋转屏幕保留当前进程内的输入与验证码；进程结束后未保存的输入消失。
+**读取账号**由你主动触发；**清除账号**删除密钥、加密记录和会话。关闭保存选项也会删除加密记录。密码默认隐藏，眼睛按钮可临时显示；读取或清除账号、开始查询及重建页面会恢复隐藏。账号界面禁止系统截图/录屏，不把密码或验证码写入 Activity 保存状态、日志或错误消息。旋转屏幕保留当前进程内的输入与验证码；进程结束后未保存的输入消失。
 
 验证码可取消；离开前台会取消正在等待的登录并阻止尚未发出的提交。已经发出的网络请求无法撤回，返回后请刷新查询学校状态。取消提示不会声称提交已经撤销。
 
@@ -56,6 +56,8 @@ Windows 本机准备好官方工具链后，在仓库根目录执行：
 公开 APK 前，维护者应完成密钥的受保护备份与保管方案；不要只把 DPAPI 密文复制到另一电脑后假定可解密，不要把私钥、明文密码或解密脚本作为 Release 资产。本轮已在仓库外建立受限 ACL 的本机备份，并从备份恢复密码/密钥实际签名，匹配同一公开证书。这只证明同电脑、同 Windows 用户恢复；离机副本保管和异机恢复尚未验证，公开 APK 前仍须完成。发行密钥没有配置到 CI。持久证书使后续同包名更新有连续身份，但最终跨版本更新仍须独立验收；丢失密钥不能通过换一个签名继续覆盖原应用。见 [Android 官方签名说明](https://developer.android.com/studio/publish/app-signing)和 [Microsoft DPAPI](https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.protecteddata?view=windowsdesktop-9.0)。
 
 ### 0.1.1-preview 候选验证状态
+
+以下记录属于此前 0.1.1 签名包，保留其原始来源和哈希，不作为 0.1.2 新界面的验收结果。新版单独记录在 [0.1.2 说明](releases/android-0.1.2-ui.md)。
 
 最终生产 APK 来源为 PR #45 的可追溯分支 commit `f62e76f9e3940de830d5cbaee89516e00fdbe89b`，源码树 `7679ef1fcf86227cb0f768729d96e91aefb3d9cd`。运行环境页已修正旧的“此 APK 不能登录或签到”文案，明确仅此页面不登录或提交；共享核心、签名和依赖没有变化。最终包重新完整验收，后续文档补充不改写其内嵌来源。非调试生产 APK 与同持久证书测试包已在下列环境完成验收：
 
