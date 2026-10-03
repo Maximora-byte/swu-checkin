@@ -4,14 +4,14 @@
 
 ## 1. 版本与分发边界
 
-已发布的最新版本是 [`v2.0.0`](https://github.com/Maximora-byte/swu-checkin/releases/tag/v2.0.0)。当前源码准备 **v2.1.0 Pre-release**，尚未创建 tag 或 Release：
+最新稳定版本是 [`v2.0.0`](https://github.com/Maximora-byte/swu-checkin/releases/tag/v2.0.0)。当前源码采用 **v2.1.0 Pre-release**，实际发行与下载见 [v2.1.0 发布页](https://github.com/Maximora-byte/swu-checkin/releases/tag/v2.1.0)：
 
 - `pyproject.toml`、`swu_checkin.__version__` 与 `uv.lock` 的项目版本已同步为 `2.1.0`；候选范围见 [v2.1.0 说明](releases/v2.1.0.md)，历史交付见 [v2.0.0 说明](releases/v2.0.0.md)
 - 旧 [`v1.1.5`](https://github.com/Maximora-byte/swu-checkin/releases/tag/v1.1.5) 只提供 Python `.whl` 与 `.tar.gz`，不含桌面功能
 - `v2.0.0` 提供 Python 分发包及 Windows 桌面资产；其发布资产不会随 `main` 更新。`main` 后续增加人工验证码接入、Actions 统一结果门禁、Windows Portable ZIP/计划任务验证、macOS 手动预览和 Android 手动客户端
 - 实际发布状态与可下载资产以 [GitHub Releases](https://github.com/Maximora-byte/swu-checkin/releases) 为准。版本号或源码说明不证明已经完成发布；Release 应记录 tag commit、对应 CI run 与资产来源
 - Windows 产物仍为未签名预览版；已做 GitHub-hosted Windows Server 2022 x64 构建/安装和 Portable smoke，干净 Windows 10/11 x64 标准用户验收仍未完成
-- macOS 提供两个原生架构的临时 Actions artifact，采用 ad-hoc 签名，未经 Developer ID 签名或公证；Android 新增独立包名、持久签名的非调试候选，同时保留 CI 临时 debug 验证。两者均尚无公开 Release 资产
+- macOS 两个原生架构预览纳入 tag 发布集，采用 ad-hoc 签名，未经 Developer ID 签名或公证；Android 新增独立包名、持久签名的非调试候选，同时保留 CI 临时 debug 验证。Android APK 暂不公开
 
 GitHub Release 资产、临时 Actions artifact 和源码 checkout 是不同交付物。不要用历史资产或旧 commit 的绿色结果证明当前源码可交付；后续版本必须选择新的 tag，协调版本、对应构建和发布门槛。Windows、macOS、Android 的具体边界分别见[桌面版指南](windows-desktop.md)、[macOS 指南](macos-desktop.md)和 [Android 指南](android-client.md)。
 

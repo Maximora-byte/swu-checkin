@@ -1,6 +1,6 @@
 # v2.1.0 发布准备（2026-10-03）
 
-本轮预发布工程门槛已通过，可以进入 **数字版本 2.1.0 + GitHub Pre-release** 的最终发行步骤。**尚未创建 v2.1.0 tag 或 Release**。最新公开版本仍是 [v2.0.0](https://github.com/Maximora-byte/swu-checkin/releases/tag/v2.0.0)，其源码 `ccedc7b642f6391d86ba7ddfc7e42e69467c2e64` 和历史资产保持原样。Windows/macOS 保留预览声明；Android 持久签名候选单独审验，离机签名保管未完成前不公开 APK。
+本轮预发布工程门槛已通过，采用 **数字版本 2.1.0 + GitHub Pre-release** 发行流程。实际发布与下载状态见 [v2.1.0 发布页](https://github.com/Maximora-byte/swu-checkin/releases/tag/v2.1.0)，来源、run 与哈希以该次 tag 构建的公开清单为准。最新稳定版仍是 [v2.0.0](https://github.com/Maximora-byte/swu-checkin/releases/tag/v2.0.0)，其源码 `ccedc7b642f6391d86ba7ddfc7e42e69467c2e64` 和历史资产保持原样。Windows/macOS 保留预览声明；Android 持久签名候选单独审验，离机签名保管未完成前不公开 APK。
 
 ## 候选范围与精确来源
 
@@ -60,4 +60,4 @@ Windows Authenticode、macOS Developer ID/公证和真实用户环境验收仍�
 
 升级为稳定版前，仍须完成所声明支持范围内的干净用户环境、平台签名、跨版本更新及真实设备验收。真实学校账号只读登录/查询需账号持有人明确授权；实际签到由本人在符合规则时主动操作，不作为自动发布测试。公共 HTTPS、合成业务、模拟器和云端 runner 不能替代这些项目。
 
-本轮结果支持准备明确标记限制的 Pre-release；不表示 Release 已发布。最终发行还须由所选 main/tag 源码运行完整发布流程，交付对应实际来源和字节。
+本轮结果支持明确标记限制的 Pre-release。公开资产须由所选 main/tag 源码运行完整发布流程，交付对应实际来源和字节；本页候选验收记录不替代发布页上的该次构建清单。

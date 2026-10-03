@@ -1,6 +1,6 @@
 # Windows 桌面预览版
 
-本页描述当前源码的桌面预览；基础界面来自 [PR #33](https://github.com/Maximora-byte/swu-checkin/pull/33)，后续新增 Portable 和发布审核。Windows x64 应用不需要使用者安装 Python、uv 或 OCR 模型；仍未签名，干净 Windows 10/11 标准用户验收未完成。最新公开 [v2.0.0](https://github.com/Maximora-byte/swu-checkin/releases/tag/v2.0.0) 有安装程序与原始 onedir ZIP。当前源码已同步 **2.1.0 预发布候选**，新包需通过本轮构建/来源/许可与同源 stage，尚无新 tag/Release。见 [候选说明](releases/v2.1.0.md)、[发布准备](releases/release-readiness.md)及 [历史说明](releases/v2.0.0.md)。
+本页描述当前源码的桌面预览；基础界面来自 [PR #33](https://github.com/Maximora-byte/swu-checkin/pull/33)，后续新增 Portable 和发布审核。Windows x64 应用不需要使用者安装 Python、uv 或 OCR 模型；仍未签名，干净 Windows 10/11 标准用户验收未完成。稳定版 [v2.0.0](https://github.com/Maximora-byte/swu-checkin/releases/tag/v2.0.0) 有安装程序与原始 onedir ZIP。当前源码为 **2.1.0 预发布版**，安装器和 Portable ZIP 的实际交付见 [v2.1.0 发布页](https://github.com/Maximora-byte/swu-checkin/releases/tag/v2.1.0)。新包须通过构建/来源/许可与同源 stage。见 [版本说明](releases/v2.1.0.md)、[发布准备](releases/release-readiness.md)及 [历史说明](releases/v2.0.0.md)。
 
 历史基础界面的验证记录：[Windows Server 2022 x64 构建与冒烟测试](https://github.com/Maximora-byte/swu-checkin/actions/runs/36897730511)、[合并后普通 CI](https://github.com/Maximora-byte/swu-checkin/actions/runs/36901319136)。当前功能合并前的 [Windows 构建与冒烟测试](https://github.com/Maximora-byte/swu-checkin/actions/runs/37019007437) 也已通过。每个记录只证明对应源码 commit 的检查结果，不构成学校认证、Windows 10/11 全面支持或未来候选 tag 资产的验证。
 

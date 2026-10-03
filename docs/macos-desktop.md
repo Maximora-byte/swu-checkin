@@ -1,6 +1,6 @@
 # macOS 桌面预览版
 
-这是 macOS 手动桌面预览，不属于已发布的 [v2.0.0](https://github.com/Maximora-byte/swu-checkin/releases/tag/v2.0.0) 资产。当前源码准备 2.1.0 Pre-release，macOS 构建新增版号、真实运行库/依赖版权清单和同源发布审核；尚无 macOS Release 资产、Developer ID 签名或公证。独立 workflow 只上传限时 artifact，Release 预检成功后可将两架构 ZIP 纳入候选六包集，当前不创建 tag/Release。它不创建后台任务、开机启动项或修改学校接口。见 [候选说明](releases/v2.1.0.md)与 [发布准备](releases/release-readiness.md)。使用者仍须真实在寝并遵守规则；程序不测量 GPS，也不证明本人在寝。
+这是 macOS 手动桌面预览，不属于已发布的 [v2.0.0](https://github.com/Maximora-byte/swu-checkin/releases/tag/v2.0.0) 资产。当前源码为 2.1.0 Pre-release，macOS 构建新增版号、真实运行库/依赖版权清单和同源发布审核；两架构 ZIP 的实际下载见 [v2.1.0 发布页](https://github.com/Maximora-byte/swu-checkin/releases/tag/v2.1.0)，仍无 Developer ID 签名或公证。独立 workflow 上传限时 artifact，tag 发布流程审核两架构 ZIP 后纳入六包集。它不创建后台任务、开机启动项或修改学校接口。见 [版本说明](releases/v2.1.0.md)与 [发布准备](releases/release-readiness.md)。使用者仍须真实在寝并遵守规则；程序不测量 GPS，也不证明本人在寝。
 
 ## 支持范围与交付
 
