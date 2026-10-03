@@ -2,7 +2,7 @@
 
 先记录版本/tag 或 commit SHA、平台、运行方式、北京时间、业务状态码、进程退出码和安全 `stage`。不要记录账号值、密码、token、验证码、ticket、完整回调 URL、宿舍地址、坐标或原始 API body。
 
-本文以所在源码 commit 为准。当前 Python 版本为 **2.1.0 预发布版**，最新稳定版本仍为 v2.0.0；报错时同时核对 tag/commit、实际包和签名。公开资产以 [v2.1.0 发布页](https://github.com/Maximora-byte/swu-checkin/releases/tag/v2.1.0) 为准，平台交付与待验项见 [发布准备](releases/release-readiness.md)。
+本文以所在源码 commit 为准。当前 Python/Windows 版本为 **2.1.1**，Android 为 **1.0.0**，开发者为 MatchAll；报错时同时核对 tag/commit、实际包和签名。下载与平台支持范围见 [v2.1.1](releases/v2.1.1.md)，历史失败与旧版证据按各自发行记录保留。
 
 ## 基础检查顺序
 

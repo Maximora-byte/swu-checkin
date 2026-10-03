@@ -2,7 +2,7 @@
 
 感谢你考虑为 `Maximora-byte/swu-checkin` 做出贡献。
 
-本项目是由 [Maximora-byte](https://github.com/Maximora-byte) 独立维护的 [Sorynthia/swu-checkin](https://github.com/Sorynthia/swu-checkin) fork。本 fork 的 Issue、Pull Request、发布和支持均在[当前仓库](https://github.com/Maximora-byte/swu-checkin)处理；除非问题可以在未经修改的上游版本中独立复现，否则请不要将本 fork 的问题转交上游作者。
+本项目是由 [MatchAll](https://github.com/Maximora-byte) 独立维护的 [Sorynthia/swu-checkin](https://github.com/Sorynthia/swu-checkin) fork。本 fork 的 Issue、Pull Request、发布和支持均在[当前仓库](https://github.com/Maximora-byte/swu-checkin)处理；除非问题可以在未经修改的上游版本中独立复现，否则请不要将本 fork 的问题转交上游作者。
 
 ## 如何贡献
 

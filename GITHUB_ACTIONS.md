@@ -2,7 +2,7 @@
 
 GitHub Actions 适合没有长期在线主机的用户，但 scheduled workflow **不保证准点**。公共 runner 可能延迟几分钟、几十分钟甚至更久；时间窗口严格时请使用 [systemd](DEPLOYMENT.md) 或 [Windows 计划任务](docs/windows.md)。
 
-本指南只适用于 [Maximora-byte/swu-checkin](https://github.com/Maximora-byte/swu-checkin) 的 [`.github/workflows/checkin.yml`](.github/workflows/checkin.yml)。它会执行正式签到，与普通 CI、多平台 Release 预检/发布及 Android 验证不同；预检使用合成数据，不读取学校账号或发行签名秘密，不执行正式签到。当前源码准备 2.1.0 Pre-release，尚无新 tag/Release；触发与权限见 [开发与发布](docs/development.md)。不要把真实凭据写进 YAML。
+本指南适用于 MatchAll 维护的 [Maximora-byte/swu-checkin](https://github.com/Maximora-byte/swu-checkin) 的 [`.github/workflows/checkin.yml`](.github/workflows/checkin.yml)。它会执行正式签到，与普通 CI、多平台 Release 预检/发布及 Android 验证不同；预检使用合成数据，不读取学校账号或发行签名秘密，不执行正式签到。当前项目版本为 2.1.1，发行说明见 [v2.1.1](docs/releases/v2.1.1.md)，触发与权限见 [开发与发布](docs/development.md)。不要把真实凭据写进 YAML。
 
 ## 工作方式
 
