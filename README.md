@@ -82,7 +82,7 @@ uv run --locked --no-dev swu-checkin run
 `run` / `probe` / `doctor` 的环境凭据缺失时会交互询问；`setup` 总是交互输入。密码无回显，`setup` 不保存凭据。无人值守运行必须使用 GitHub Secrets、Windows DPAPI 或权限受限的 systemd 环境文件。
 
 > [!TIP]
-> 上例检出当前默认分支，不等于安装已发布版本。需要 Python 发布版时，请从 [Releases](https://github.com/Maximora-byte/swu-checkin/releases) 选择 tag，并同时使用该 tag 的代码、文档和 `uv.lock`。最新已发布的 `v2.0.0` 不包含当前 `main` 的全部新增功能；旧 [v1.1.5](https://github.com/Maximora-byte/swu-checkin/releases/tag/v1.1.5) 只有 wheel/sdist，不含桌面功能。桌面构建还需核对 commit、`BUILD-INFO.json` 与校验清单。
+> 上例检出当前默认分支。需要本次发行时，选择 `v2.1.1`，同时使用该 tag 的代码、文档和 `uv.lock`；下载见 [Releases](https://github.com/Maximora-byte/swu-checkin/releases)。旧 [v1.1.5](https://github.com/Maximora-byte/swu-checkin/releases/tag/v1.1.5) 只有 wheel/sdist，不含桌面功能。桌面和 Android 包须核对 commit、`BUILD-INFO.json`、签名与校验清单。
 
 ## 常用命令
 

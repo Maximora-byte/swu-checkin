@@ -1,6 +1,6 @@
 # CLI 与状态码参考
 
-本文描述当前源码的 Python CLI、结果与安全边界；项目版本为 **2.1.0 预发布版**，实际资产见 [v2.1.0 发布页](https://github.com/Maximora-byte/swu-checkin/releases/tag/v2.1.0)，CLI 状态码与 JSON schema v1 沿用。图形应用另见 [Windows 桌面](windows-desktop.md)、[macOS 桌面](macos-desktop.md)和 [Android](android-client.md)，它们不提供同一套 CLI 参数。稳定版 v2.0.0 应使用自身 tag 文档；版本差异见 [v2.1.0 说明](releases/v2.1.0.md)与 [发布准备](releases/release-readiness.md)。
+本文描述 MatchAll 维护的 **2.1.1** Python CLI、结果与安全边界，CLI 状态码与 JSON schema v1 沿用。下载和版本范围见 [v2.1.1](releases/v2.1.1.md)。图形应用另见 [Windows 桌面](windows-desktop.md)、[macOS 预览](macos-desktop.md)和 [Android](android-client.md)，它们不提供同一套 CLI 参数。部署时使用同一 tag 的代码、文档和锁文件。
 
 ## 命令
 
