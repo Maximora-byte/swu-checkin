@@ -1,0 +1,325 @@
+{
+  "schema_version": 1,
+  "generated_utc": "2026-10-03T05:13:13.741588+00:00",
+  "scope": "Android 0.1.2-preview UI; synthetic signed production acceptance, no school account or actual submission",
+  "apk": {
+    "sha256": "280c750adeb4c67485f0f03b1296d01bba4bf09896e8c4787d6011a8e0326a47",
+    "test_apk_sha256": "c5a6a170ee4db01d036ac617fe86380c8316563b60ea2ecec57ee56c46cbe41f",
+    "size_bytes": 43456550,
+    "certificate_sha256": "77ad72b44323fa7917470442e21fb258b5b8bc8a367e87c83ba6fa22d08f811a",
+    "application_id": "io.github.maximorabyte.swucheckin",
+    "version_name": "0.1.2-preview",
+    "version_code": 4,
+    "debuggable": false,
+    "provenance": {
+      "android_version": "0.1.2-preview",
+      "android_version_code": 4,
+      "preview": true,
+      "project_version": "2.1.0",
+      "schema_version": 1,
+      "signature": "persistent local protected RSA-4096 preview key",
+      "source_commit": "ed60fb577e50a0f9aa4db9df6d05c8592bbfbabc",
+      "source_dirty": false,
+      "source_tree": "7157e7974a79cb996375153cb38512ef23956524",
+      "uv_lock_sha256": "dca1ad1720fbc4badd824859be2e318d3375cb8ed91e3c17b12e56ffadae998b",
+      "verification_scope": "synthetic acceptance; no school-account authentication or submission"
+    },
+    "source_subtrees": {
+      "android": "657f6669ee4c053ebafe361d742f373c32fe5fd3",
+      "src": "ea6cfc79e8a1726ff86e89d2ff4b19c067e131ac",
+      "scripts/android": "f026b7107cada7cfa4ff7daf7f30ebcc0b8433d2",
+      "packaging/android": "4fc45376597e4df3057ab1841002d2b1dd0a5e52",
+      "uv.lock": "887ee658450f398db959d5460863b7c0f6a7670a"
+    }
+  },
+  "build_gates": {
+    "passed": true,
+    "release_lint": true,
+    "signature": "v2 and v3; persistent RSA-4096 certificate unchanged",
+    "source_provenance": true,
+    "zip_alignment_16kb": true,
+    "elf_alignment_16kb": 138,
+    "distribution_notices": {
+      "license_assets": 78,
+      "maven_components": 101,
+      "native_files": 138,
+      "nested_notices": 14,
+      "python_distributions": 11,
+      "runtime_archives": 2
+    },
+    "production_debug_components": "LockProbeService and DesignPreviewActivity absent",
+    "verification_report": {
+      "file": "android/app/build/outputs/release-verification.json",
+      "sha256": "4d9142df24dbf6bdff8505576bb1b365a152bae46919f14403dd72059dcc9db8"
+    }
+  },
+  "production_matrix": {
+    "passed": true,
+    "tests_passed": 60,
+    "rows": [
+      {
+        "device": {
+          "api": 24,
+          "abi": "x86_64",
+          "page_size": 4096,
+          "emulator": true
+        },
+        "tests": {
+          "fresh-install": 6,
+          "upgrade-account-seed": 1,
+          "upgrade-account-retained": 1,
+          "replacement-install": 6,
+          "cleared-data": 6
+        },
+        "passed": true,
+        "attempts": 1,
+        "evidence": [
+          {
+            "file": ".local-tools/evidence/android-ui-signed-api24-4096/result.json",
+            "sha256": "5f93a8b26921281e9ee7b593d496de2a9caf29cdddaa5903371b91dddb0f966b"
+          },
+          {
+            "file": ".local-tools/evidence/android-ui-signed-api24-4096/device.json",
+            "sha256": "fe5632e83c8666c9d72d1e629289a98c5daa06a1bfbeb2274b25a3dc8b9542c7"
+          },
+          {
+            "file": ".local-tools/evidence/android-ui-signed-api24-4096/apk-checksums.json",
+            "sha256": "4f8bb847f81633a4363c07d44241041eec147b6b44c3aaced6f6f595a9726b39"
+          },
+          {
+            "file": ".local-tools/evidence/android-ui-signed-api24-4096/apk-inventory.json",
+            "sha256": "33b7515f8ac9a2a30469fe575640eddf82a841789430754af16279e99ea7cb4f"
+          },
+          {
+            "file": ".local-tools/evidence/android-ui-signed-api24-4096/instrumentation-fresh-install.txt",
+            "sha256": "45f75ac929626a115497d41088bd4a28b5f9d6c3b8d4f51692d93ad80d6062b1"
+          },
+          {
+            "file": ".local-tools/evidence/android-ui-signed-api24-4096/instrumentation-upgrade-account-seed.txt",
+            "sha256": "5c3af9bc481f18c00ae427abd3333f7230d40a799eadca52dcc2eabf6d553b21"
+          },
+          {
+            "file": ".local-tools/evidence/android-ui-signed-api24-4096/instrumentation-upgrade-account-retained.txt",
+            "sha256": "205d19ee382903a90a71a1ebb8fad4afcb411f1af706efdfb76359b18d10f4df"
+          },
+          {
+            "file": ".local-tools/evidence/android-ui-signed-api24-4096/instrumentation-replacement-install.txt",
+            "sha256": "962bef095d09d408a4f7077014a8a04f6c9aa75a2e0950609cf854fa970c7ccf"
+          },
+          {
+            "file": ".local-tools/evidence/android-ui-signed-api24-4096/instrumentation-cleared-data.txt",
+            "sha256": "2e1cc1275d2e52ac84a87ddb497dc6c1d7dc2f6a21d3f17d5b157fac2844db40"
+          },
+          {
+            "file": ".local-tools/evidence/android-ui-signed-api24-4096/release-ui.xml",
+            "sha256": "ca6a06be390890ffe28cc212e0c37d2594e0941dbd49f4562332e9d817a2bee0"
+          },
+          {
+            "file": ".local-tools/evidence/android-ui-signed-api24-4096/release-screen.png",
+            "sha256": "50feaaada2b0a8689b9e5777a8d73ca7ad82264cc4226e5f13140754c9502aa2"
+          }
+        ]
+      },
+      {
+        "device": {
+          "api": 35,
+          "abi": "x86_64",
+          "page_size": 4096,
+          "emulator": true
+        },
+        "tests": {
+          "fresh-install": 6,
+          "upgrade-account-seed": 1,
+          "upgrade-account-retained": 1,
+          "replacement-install": 6,
+          "cleared-data": 6
+        },
+        "passed": true,
+        "attempts": 1,
+        "evidence": [
+          {
+            "file": ".local-tools/evidence/android-ui-signed-api35-4096/result.json",
+            "sha256": "5f93a8b26921281e9ee7b593d496de2a9caf29cdddaa5903371b91dddb0f966b"
+          },
+          {
+            "file": ".local-tools/evidence/android-ui-signed-api35-4096/device.json",
+            "sha256": "256f4836b5fb936105e920f71c5f93b019a89f52be3939ffc61283fab9eee0eb"
+          },
+          {
+            "file": ".local-tools/evidence/android-ui-signed-api35-4096/apk-checksums.json",
+            "sha256": "4f8bb847f81633a4363c07d44241041eec147b6b44c3aaced6f6f595a9726b39"
+          },
+          {
+            "file": ".local-tools/evidence/android-ui-signed-api35-4096/apk-inventory.json",
+            "sha256": "33b7515f8ac9a2a30469fe575640eddf82a841789430754af16279e99ea7cb4f"
+          },
+          {
+            "file": ".local-tools/evidence/android-ui-signed-api35-4096/instrumentation-fresh-install.txt",
+            "sha256": "b204a8d893d424542515da529df8e9b8b9e6b471e63b9a3f1f1892516e9ed630"
+          },
+          {
+            "file": ".local-tools/evidence/android-ui-signed-api35-4096/instrumentation-upgrade-account-seed.txt",
+            "sha256": "8f77d9d5bc92518979e41279221de31134e8570154426e31910468c9ab9c1b98"
+          },
+          {
+            "file": ".local-tools/evidence/android-ui-signed-api35-4096/instrumentation-upgrade-account-retained.txt",
+            "sha256": "0acae660f3d16ba5850783b730fee27fc3e9f319188c01a40f2bf9543c64248c"
+          },
+          {
+            "file": ".local-tools/evidence/android-ui-signed-api35-4096/instrumentation-replacement-install.txt",
+            "sha256": "b5363060cd8c5dc7f5ae34dbc702142cf16c77afba24dc875ddaeadf8e8f22df"
+          },
+          {
+            "file": ".local-tools/evidence/android-ui-signed-api35-4096/instrumentation-cleared-data.txt",
+            "sha256": "f7a660f8db22061668ff734a631acda248d9053626847e947c2b8d74cca5cbcf"
+          },
+          {
+            "file": ".local-tools/evidence/android-ui-signed-api35-4096/release-ui.xml",
+            "sha256": "ae1e5cbac1d4d1145ce94a732b8cff2275565a941671a019e76ac00bb27f5aaa"
+          },
+          {
+            "file": ".local-tools/evidence/android-ui-signed-api35-4096/release-screen.png",
+            "sha256": "3f4c160f4663261b42486deb97e10e06046143f140f33050db77eb79f847517e"
+          }
+        ]
+      },
+      {
+        "device": {
+          "api": 35,
+          "abi": "x86_64",
+          "page_size": 16384,
+          "emulator": true
+        },
+        "tests": {
+          "fresh-install": 6,
+          "upgrade-account-seed": 1,
+          "upgrade-account-retained": 1,
+          "replacement-install": 6,
+          "cleared-data": 6
+        },
+        "passed": true,
+        "attempts": 1,
+        "evidence": [
+          {
+            "file": ".local-tools/evidence/android-ui-signed-api35-16384/result.json",
+            "sha256": "5f93a8b26921281e9ee7b593d496de2a9caf29cdddaa5903371b91dddb0f966b"
+          },
+          {
+            "file": ".local-tools/evidence/android-ui-signed-api35-16384/device.json",
+            "sha256": "93876dda9b8332f9287b979514cc82bcc448bc80ded6c5ae56e44017916bd086"
+          },
+          {
+            "file": ".local-tools/evidence/android-ui-signed-api35-16384/apk-checksums.json",
+            "sha256": "4f8bb847f81633a4363c07d44241041eec147b6b44c3aaced6f6f595a9726b39"
+          },
+          {
+            "file": ".local-tools/evidence/android-ui-signed-api35-16384/apk-inventory.json",
+            "sha256": "33b7515f8ac9a2a30469fe575640eddf82a841789430754af16279e99ea7cb4f"
+          },
+          {
+            "file": ".local-tools/evidence/android-ui-signed-api35-16384/instrumentation-fresh-install.txt",
+            "sha256": "0f00780526aad2ee5d44a8e9fdfd6ffdbc03125ed120a1d415214af4d845dd11"
+          },
+          {
+            "file": ".local-tools/evidence/android-ui-signed-api35-16384/instrumentation-upgrade-account-seed.txt",
+            "sha256": "0bdf79c62acfca5ab4d144c5e7d6e23042eb5e6a272d5256f29b4edc1c08c7e7"
+          },
+          {
+            "file": ".local-tools/evidence/android-ui-signed-api35-16384/instrumentation-upgrade-account-retained.txt",
+            "sha256": "56439f47a9f98cbed8196d585b22b0c7ec0ebeab68d037524db78f95f11eea5b"
+          },
+          {
+            "file": ".local-tools/evidence/android-ui-signed-api35-16384/instrumentation-replacement-install.txt",
+            "sha256": "8f96568ed1759512bc99a5032cc1ceb0b72a4fd202b17332c7cb442c0c87f50d"
+          },
+          {
+            "file": ".local-tools/evidence/android-ui-signed-api35-16384/instrumentation-cleared-data.txt",
+            "sha256": "c850ce3cb3e71f7d42c3c9e9629af16e4565c8fbe28beb7aff1fe3b6b714ec52"
+          },
+          {
+            "file": ".local-tools/evidence/android-ui-signed-api35-16384/release-ui.xml",
+            "sha256": "d72eb93f669dd807edab1732b4a9908d9f7a7efc6c30e58d8fcb11ab50929219"
+          },
+          {
+            "file": ".local-tools/evidence/android-ui-signed-api35-16384/release-screen.png",
+            "sha256": "17b1c6f8edacdb59160fa7cbe93e743c20bccc407285fe69f60954629c40b823"
+          }
+        ]
+      }
+    ]
+  },
+  "cross_version_upgrade": {
+    "result": {
+      "passed": true,
+      "scope": "0.1.1-preview/code3 to 0.1.2-preview/code4; synthetic encrypted account only",
+      "api": 35,
+      "abi": "x86_64",
+      "page_size": 4096,
+      "tests": {
+        "old-version-seed": 1,
+        "new-version-retained": 1
+      },
+      "checksums": {
+        "dist\\android\\SWUCheckin-0.1.1-android-preview.apk": "ab5eaf7b1e4f1ee1183ade9667d95e557a237ff7d4f91f0b86ac563ce250994a",
+        ".local-tools\\evidence\\android-ui-upgrade-old\\0.1.1-test.apk": "838f6b188e9e3acee60e847089404a8e2221a14e1e6d21482f8aa99a37642153",
+        "android\\app\\build\\outputs\\apk\\release\\app-release.apk": "280c750adeb4c67485f0f03b1296d01bba4bf09896e8c4787d6011a8e0326a47",
+        "android\\app\\build\\outputs\\apk\\androidTest\\release\\app-release-androidTest.apk": "c5a6a170ee4db01d036ac617fe86380c8316563b60ea2ecec57ee56c46cbe41f"
+      }
+    },
+    "evidence": [
+      {
+        "file": ".local-tools/evidence/android-ui-upgrade-011-to-012/result.json",
+        "sha256": "5ab593bc602a6da55c231acd9d5824b75adf53a0ddb2efbd50aaf0166011fba6"
+      },
+      {
+        "file": ".local-tools/evidence/android-ui-upgrade-011-to-012/old-version-seed.txt",
+        "sha256": "9f0be9d31d72bbe0f9638a5851ea9838ab6a58fcb5294c368e9dc192802657b1"
+      },
+      {
+        "file": ".local-tools/evidence/android-ui-upgrade-011-to-012/new-version-retained.txt",
+        "sha256": "724e796a8820076b4dd01742137eecc44328414826969c6b976bb8b1db8487e6"
+      },
+      {
+        "file": ".local-tools/evidence/android-ui-upgrade-011-to-012/old-package.txt",
+        "sha256": "9db5172011842ff64b07f0e60e3a1d03740a93dd99736c7779b2576071039130"
+      },
+      {
+        "file": ".local-tools/evidence/android-ui-upgrade-011-to-012/new-package.txt",
+        "sha256": "44f2de6a8930ba7270b6f338c130a4ca4afe4d7c1b3ad2ad0d1e208ab236d618"
+      }
+    ]
+  },
+  "visual_qa": {
+    "device": "API35 / x86_64 / 4096-byte pages / 1080x2400",
+    "synthetic_debug_preview": true,
+    "cases": [
+      "empty",
+      "pending light",
+      "pending dark",
+      "completed",
+      "font scale 1.5"
+    ],
+    "screenshots": [
+      {
+        "file": "android/artwork/previews/light-home.png",
+        "sha256": "c8044722a41d63ed46ddfc1adf007c7aa8ba7efb828c27236fc3c020a56beb70"
+      },
+      {
+        "file": "android/artwork/previews/dark-home.png",
+        "sha256": "d7c83fac2bb070c66c38b18eff31a4b29e0b9ca5bd57862821600736527555d4"
+      },
+      {
+        "file": "android/artwork/previews/large-text.png",
+        "sha256": "71802552874aa0b6e9f15e8d0af744ca3aa9d15dace99277854149b45a9772e2"
+      }
+    ]
+  },
+  "limitations": [
+    "No physical-device acceptance for this new UI APK",
+    "No real school-account authentication or submission",
+    "No 16 KB physical-device acceptance",
+    "Cross-version proof covers only this 0.1.1 to 0.1.2 synthetic account pair",
+    "Off-machine protected signing-key custody and restore remain required before public APK distribution"
+  ],
+  "published": false
+}

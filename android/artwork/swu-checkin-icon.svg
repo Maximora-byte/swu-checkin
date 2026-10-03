@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 108 108">
+  <title>SWU 查寝 · 宿舍与确认</title>
+  <desc>原创矢量图标。深绿底色、暖白宿舍、灯光与薄荷绿确认标记。</desc>
+  <defs><linearGradient id="background" x1="0" y1="0" x2="1" y2="1">
+    <stop stop-color="#204A37"/><stop offset="1" stop-color="#12382C"/>
+  </linearGradient></defs>
+  <rect width="108" height="108" rx="24" fill="url(#background)"/>
+  <g transform="translate(54 54) scale(1.35) translate(-54 -54)">
+    <path fill="#FFF9EA" d="M54,27 C55.2,27 56.2,27.4 57.2,28.2 L78,44.5 C80.1,46.2 78.9,49.2 76.4,49.2 L73,49.2 L73,73 C73,75.8 70.8,78 68,78 L40,78 C37.2,78 35,75.8 35,73 L35,49.2 L31.6,49.2 C29.1,49.2 27.9,46.2 30,44.5 L50.8,28.2 C51.8,27.4 52.8,27 54,27 Z"/>
+    <path fill="#D6E7DB" d="M54,27 C55.2,27 56.2,27.4 57.2,28.2 L78,44.5 C80.1,46.2 78.9,49.2 76.4,49.2 L73,49.2 L54,34 L35,49.2 L31.6,49.2 C29.1,49.2 27.9,46.2 30,44.5 L50.8,28.2 C51.8,27.4 52.8,27 54,27 Z"/>
+    <path fill="#E7BE76" d="M44,48 H51 Q53,48 53,50 V55 Q53,57 51,57 H44 Q42,57 42,55 V50 Q42,48 44,48 Z"/>
+    <path fill="#2C5F47" d="M45,64 Q45,62 47,62 H51 Q53,62 53,64 V78 H45 Z"/>
+    <path fill="#A5DEB8" stroke="#183D32" stroke-width="2.5" d="M68,57 a12,12 0,1 0,0 24 a12,12 0,1 0,0 -24"/>
+    <path fill="none" stroke="#183D32" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round" d="M62,69 l4,4 8,-9"/>
+  </g>
+</svg>
