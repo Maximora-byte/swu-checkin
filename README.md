@@ -22,7 +22,7 @@
 
 ## 版本与下载
 
-截至 2026-10-03，最新已发布版本是 [v2.0.0](https://github.com/Maximora-byte/swu-checkin/releases/tag/v2.0.0)，提供 Python wheel/sdist、Windows x64 安装包和完整 onedir ZIP。当前源码已同步为 **2.1.0 预发布候选**，新增 macOS、Android、新版 Portable ZIP 和 Actions 修复；尚未创建 v2.1.0 tag 或 Release，旧资产保持原样。
+截至 2026-10-03，最新稳定版本是 [v2.0.0](https://github.com/Maximora-byte/swu-checkin/releases/tag/v2.0.0)，提供 Python wheel/sdist、Windows x64 安装包和完整 onedir ZIP。当前源码为 **2.1.0 预发布版**，新增 macOS、Android、新版 Portable ZIP 和 Actions 修复；预发布流程及实际下载见 [v2.1.0 发布页](https://github.com/Maximora-byte/swu-checkin/releases/tag/v2.1.0)，旧资产保持原样。
 
 发布预检现可从 PR 或手动运行，以同一源码构建并审核 Python、Windows 与 macOS 用户包；只有受校验的 tag push 才创建明确标记的 Pre-release。Android CI debug 包仅供验证，持久签名候选 APK 单独审核。本轮只读预检和六包校验已通过；持久签名 Android 候选在三组模拟器共通过 60 项生产验收，精确来源及哈希见 [验收清单](docs/releases/v2.1.0-acceptance.json)。变化与限制见 [v2.1.0 候选说明](docs/releases/v2.1.0.md)和 [发布准备](docs/releases/release-readiness.md)。下载时核对实际资产、源码 commit、签名与 SHA256；Actions artifact 保留 14 天。
 
@@ -140,7 +140,7 @@ swu-checkin probe --json   # probe 的 schema v1 JSON，不提交签到
 - [故障排查](docs/troubleshooting.md)：状态 3/4、缓存 session、锁、Actions 和安全报告
 - [安全模型](docs/security.md)：认证、TokenStore、提交安全、日志与支持边界
 - [v2.0.0 发布说明](docs/releases/v2.0.0.md)：已发布资产、相对 v1.1.5 的变化与该版本限制
-- [v2.1.0 预发布候选](docs/releases/v2.1.0.md)：已准备的变化、拟交付资产与平台限制
+- [v2.1.0 预发布说明](docs/releases/v2.1.0.md)：版本变化、交付资产与平台限制
 - [新版本发布评估](docs/releases/release-readiness.md)：当前 main 的变化、证据和发布待办
 - [开发、CI 与发布](docs/development.md)：模块分工、离线验证、发布边界
 - [贡献指南](CONTRIBUTING.md) / [维护与归属](MAINTAINERS.md)

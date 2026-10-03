@@ -16,7 +16,7 @@ cd swu-checkin
 uv sync --locked --no-dev --python 3.13
 ```
 
-上例使用当前默认分支。需要已发布 Python 稳定版时，从 [Releases](https://github.com/Maximora-byte/swu-checkin/releases) 选择 tag，执行 `git checkout <tag>`，并改读该 tag 的文档。[v2.0.0](https://github.com/Maximora-byte/swu-checkin/releases/tag/v2.0.0) 仍是最新公开版本，包含 Python 包和 Windows x64 未签名桌面预览。当前源码为 **2.1.0 预发布候选**，包含后续修复和平台功能，尚无新 tag/Release；预检包须按具体来源与测试核对，不能作为已发布稳定版。见 [候选说明](releases/v2.1.0.md)与 [发布准备](releases/release-readiness.md)。
+上例使用当前默认分支。需要已发布 Python 稳定版时，从 [Releases](https://github.com/Maximora-byte/swu-checkin/releases) 选择 tag，执行 `git checkout <tag>`，并改读该 tag 的文档。[v2.0.0](https://github.com/Maximora-byte/swu-checkin/releases/tag/v2.0.0) 仍是最新稳定版本，包含 Python 包和 Windows x64 未签名桌面预览。当前源码为 **2.1.0 预发布版**，包含后续修复和平台功能；预览资产及具体来源见 [v2.1.0 发布页](https://github.com/Maximora-byte/swu-checkin/releases/tag/v2.1.0)，不作为稳定版。见 [版本说明](releases/v2.1.0.md)与 [发布准备](releases/release-readiness.md)。
 
 `uv sync --locked` 会严格使用检出版本的 `uv.lock`。如果锁文件与项目元数据不一致，命令会失败，而不是悄悄更新依赖。
 
