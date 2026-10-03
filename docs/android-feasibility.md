@@ -4,6 +4,8 @@
 
 0.1.0 功能版已通过 [PR #38](https://github.com/Maximora-byte/swu-checkin/pull/38) 合并；旧 debug 包本机/云端各 63 项及哈希见 [历史记录](android-client.md#2026-10-02-功能版验收记录)。此前 0.1.1-preview 在 API24/4 KB、API35/4 KB、API35/16 KB 模拟器各通过 20 项生产 APK 验收，共 60 项；精确包哈希、失败与重跑见 [候选验证状态](android-client.md#011-preview-候选验证状态)。0.1.2 新界面另见 [版本说明](releases/android-0.1.2-ui.md)，不沿用旧包测试数。尚无公开 Android APK；公开分发与未验证项见 [发布准备](releases/release-readiness.md)。下文四项/12 项明确属于旧环境 APK，不代表功能版 debug 七项或 release 六项测试。
 
+0.1.2 持久签名生产 APK 在三组官方模拟器共 60 项通过，另于 2026-10-03 在 vivo V2405A / Android 16 / API36 / arm64-v8a / 4 KB 真机共 20 项一次通过；真机还检查浅深色、大字号、密码显隐与输入法。两组验收分开记录，不使用真实学校账号；具体包身份与证据见 [0.1.2 真机验收](releases/android-0.1.2-physical-acceptance.json)。
+
 ## 选型与官方依据
 
 2026-10-02 核对官方资料：
