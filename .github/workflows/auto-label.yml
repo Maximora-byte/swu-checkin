@@ -1,0 +1,167 @@
+# Auto labeler v1: trusted inline rules; never executes PR code.
+name: Auto label PRs and Issues
+
+on:
+  issues:
+    types: [opened, edited, reopened]
+  pull_request_target:
+    types: [opened, edited, reopened, synchronize, ready_for_review]
+  workflow_dispatch:
+    inputs:
+      number:
+        description: 'Issue/PR number; leave empty to label all open items'
+        required: false
+        type: string
+      dry_run:
+        description: 'Preview matching labels without changing anything'
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  issues: write
+  pull-requests: write
+
+concurrency:
+  group: auto-label-${{ github.event.issue.number || github.event.pull_request.number || 'backfill' }}
+  cancel-in-progress: false
+
+jobs:
+  label:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Classify and add labels
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        env:
+          AUTO_LABEL_NUMBER: ${{ inputs.number || '' }}
+          AUTO_LABEL_DRY_RUN: ${{ inputs.dry_run && 'true' || 'false' }}
+        with:
+          retries: 3
+          script: |
+            // The runner executes only this trusted script. Issue text and PR files are data.
+            const definitions = {
+              bug: ['d73a4a', 'Something is not working'],
+              enhancement: ['a2eeef', 'New feature or improvement'],
+              documentation: ['0075ca', 'Documentation changes or requests'],
+              question: ['d876e3', 'Question or help request'],
+              dependencies: ['0366d6', 'Dependency updates'],
+              security: ['b60205', 'Security related change or report'],
+              performance: ['f9d0c4', 'Performance improvement or issue'],
+              refactor: ['c5def5', 'Code refactoring'],
+              tests: ['bfd4f2', 'Tests and test infrastructure'],
+              'github-actions': ['000000', 'GitHub Actions and CI configuration'],
+              frontend: ['5319e7', 'Frontend code or user interface'],
+              backend: ['1d76db', 'Backend services or API code'],
+              mobile: ['006b75', 'Android or iOS code'],
+              'needs-triage': ['fbca04', 'Needs human classification'],
+            };
+            
+            function clean(text) {
+              return String(text || '').slice(0, 65536)
+                .replace(/<!--[\s\S]*?-->/g, '')
+                .replace(/```[\s\S]*?```|~~~[\s\S]*?~~~/g, '')
+                .replace(/^\s*[-*]\s+\[\s\].*$/gm, '')
+                .replace(/`[^`\n]*`/g, '')
+                .replace(/https?:\/\/\S+/g, '')
+                .toLowerCase();
+            }
+            
+            function classify(item, files = []) {
+              const title = clean(item.title);
+              const body = clean(item.body);
+              const labels = new Set();
+              const titleRules = [
+                ['bug', /\b(?:bug|fix(?:es|ed)?|hotfix|crash(?:es)?|regression|broken|error)\b|修复|报错|故障|崩溃|缺陷|无法|不能|失效/],
+                ['enhancement', /\b(?:feat|feature|enhancement|improve(?:ment)?|add|implement)\b|新增|新功能|增强|改进|增加|添加|支持/],
+                ['documentation', /\b(?:docs?|documentation|readme|markdown|tutorial)\b|文档|教程|使用说明/],
+                ['dependencies', /\b(?:deps|dependencies|dependency|bump)\b|依赖|升级依赖/],
+                ['security', /\b(?:security|vulnerability|cve-\d+|xss|csrf|sqli)\b|漏洞|安全问题|安全修复/],
+                ['performance', /\b(?:perf|performance|latency|memory leak|slow)\b|性能|卡顿|内存泄漏|速度慢/],
+                ['refactor', /\b(?:refactor|refactoring)\b|重构/],
+                ['tests', /\b(?:test|tests|testing|coverage)\b|单元测试|集成测试|测试用例/],
+                ['github-actions', /\b(?:ci|github actions|workflow)\b|持续集成|工作流/],
+              ];
+              for (const [label, pattern] of titleRules) {
+                if (pattern.test(title)) labels.add(label);
+              }
+              const bodyRules = [
+                ['bug', /\b(?:steps to reproduce|reproduction steps|does not work|doesn't work|unexpected error|unhandled exception)\b|复现步骤|出现报错|发生崩溃|无法正常|预期行为[\s\S]{0,500}实际行为/],
+                ['enhancement', /\b(?:feature request|would like to add|request a feature)\b|希望增加|希望支持|功能请求|建议新增/],
+                ['documentation', /\b(?:documentation is missing|incorrect documentation|update the documentation)\b|文档缺失|文档有误|更新文档/],
+                ['security', /\b(?:security vulnerability|sql injection|cross-site scripting|cve-\d{4}-\d+)\b|安全漏洞|权限绕过/],
+                ['performance', /\b(?:performance issue|memory leak|high latency)\b|性能问题|内存泄漏|响应过慢/],
+              ];
+              for (const [label, pattern] of bodyRules) {
+                if (pattern.test(body)) labels.add(label);
+              }
+              if (/^(?:dependabot|renovate)(?:\[bot\])?$/.test(item.user?.login || '')) {
+                labels.add('dependencies');
+              }
+              for (const entry of files) {
+                const paths = [entry.filename, entry.previous_filename].filter(Boolean);
+                for (const original of paths) {
+                  const path = original.toLowerCase();
+                  if (/(^|\/)(docs?|readme(?:\.[^/]+)?|changelog(?:\.[^/]+)?|contributing(?:\.[^/]+)?)(\/|$)|\.(?:md|mdx|rst|adoc)$/.test(path)) labels.add('documentation');
+                  if (/(^|\/)(?:tests?|__tests__|spec|specs|fixtures)(\/|$)|(?:^|\/)test_[^/]+\.py$|(?:[._-](?:test|spec)\.[^/]+$)|_test\.go$/.test(path)) labels.add('tests');
+                  if (/(^|\/)(?:package(?:-lock)?\.json|npm-shrinkwrap\.json|yarn\.lock|pnpm-lock\.yaml|bun\.lockb?|requirements(?:[^/]*)\.txt|pyproject\.toml|poetry\.lock|uv\.lock|pipfile(?:\.lock)?|go\.(?:mod|sum)|cargo\.(?:toml|lock)|gemfile(?:\.lock)?|composer\.(?:json|lock)|pom\.xml|build\.gradle(?:\.kts)?|gradle\.properties|libs\.versions\.toml)$/.test(path)) labels.add('dependencies');
+                  if (/^\.github\/(?:workflows|actions)\//.test(path) || /(^|\/)(?:\.gitlab-ci\.yml|jenkinsfile)$/.test(path)) labels.add('github-actions');
+                  if (/(^|\/)(?:frontend|web|ui)(\/|$)|\.(?:jsx|tsx|vue|svelte|css|scss|sass|less|html)$/.test(path)) labels.add('frontend');
+                  if (/(^|\/)(?:backend|server|services|api)(\/|$)|\.(?:go|php)$/.test(path)) labels.add('backend');
+                  if (/(^|\/)(?:android|ios)(\/|$)|\.(?:kt|kts|swift)$/.test(path) || /(^|\/)androidmanifest\.xml$/.test(path)) labels.add('mobile');
+                }
+              }
+              if (labels.size === 0 && /\b(?:question|how do i|how to|help needed)\b|如何|怎么|咨询|求助|[?？]/.test(title + '\n' + body)) labels.add('question');
+              if (labels.size === 0) labels.add('needs-triage');
+              return [...labels].sort();
+            }
+            
+            const { owner, repo } = context.repo;
+            const dryRun = process.env.AUTO_LABEL_DRY_RUN === 'true';
+            const requestedNumber = process.env.AUTO_LABEL_NUMBER || '';
+            if (requestedNumber && !/^[1-9]\d*$/.test(requestedNumber)) {
+              throw new Error('number must be a positive Issue or PR number');
+            }
+            const eventNumber = context.payload.issue?.number || context.payload.pull_request?.number;
+            const number = requestedNumber ? Number(requestedNumber) : eventNumber;
+            const items = number
+              ? [(await github.rest.issues.get({ owner, repo, issue_number: number })).data]
+              : await github.paginate(github.rest.issues.listForRepo, { owner, repo, state: 'open', per_page: 100 });
+            const existingLabels = dryRun ? [] : await github.paginate(github.rest.issues.listLabelsForRepo, { owner, repo, per_page: 100 });
+            const labelNames = new Set(existingLabels.map(label => label.name.toLowerCase()));
+            const rows = [];
+            for (const item of items) {
+              const files = item.pull_request
+                ? await github.paginate(github.rest.pulls.listFiles, { owner, repo, pull_number: item.number, per_page: 100 })
+                : [];
+              const desired = classify(item, files);
+              const current = new Set(item.labels.map(label => (typeof label === 'string' ? label : label.name).toLowerCase()));
+              const additions = desired.filter(label => !current.has(label));
+              if (!dryRun && additions.length) {
+                for (const name of additions) {
+                  if (!labelNames.has(name)) {
+                    const [color, description] = definitions[name];
+                    try {
+                      await github.rest.issues.createLabel({ owner, repo, name, color, description });
+                    } catch (error) {
+                      // Another labeling run can create the same label first.
+                      if (error.status !== 422) throw error;
+                      const found = await github.rest.issues.getLabel({ owner, repo, name });
+                      if (!found.data?.name) throw error;
+                    }
+                    labelNames.add(name);
+                  }
+                }
+                await github.rest.issues.addLabels({ owner, repo, issue_number: item.number, labels: additions });
+              }
+              core.info(`#${item.number}: ${additions.length ? additions.join(', ') : 'already labeled'}${dryRun ? ' (dry run)' : ''}`);
+              rows.push([`#${item.number}`, item.pull_request ? 'PR' : 'Issue', desired.join(', '), additions.length ? additions.join(', ') : '—']);
+            }
+            await core.summary
+              .addHeading(dryRun ? 'Auto label preview' : 'Auto label results')
+              .addRaw('Rules: title, body and PR file paths. Existing labels are preserved.\n\n')
+              .addTable([
+                [{data:'Number',header:true}, {data:'Type',header:true}, {data:'Matched',header:true}, {data:dryRun?'Would add':'Added',header:true}],
+                ...rows,
+              ])
+              .write();
