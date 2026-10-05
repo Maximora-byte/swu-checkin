@@ -1,0 +1,10 @@
+# Observe coverage first; required build/test checks remain authoritative.
+comment: false
+coverage:
+  status:
+    project:
+      default:
+        informational: true
+    patch:
+      default:
+        informational: true

@@ -55,3 +55,10 @@ android/local.properties
 *.pfx
 *.dpapi
 .local-tools/
+
+# Local test coverage (reports are uploaded by CI)
+coverage/
+.coverage
+.coverage.*
+coverage.xml
+coverage.out
