@@ -17,6 +17,7 @@ on:
       - "!android/artwork/swu-checkin-icon-preview.png"
       - "!android/artwork/ui-preview.png"
       - "docs/releases/**"
+      - "docs/macos-desktop.md"
       - "pyproject.toml"
       - "uv.lock"
       - "LICENSE"

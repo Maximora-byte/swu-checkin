@@ -1,18 +1,7 @@
 name: macOS desktop preview
 
 on:
-  pull_request:
-    paths:
-      - "src/**"
-      - "tests/**"
-      - "packaging/macos/**"
-      - "packaging/license_inventory.py"
-      - "packaging/licenses/**"
-      - "scripts/macos/**"
-      - "docs/macos-desktop.md"
-      - "pyproject.toml"
-      - "uv.lock"
-      - ".github/workflows/macos-desktop.yml"
+  # PR native builds are called once by release.yml.
   workflow_dispatch:
   workflow_call:
     inputs:
