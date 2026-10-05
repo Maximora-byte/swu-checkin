@@ -16,7 +16,9 @@ def color_signature(data: bytes, image: Image.Image) -> tuple:
 
     Untagged previews use the browser's sRGB default. PNG's specified fallback
     gAMA/cHRM values may replace an sRGB marker. Custom profiles, HDR, orientation,
-    significant bits and rendering metadata must still be byte-for-byte stable.
+    significant bits and orientation must still be byte-for-byte stable. A full
+    precision sBIT marker is redundant. Browser page backgrounds override bKGD
+    suggestions, so those suggestions do not alter these previews' RGBA pixels.
     https://www.w3.org/TR/png-3/#11sRGB
     """
     chunks = []
@@ -25,7 +27,8 @@ def color_signature(data: bytes, image: Image.Image) -> tuple:
         length = struct.unpack_from(">I", data, position)[0]
         kind = data[position + 4 : position + 8]
         payload = data[position + 8 : position + 8 + length]
-        if kind in {b"cICP", b"mDCV", b"cLLI", b"sBIT", b"eXIf", b"bKGD"}:
+        full_precision = kind == b"sBIT" and data[24] == 8 and payload in (b"\x08" * 3, b"\x08" * 4)
+        if kind in {b"cICP", b"mDCV", b"cLLI", b"sBIT", b"eXIf"} and not full_precision:
             chunks.append((kind, payload))
         position += length + 12
     gamma = image.info.get("gamma")

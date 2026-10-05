@@ -99,11 +99,19 @@ class PreviewPixelsTests(unittest.TestCase):
             (b"cICP", b"\1\15\0\1"),
             (b"mDCV", b"\0" * 24),
             (b"cLLI", b"\0" * 8),
-            (b"sBIT", b"\10" * 4),
-            (b"bKGD", struct.pack(">3H", 20, 40, 60)),
+            (b"sBIT", b"\7" * 4),
         ):
             with self.subTest(kind=kind):
                 self.assertNotEqual(pixels(png()), pixels(png(chunks=((kind, payload),))))
+
+    def test_full_precision_significant_bits_are_redundant(self):
+        self.assertEqual(pixels(png(chunks=((b"sBIT", b"\10" * 4),))), pixels(png()))
+
+    def test_browser_page_background_overrides_png_background_suggestion(self):
+        self.assertEqual(
+            pixels(png(color=(20, 40, 60, 128))),
+            pixels(png(color=(20, 40, 60, 128), chunks=((b"bKGD", struct.pack(">3H", 255, 255, 255)),))),
+        )
 
     def test_dpi_cannot_change(self):
         self.assertNotEqual(pixels(png(dpi=(96, 96))), pixels(png(dpi=(144, 144))))
