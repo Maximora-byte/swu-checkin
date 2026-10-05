@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import importlib.util
+import os
+import shutil
 import subprocess
 import sys
 import tarfile
+import textwrap
 import tomllib
 import zipfile
 from pathlib import Path
@@ -183,7 +186,48 @@ def test_required_quality_context_still_aggregates_all_jobs():
     workflow = CI_WORKFLOW.read_text(encoding="utf-8")
 
     assert "  quality:\n    name: quality" in workflow
-    assert "needs: [linux-quality, windows-quality, package-quality]" in workflow
+    quality = _workflow_job(workflow, "quality")
+    assert "if: ${{ always() }}" in quality
+    assert "needs: [changes, preview-quality, linux-quality, windows-quality, package-quality]" in quality
+
+
+@pytest.mark.parametrize(
+    ("preview", "scope", "image", "linux", "windows", "package", "success"),
+    [
+        ("false", "success", "skipped", "success", "success", "success", True),
+        ("true", "success", "success", "skipped", "skipped", "skipped", True),
+        ("true", "failure", "success", "skipped", "skipped", "skipped", False),
+        ("true", "success", "failure", "skipped", "skipped", "skipped", False),
+        ("true", "success", "skipped", "skipped", "skipped", "skipped", False),
+        ("true", "success", "cancelled", "skipped", "skipped", "skipped", False),
+        ("true", "success", "success", "failure", "skipped", "skipped", False),
+        ("false", "success", "skipped", "failure", "success", "success", False),
+        ("false", "success", "skipped", "success", "failure", "success", False),
+        ("false", "success", "skipped", "success", "success", "failure", False),
+        ("false", "success", "skipped", "skipped", "success", "success", False),
+    ],
+)
+def test_quality_gate_executes_real_shell_and_rejects_incomplete_checks(
+    preview, scope, image, linux, windows, package, success
+):
+    quality = _workflow_job(CI_WORKFLOW.read_text(encoding="utf-8"), "quality")
+    script = textwrap.dedent(quality.split("        run: |\n", 1)[1])
+    bash = shutil.which("bash")
+    if os.name == "nt":
+        git = shutil.which("git")
+        bash = str(Path(git).resolve().parent.parent / "bin/bash.exe") if git else None
+    assert bash
+    env = {
+        **os.environ,
+        "PREVIEW_ONLY": preview,
+        "SCOPE_RESULT": scope,
+        "PREVIEW_RESULT": image,
+        "LINUX_RESULT": linux,
+        "WINDOWS_RESULT": windows,
+        "PACKAGE_RESULT": package,
+    }
+    result = subprocess.run([bash, "-e", "-o", "pipefail", "-c", script], env=env, capture_output=True, check=False)
+    assert (result.returncode == 0) == success
 
 
 def test_artifact_verifier_smokes_wheel_and_sdist_separately(monkeypatch, tmp_path: Path):
