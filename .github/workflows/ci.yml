@@ -38,6 +38,8 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
       - run: python -m pip install Pillow==12.3.0
+      - name: Check preview verifier acceptance and rejection cases
+        run: python -m unittest discover -s scripts -p 'test_preview_pixels.py' -v
       - name: Verify lossless preview pixels and color profiles
         run: python scripts/verify_preview_pixels.py
 
@@ -83,6 +85,9 @@ jobs:
 
       - name: Ruff 检查
         run: uv run --locked ruff check .
+
+      - name: Preview verifier acceptance and rejection cases
+        run: uv run --locked --with Pillow==12.3.0 python -m unittest discover -s scripts -p 'test_preview_pixels.py' -v
 
       - name: Ruff 格式检查
         run: uv run --locked ruff format --check .
