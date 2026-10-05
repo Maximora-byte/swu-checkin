@@ -1,13 +1,7 @@
 name: Android feasibility
 
 on:
-  pull_request:
-    paths:
-      - 'android/**'
-      - 'src/**'
-      - 'scripts/android/**'
-      - '.github/workflows/android-feasibility.yml'
-      - '.github/workflows/release.yml'
+  # PR verification is called once by release.yml. Keep manual and reusable entry points.
   workflow_dispatch:
   workflow_call:
     inputs:

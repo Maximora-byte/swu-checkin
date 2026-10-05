@@ -11,7 +11,13 @@ on:
       - "scripts/macos/**"
       - "scripts/android/**"
       - "android/**"
+      - "!android/artwork/previews/dark-home.png"
+      - "!android/artwork/previews/large-text.png"
+      - "!android/artwork/previews/light-home.png"
+      - "!android/artwork/swu-checkin-icon-preview.png"
+      - "!android/artwork/ui-preview.png"
       - "docs/releases/**"
+      - "docs/macos-desktop.md"
       - "pyproject.toml"
       - "uv.lock"
       - "LICENSE"
@@ -27,6 +33,10 @@ on:
 # PR and manual runs prepare reviewable artifacts without publishing or secrets.
 permissions:
   contents: read
+
+concurrency:
+  group: preflight-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   build-verify:

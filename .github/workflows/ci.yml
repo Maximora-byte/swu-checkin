@@ -8,8 +8,45 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: quality-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
+  changes:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      preview_only: ${{ steps.scope.outputs.preview_only }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Select trusted documentation preview optimization
+        id: scope
+        run: python scripts/ci_preview_scope.py --event-path "$GITHUB_EVENT_PATH" --output "$GITHUB_OUTPUT"
+
+  preview-quality:
+    needs: changes
+    if: needs.changes.outputs.preview_only == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - run: python -m pip install Pillow==12.3.0
+      - name: Verify lossless preview pixels and color profiles
+        run: python scripts/verify_preview_pixels.py
+
   linux-quality:
+    permissions:
+      contents: read
+      id-token: write
+    needs: changes
+    if: needs.changes.outputs.preview_only != 'true'
     name: linux-quality
     runs-on: ubuntu-24.04
     timeout-minutes: 15
@@ -31,7 +68,18 @@ jobs:
           uv sync --locked --all-groups --python 3.13
 
       - name: 运行测试
-        run: uv run --locked pytest -q
+        run: |
+          uv run --locked --with coverage==7.16.2 coverage run --branch --source=src/swu_checkin -m pytest -q
+          uv run --locked --with coverage==7.16.2 coverage xml
+      - name: Upload existing Linux test coverage
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7
+        with:
+          use_oidc: true
+          files: coverage.xml
+          flags: python
+          disable_search: true
+          disable_telem: true
+          fail_ci_if_error: false
 
       - name: Ruff 检查
         run: uv run --locked ruff check .
@@ -70,6 +118,8 @@ jobs:
             | uv run --locked pip-audit -r /dev/stdin
 
   windows-quality:
+    needs: changes
+    if: needs.changes.outputs.preview_only != 'true'
     name: windows-quality
     runs-on: windows-latest
     timeout-minutes: 15
@@ -143,6 +193,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "Windows workflow shell acceptance failed." }
 
   package-quality:
+    needs: changes
+    if: needs.changes.outputs.preview_only != 'true'
     name: package-quality
     runs-on: ubuntu-24.04
     timeout-minutes: 10
@@ -172,16 +224,27 @@ jobs:
   quality:
     name: quality
     if: ${{ always() }}
-    needs: [linux-quality, windows-quality, package-quality]
+    needs: [changes, preview-quality, linux-quality, windows-quality, package-quality]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
       - name: 汇总 Linux、Windows 与 package 门禁
         env:
+          SCOPE_RESULT: ${{ needs.changes.result }}
+          PREVIEW_ONLY: ${{ needs.changes.outputs.preview_only }}
+          PREVIEW_RESULT: ${{ needs.preview-quality.result }}
           LINUX_RESULT: ${{ needs.linux-quality.result }}
           WINDOWS_RESULT: ${{ needs.windows-quality.result }}
           PACKAGE_RESULT: ${{ needs.package-quality.result }}
         run: |
-          test "$LINUX_RESULT" = "success"
-          test "$WINDOWS_RESULT" = "success"
-          test "$PACKAGE_RESULT" = "success"
+          test "$SCOPE_RESULT" = "success"
+          if [[ "$PREVIEW_ONLY" == true ]]; then
+            test "$PREVIEW_RESULT" = "success"
+            test "$LINUX_RESULT" = "skipped"
+            test "$WINDOWS_RESULT" = "skipped"
+            test "$PACKAGE_RESULT" = "skipped"
+          else
+            test "$LINUX_RESULT" = "success"
+            test "$WINDOWS_RESULT" = "success"
+            test "$PACKAGE_RESULT" = "success"
+          fi

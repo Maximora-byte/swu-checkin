@@ -109,4 +109,8 @@ def test_build_produces_portable_and_ci_verifies_before_installation():
     assert workflow.index("./scripts/windows/verify-portable.ps1") < workflow.index(
         "./scripts/windows/verify-install.ps1"
     )
-    assert "scripts/windows/verify-portable.ps1" in workflow.split("workflow_dispatch:")[0]
+    release = (root / ".github/workflows/release.yml").read_text(encoding="utf-8")
+    pr_trigger = release.split("workflow_dispatch:")[0]
+    assert '"scripts/windows/**"' in pr_trigger
+    assert '".github/workflows/windows-desktop.yml"' in pr_trigger
+    assert "uses: ./.github/workflows/windows-desktop.yml" in release
