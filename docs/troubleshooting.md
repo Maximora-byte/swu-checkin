@@ -115,6 +115,18 @@ GitHub cron 不保证准点。先查看 workflow 的实际开始时间，不要�
 
 当前 workflow 已修复“成功业务 JSON 配合非零退出码仍显示正常”的判定边界。只有执行 step 成功、CLI 退出 `0` 且结构校验后的正式业务码为 `1`、`2` 或 `5`，才跳过异常通知并让最终检查通过。任何一项不成立，均按异常处理；邮件缺少配置或发送失败不会改写签到的失败结论。旧 v2.0.0 tag 未包含 [PR #42](https://github.com/Maximora-byte/swu-checkin/pull/42)，升级 fork 时应同步完整 workflow 与源码，而不是只拷贝 JSON 解析器。
 
+## Telegram 汇总失败或超时
+
+通知包装器只读取本地签到状态；它不重新签到，也不调用模型。检查 notifier 自己的固定诊断，而不是把通知失败归为签到失败：
+
+- `stage=spawn reason=spawn_error outcome=not_sent`：本次 CLI 未启动；只给安全分类，不输出 OSError 正文。
+- `stage=send reason=nonzero_exit` / `signal_exit`：CLI 非零/信号退出，附 `exit` 或 `signal` 与有界 `elapsed_ms`。
+- `stage=send reason=timeout`：60 秒发送预算用尽；POSIX 独立进程组收到 TERM，等待 2 秒后整组 KILL，并限时 2 秒 wait 直接子进程。若 wait 仍超时，分类为 `cleanup_timeout`，由服务管理器继续兜底；非 POSIX 只保证处理直接子进程。主动脱离该进程组的后代不在应用层保证内。
+
+启动后的这些失败都记为 `outcome=unknown_after_send`：消息可能已经被平台接收。包装器不会自动重试，也不会写成功 marker；之后的独立手动调用仍可能重发，务必先核实收件端，不要直接补跑或删除 marker。成功 marker 仍仅表示 CLI 退出 0，并不校验 Telegram 送达回执；dry-run 的既有 marker 语义不变。
+
+所有 CLI stdout/stderr 都直接丢弃，不缓存无限输出、不等待继承的输出管道、不尝试从任意文本推断 API 故障。日志仅包含固定分类和数值，不能据此定位 OpenClaw/Telegram 内部根因。不要为诊断打开命令、target、message、token 或原始日志输出，也不要放宽沙箱或凭据权限。
+
 ## Windows 任务：Desktop 与旧版 Daily
 
 图形桌面版任务叫 `SWUCheckin-Desktop`，旧 PowerShell 安装方案叫 `SWUCheckin-Daily`。查看对应任务，而不是只查旧名：

@@ -123,6 +123,8 @@ sudo swu-checkin-set-credentials --sync-notify
 
 通知按上海日期汇总已有运行记录：当天任一条状态 1/2 优先报告成功；否则有状态 5 时报告请假；否则报告最后失败，缺失或过期状态也会发出提醒。OpenClaw 命令返回 0 后写入 `notified-YYYY-MM-DD`（`0600`），当天后续执行跳过；这不等同于收件人已读。失败或超时不写标记。手动提前运行会占用当天通知机会；`SWUDK_NOTIFY_DRY_RUN=1` 也会在命令返回 0 后写标记，不应在正式状态目录中用它试发。
 
+发送失败诊断与进程清理边界见 [Telegram 汇总排障](docs/troubleshooting.md#telegram-汇总失败或超时)：启动后的非零退出/超时保守视为送达未知，不自动重试；CLI 原始输出不进入日志。Linux 超时清理使用独立进程组 TERM → 2 秒 grace → KILL → 限时 wait，不需要放宽现有 unit 沙箱。成功标记仍仅代表命令退出 0，不是 Telegram 送达回执；失败后不要直接手动补发。
+
 ## 6. 验证
 
 ```bash

@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import json
 import os
+import signal
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 from .status import CheckinStatus
@@ -13,6 +15,27 @@ from .time_utils import today_shanghai
 
 SUCCESS_CODES = {int(CheckinStatus.SUCCESS), int(CheckinStatus.ALREADY_CHECKED_IN)}
 LEAVE_CODE = int(CheckinStatus.ON_LEAVE)
+SEND_TIMEOUT = 60
+TERMINATE_GRACE = 2
+
+
+def _stop_send(process: subprocess.Popen) -> None:
+    """Terminate this send's POSIX group, even if its leader exits on TERM."""
+    if os.name == "posix":
+        try:
+            os.killpg(process.pid, signal.SIGTERM)
+        except ProcessLookupError:
+            pass
+        # Do not reap the leader before KILL: keep its PID reserved as the PGID.
+        time.sleep(TERMINATE_GRACE)
+        try:
+            os.killpg(process.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+    else:
+        # The notifier is deployed on Linux; other platforms only kill the child.
+        process.kill()
+    process.wait(timeout=TERMINATE_GRACE)
 
 
 def _load_status(path: Path, today: str) -> tuple[list[dict], str]:
@@ -77,13 +100,42 @@ def main() -> int:
     if os.getenv("SWUDK_NOTIFY_DRY_RUN") == "1":
         command.append("--dry-run")
 
+    started = time.monotonic()
     try:
-        result = subprocess.run(command, capture_output=True, text=True, timeout=60, check=False)
-    except subprocess.TimeoutExpired:
-        print("Telegram 通知发送超时", file=sys.stderr)
+        # Never retain untrusted CLI output (secrets, unbounded data or held pipes).
+        process = subprocess.Popen(
+            command,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            start_new_session=os.name == "posix",
+        )
+    except OSError:
+        elapsed_ms = min(999999, max(0, int((time.monotonic() - started) * 1000)))
+        print(f"notify stage=spawn reason=spawn_error outcome=not_sent elapsed_ms={elapsed_ms}", file=sys.stderr)
         return 1
-    if result.returncode != 0:
-        print(f"Telegram 通知发送失败（退出码 {result.returncode}）", file=sys.stderr)
+    try:
+        returncode = process.wait(timeout=SEND_TIMEOUT)
+    except subprocess.TimeoutExpired:
+        reason = "timeout"
+        try:
+            _stop_send(process)
+        except subprocess.TimeoutExpired:
+            reason = "cleanup_timeout"
+        elapsed_ms = min(999999, max(0, int((time.monotonic() - started) * 1000)))
+        print(
+            f"notify stage=send reason={reason} outcome=unknown_after_send elapsed_ms={elapsed_ms}",
+            file=sys.stderr,
+        )
+        return 1
+    if returncode != 0:
+        elapsed_ms = min(999999, max(0, int((time.monotonic() - started) * 1000)))
+        reason = "signal_exit" if returncode < 0 else "nonzero_exit"
+        exit_detail = f"signal={-returncode}" if returncode < 0 else f"exit={returncode}"
+        print(
+            f"notify stage=send reason={reason} outcome=unknown_after_send {exit_detail} elapsed_ms={elapsed_ms}",
+            file=sys.stderr,
+        )
         return 1
 
     state_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
