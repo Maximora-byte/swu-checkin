@@ -43,7 +43,7 @@ Gradle wrapper 与 distribution 都校验固定 SHA256。SDK 路径放本地 `an
 
 CI API24 保留 1536 MB / 2 核的轻量配置；API35 普通镜像固定 4096 MB 内存，16 KB 镜像固定 6144 MB，均为 4 核并记录配置。16 KB 官方 Google 镜像在默认 2560 MB 下曾触发 `lowmemorykiller`，前台测试进程被系统杀死；该失败必须保留系统日志并通过增加模拟器内存重新验证，不能忽略失败或降低测试要求。本机启动 API35 对应镜像也应显式传入 `-memory 4096` / `-memory 6144` 和 `-accel on`。
 
-[`android-feasibility.yml`](../.github/workflows/android-feasibility.yml) 分别构建双 ABI debug APK、运行 lint、核对 Python/ABI 与实际许可，并在 API24/4 KB、API35/4 KB、API35/16 KB x86_64 模拟器执行 instrumentation。它支持独立 PR/手动运行和 Release 预检的精确 `workflow_call(ref)`，默认同源 `github.sha`。API35 实际页大小必须匹配矩阵。debug 每状态七项 × 首装/覆盖/清数据共 21 项，第二进程锁探针仅在 debug。公共 HTTPS 需网络，失败不改写为通过；各行使用 package job 的同一 APK/test APK，核对源 commit 和 SHA256。debug 临时证书包不会自动公开为 Release。
+[`android-feasibility.yml`](../.github/workflows/android-feasibility.yml) 分别构建双 ABI debug APK、运行 lint、核对 Python/ABI 与实际许可，并在 API24/4 KB、API35/4 KB、API35/16 KB x86_64 模拟器执行 instrumentation。它支持手动运行和 Release 预检的精确 `workflow_call(ref)`；PR 由 `release.yml` 的路径规则统一触发，原生工作流不再独立重复响应 PR。手动运行默认使用 `github.sha`。API35 实际页大小必须匹配矩阵。debug 每状态七项 × 首装/覆盖/清数据共 21 项，第二进程锁探针仅在 debug。公共 HTTPS 需网络，失败不改写为通过；各行使用 package job 的同一 APK/test APK，核对源 commit 和 SHA256。debug 临时证书包不会自动公开为 Release。
 
 持久签名 release 单独检查 canonical ID、版本、非 debuggable、内嵌 `assets/BUILD-INFO.json` 的干净 commit/tree、许可证清单、证书和全部 ELF/ZIP 16 KB 对齐；来源必须与当前选定源码一致，脏工作区拒绝发行构建。一次性模拟器脚本仅接受未装正式包名的环境，每行六项共享生产测试 × 三安装状态，再加合成账号同证书重装保持两项共 20。详细构建、签名保管与验收状态见 [客户端指南](android-client.md)。
 
@@ -81,9 +81,11 @@ vivo X200 Pro，Android 16 / API36，`arm64-v8a`，实际内存页大小 `4096`�
 
 同一修复版 APK 在本机官方 API24 / 4 KB 与 API35 / 16 KB x86_64 模拟器上各通过三轮、12 项测试；验收脚本相关主机回归 31 passed。云端当前结果与原始失败证据记录在 PR，不用本机结果改写云端结果。
 
-以上 SHA256 和 12 项结果属于原可行性 APK，不能用于证明后来新增的账号界面通过。当前手动客户端须核对自己的源码、包哈希和七项测试结果；16 KB 真机、跨版本数据迁移和真实学校账号网络登录仍未验证。
+以上 SHA256 和 12 项结果属于原可行性 APK，不能用于证明后来新增的账号界面通过。当前手动客户端须核对自己的源码、包哈希和对应变体测试结果。该历史环境验收当时没有覆盖 16 KB 真机、跨版本数据迁移和真实学校账号网络登录；后续限定范围的升级检查与只读登录反馈见 [客户端指南](android-client.md)，不能回写为旧 APK 的测试结果。
 
-## 运行环境完成门槛与待验证项
+## 历史运行环境门槛与后续验证边界
+
+下列勾选记录属于原环境/早期客户端验证，保留其原始范围。当前 1.0.0 的发行、升级和验收以 [v2.1.1](releases/v2.1.1.md) 及最终包报告为准；不能把历史列表视为新包测试结果。
 
 必须区分本机 Python 单元测试、APK 构建、Android 模拟器、真实设备四类证据。PR 中记录实际 commit、run 与结果；没有执行的项目保持“未验证”。
 
@@ -94,6 +96,6 @@ vivo X200 Pro，Android 16 / API36，`arm64-v8a`，实际内存页大小 `4096`�
 - [x] Android 跨进程锁与进程被杀后的释放（debug-only 私有第二进程测试，arm64 / 4 KB 真机与模拟器均通过）
 - [x] 同版本覆盖安装与清除数据后的重新启动（真机与模拟器均通过）；跨版本升级迁移仍待后续验证
 
-Windows 可通过项目内工具链构建和验收。应用户明确要求继续到可用状态，当前范围推进到人工验证码、AndroidKeystore、中文只读诊断、任务待签/已签与确认后的单次手动签到，并独立验证新增界面；16 KB 真机没有可用设备，继续明确保留未验证，不宣称全部设备兼容或生产发布。任何真实学校账号测试须另行授权；不把真实签到用作验收。
+Windows 可通过项目内工具链构建和验收。后续客户端范围推进到人工验证码、AndroidKeystore、中文只读诊断、任务待签/已签与确认后的单次手动签到，并独立验证新增界面；16 KB 真机没有可用设备，继续明确保留未验证，不宣称全部设备兼容；当前正式分发范围见 v2.1.1 说明。任何真实学校账号测试须另行授权；不把真实签到用作验收。
 
 旧 0.1.0 debug 验收包缺少项目/Chaquopy 版权材料，这项历史阻塞保留；本轮已补入实际项目、Chaquopy、CPython/运行库、Python/Maven 依赖及 vendor 原文与哈希清单，并让 APK 检查拒绝缺失/篡改/未审核依赖集。最终新包必须独立核对其内容、来源、签名和验收，不能用历史环境测试代替发行检查。

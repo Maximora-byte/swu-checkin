@@ -56,10 +56,10 @@ sudo env UV_PYTHON_INSTALL_DIR=/opt/swu-checkin-python \
 
 ## 2. 安装稳定 release
 
-以下使用最新公开的 [`v2.0.0`](https://github.com/Maximora-byte/swu-checkin/releases/tag/v2.0.0) 作为稳定安装示例。当前源码已同步为 **2.1.0 预发布候选**，尚未创建新 tag/Release，不直接替换此处生产安装标签。后续部署先在 [Releases](https://github.com/Maximora-byte/swu-checkin/releases) 确认实际 tag、完整 CI、资产与限制，再将 `release_tag` 替换为所选版本，并使用该 tag 的完整代码、文档、锁文件与 units。候选预检不连接学校、不自动启用任务，也不能替代部署后的只读检查；差异见 [发布准备](docs/releases/release-readiness.md)。
+以下使用已于 2026-10-03 公开的稳定版 [`v2.1.1`](https://github.com/Maximora-byte/swu-checkin/releases/tag/v2.1.1)。部署前先在发布页核对实际 tag、资产与限制，并使用该 tag 的完整代码、文档、锁文件与 units。版本相同不代表某台服务器已经升级；构建与离线检查也不能替代部署后的只读 probe。升级已有实例时先按下文停用调度、等待现有任务结束，勿直接重复执行首次安装命令。版本范围见 [发行说明](docs/releases/v2.1.1.md)。
 
 ```bash
-release_tag=v2.0.0
+release_tag=v2.1.1
 release_dir="/opt/swu-checkin-releases/$release_tag"
 
 sudo git clone --branch "$release_tag" --depth 1 \
@@ -120,6 +120,26 @@ sudo swu-checkin-set-credentials --sync-notify
 必须先替换示例中的 `your-telegram-chat-id`。不要直接 `enable` notifier timer。`--sync-notify` 仅检查环境文件语法与 `SWUDK_NOTIFY_TARGET` 非空；缺失或无效会禁用 timer，但它不会核实收件人、登录状态或实际送达，示例占位符也会通过非空检查。
 
 通知服务以 `root:swu-checkin` 运行，以读取 root 的 OpenClaw 配置并通过组权限读取状态；unit 清空 capabilities、启用 `NoNewPrivileges` 并限制可写路径。不要把主签到或 probe 服务改成 root，或放宽凭据/状态目录权限来修复通知。
+
+### 通知入口与核对基线
+
+本节记录 2026-10-16 对 Python 2.1.1 源码 `main@6ea33233f939f7367152e5a8570e0dcf2466423c` 的静态核对。之后的修复状态与具体行为应以实际使用的 commit 为准；版本字符串本身不证明某项修复已包含。
+
+`swu-checkin-notify` 使用环境变量配置，没有 `--target`、`--dry-run` 等应用自身参数；不要把它当作 OpenClaw CLI 直接传参。
+
+| 变量 | 默认值 | 含义 |
+| --- | --- | --- |
+| `SWUDK_STATE_DIR` | `/var/lib/swu-checkin` | 读取 `status.json`，并写入当天通知标记的目录 |
+| `SWUDK_NOTIFY_TARGET` | 无，必填 | OpenClaw 目标；仅非空检查不证明收件人正确 |
+| `SWUDK_NOTIFY_CHANNEL` | `telegram` | 传给 OpenClaw 的通道 |
+| `SWUDK_NOTIFY_ACCOUNT` | `default` | 传给 OpenClaw 的账号 |
+| `SWUDK_NOTIFY_DRY_RUN` | 关闭 | 恰为 `1` 时追加 OpenClaw `--dry-run`；该基线实现仍可能写当天标记 |
+
+在上述核对基线中，发送器以 OpenClaw 进程退出码 `0` 判成功，不解析其 JSON 为平台送达回执。非零退出或 60 秒应用超时返回 `1`，缺少目标返回 `2`；已有当天标记则直接退出 `0`。发送后失败或超时仍可能已送达，不能据此自动补发。超时也不保证清理完整后代进程树。
+
+截至 2026-10-16，[Issue #56](https://github.com/Maximora-byte/swu-checkin/issues/56) 的通知失败原因仍未定位；增加安全诊断与进程组清理的 [PR #57](https://github.com/Maximora-byte/swu-checkin/pull/57) 仍是未合并。后续请以该 PR 的合并状态和所用 commit 为准；合并不代表生产实例已部署。排查见 [通知与送达不确定性](docs/troubleshooting.md#telegram-通知未到或超时)。
+
+### 通知汇总与送达边界
 
 通知按上海日期汇总已有运行记录：当天任一条状态 1/2 优先报告成功；否则有状态 5 时报告请假；否则报告最后失败，缺失或过期状态也会发出提醒。OpenClaw 命令返回 0 后写入 `notified-YYYY-MM-DD`（`0600`），当天后续执行跳过；这不等同于收件人已读。失败或超时不写标记。手动提前运行会占用当天通知机会；`SWUDK_NOTIFY_DRY_RUN=1` 也会在命令返回 0 后写标记，不应在正式状态目录中用它试发。
 
