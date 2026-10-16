@@ -139,7 +139,7 @@ fi
 
 当前 `main` 的“执行签到” step 使用 `continue-on-error: true`，以便继续走通知与最终检查。“汇总签到执行结果”统一计算 `execution_result.outputs.ok`：只有执行 step 的 `outcome == success`、CLI exit code 为 `0`、严格校验后的状态为 `1/2/5` 才为 `true`。邮件条件与最终 job 检查都读取这个汇总结果；成功状态 JSON 搭配非零退出码、解析失败或 step 失败均不会被绿色结果掩盖。通知成功也不会把原本失败的签到 job 改为成功。
 
-这项一致性修复属于 v2.0.0 后的候选代码，现已纳入 2.1.0 准备；旧 tag/fork 可能仍只检查业务码。同步时须核对完整 workflow、源码和锁文件，不能只提升显示版本号；最新公开版仍是 v2.0.0。差异见 [候选说明](docs/releases/v2.1.0.md)与 [发布准备](docs/releases/release-readiness.md)。
+这项一致性修复已纳入 v2.1.0 和当前稳定版 v2.1.1；旧 v2.0.0 tag/fork 可能仍只检查业务码。同步时须核对完整 workflow、源码和锁文件，不能只提升显示版本号。当前版本见 [v2.1.1 说明](docs/releases/v2.1.1.md)，原修复范围见 [v2.1.0 历史说明](docs/releases/v2.1.0.md)。
 
 ## 8. 更新 fork
 

@@ -57,11 +57,13 @@ Windows 本机准备好官方工具链后，在仓库根目录执行：
 
 ### 0.1.2-preview 界面更新验证状态
 
+本节为 2026-10-03 该候选包的历史记录；随后发行的 1.0.0 以及真实只读查询反馈见上文。以下包哈希、测试和当时未完成项仅属于 0.1.2-preview。
+
 新版生产候选在 API24 / 4 KB、API35 / 4 KB、API35 / 16 KB 三组官方 x86_64 模拟器各通过 20 项检查，共 60 项，三组均一次完成。另在 API35 / 4 KB 验证旧 0.1.1 到 0.1.2 覆盖升级后合成账号仍可解密。浅色、深色及 1.5 倍字号已检查，截图使用 debug 专用合成预览，不取消正式账号页的防截屏保护。
 
 2026-10-03，同一持久签名生产包在 vivo V2405A（Android 16 / API36 / arm64-v8a / 4 KB）手机首装、覆盖安装、清数据和合成账号保持检查共 20 项一次通过。真机浅深色、大字号按钮、密码显隐及输入法已检查，原字号恢复，测试组件移除，旧验证应用未卸载或清数据。具体范围见 [真机验收清单](releases/android-0.1.2-physical-acceptance.json)；这不代表真实学校账号或 16 KB 真机已经验证。
 
-生产 APK SHA256 为 `280c750adeb4c67485f0f03b1296d01bba4bf09896e8c4787d6011a8e0326a47`，来源 commit 为 `ed60fb577e50a0f9aa4db9df6d05c8592bbfbabc`；仍未公开发布 Android APK。完整范围、原始报告哈希及后续限制见 [0.1.2 说明](releases/android-0.1.2-ui.md)与 [验收清单](releases/android-0.1.2-acceptance.json)。
+生产 APK SHA256 为 `280c750adeb4c67485f0f03b1296d01bba4bf09896e8c4787d6011a8e0326a47`，来源 commit 为 `ed60fb577e50a0f9aa4db9df6d05c8592bbfbabc`；该候选包当时未公开为 Release APK。完整范围、原始报告哈希及后续限制见 [0.1.2 说明](releases/android-0.1.2-ui.md)与 [验收清单](releases/android-0.1.2-acceptance.json)。
 
 ### 0.1.1-preview 候选验证状态
 
@@ -81,7 +83,7 @@ Windows 本机准备好官方工具链后，在仓库根目录执行：
 - 对应测试包 SHA256：`838f6b188e9e3acee60e847089404a8e2221a14e1e6d21482f8aa99a37642153`
 - 公开证书 SHA256：`77ad72b44323fa7917470442e21fb258b5b8bc8a367e87c83ba6fa22d08f811a`
 
-最终包的逐行测试身份、报告摘要及字节哈希见 [最终 Android 验收清单](releases/v2.1.0-android-final-acceptance.json)，前一候选及失败见 [初次验收清单](releases/v2.1.0-acceptance.json)。初次工程候选的 [发布预检 37031347112](https://github.com/Maximora-byte/swu-checkin/actions/runs/37031347112) 的三组 debug 验证另为 63 项通过；debug 和生产包分别记录，不累计冒充同一 APK 的测试数。发行构建要求干净工作区，内嵌 `assets/BUILD-INFO.json` 记录精确 commit/tree、项目与 Android 版本、锁文件摘要；验证器反查所选源码，拒绝不一致。`verify_signed_apk.py` 还检查非 debuggable、实际许可、证书、全部 ELF LOAD 与 16 KB ZIP 对齐；signed 构建和 debug CI 核对 Maven runtime 依赖集。`verify_release_device.py` 执行上述 20 项/行，并将 instrumentation 非零退出视为失败，不因打印 OK 忽略。尚未公开发布 APK。
+最终包的逐行测试身份、报告摘要及字节哈希见 [最终 Android 验收清单](releases/v2.1.0-android-final-acceptance.json)，前一候选及失败见 [初次验收清单](releases/v2.1.0-acceptance.json)。初次工程候选的 [发布预检 37031347112](https://github.com/Maximora-byte/swu-checkin/actions/runs/37031347112) 的三组 debug 验证另为 63 项通过；debug 和生产包分别记录，不累计冒充同一 APK 的测试数。发行构建要求干净工作区，内嵌 `assets/BUILD-INFO.json` 记录精确 commit/tree、项目与 Android 版本、锁文件摘要；验证器反查所选源码，拒绝不一致。`verify_signed_apk.py` 还检查非 debuggable、实际许可、证书、全部 ELF LOAD 与 16 KB ZIP 对齐；signed 构建和 debug CI 核对 Maven runtime 依赖集。`verify_release_device.py` 执行上述 20 项/行，并将 instrumentation 非零退出视为失败，不因打印 OK 忽略。该 0.1.1 候选当时未公开为 Release APK。
 
 ### 2026-10-02 功能版验收记录
 
@@ -103,4 +105,4 @@ Windows 本机准备好官方工具链后，在仓库根目录执行：
 - 云端应用 SHA256：`8e45db8ff150da14284deb9dfaeb98b6afff7be68c9276ef0ce961bff6a579b0`
 - 云端测试包 SHA256：`c4bdbeef16ff3d02156b795a1447bb9499dd77bf95e463ceb10bffbad26bf741`
 
-这些哈希只适用于历史 0.1.0-manual / `.feasibility` debug 构建；独立构建因工具链和临时签名可能不同。其许可缺失曾作为发布阻塞记录，新的许可与持久签名不能改变旧文件内容。真实学校账号登录/实际签到、16 KB 真机和公开签名发布仍无验收证据。
+这些哈希只适用于历史 0.1.0-manual / `.feasibility` debug 构建；独立构建因工具链和临时签名可能不同。其许可缺失曾作为发布阻塞记录，新的许可与持久签名不能改变旧文件内容。在该 0.1.0 历史验收时，真实学校账号登录/实际签到、16 KB 真机和公开签名发布尚无证据；后续只读查询反馈与 1.0.0 分发以当前版本说明为准。

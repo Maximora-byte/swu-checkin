@@ -11,7 +11,7 @@
 - 不提供自动签到或只读定时：`--scheduled` 在 macOS 直接拒绝，不读取账号、不访问学校
 - macOS 桌面与 CLI 使用同一个 `formal_execution` 入口及默认跨进程锁。自定义了不同 `SWUDK_LOCK_FILE` 的入口不在同一锁域
 
-在本仓库 [macOS desktop preview workflow](https://github.com/Maximora-byte/swu-checkin/actions/workflows/macos-desktop.yml)的成功运行中选取匹配架构的 artifact。新版 ZIP 为 `SWUCheckin-2.1.1-macos15-<架构>-preview.zip`，带 `BUILD-INFO.json`、`LICENSE-INVENTORY.json` 与 `SHA256SUMS.txt`；保留 14 天，可能要求登录。PR/手动默认 `github.sha`，发布预检通过 `workflow_call(ref)` 指定同一精确 SHA。检查实际 commit、版本、架构、OS 与自测记录；不存在新版成功 artifact 时，不能视为该架构已交付。
+在本仓库 [macOS desktop preview workflow](https://github.com/Maximora-byte/swu-checkin/actions/workflows/macos-desktop.yml)的成功运行中选取匹配架构的 artifact。新版 ZIP 为 `SWUCheckin-2.1.1-macos15-<架构>-preview.zip`，带 `BUILD-INFO.json`、`LICENSE-INVENTORY.json` 与 `SHA256SUMS.txt`；保留 14 天，可能要求登录。手动运行默认使用所选 ref 的 `github.sha`；PR 由 `release.yml` 路径规则统一触发，再通过 `workflow_call(ref)` 指定同一精确 SHA。检查实际 commit、版本、架构、OS 与自测记录；不存在新版成功 artifact 时，不能视为该架构已交付。
 
 当前功能合并前的 [双架构原生构建与验证](https://github.com/Maximora-byte/swu-checkin/actions/runs/37019008388) 已通过；覆盖两个 runner 的单元测试、生产依赖审计、合成钥匙串项与冻结应用离线自测。该 PR 工作流默认检出 GitHub 的临时 merge-test commit，不能只看 PR head 或版本字符串判断产物来源；应以 `BUILD-INFO.json` 和 run 记录为准。它证明对应源码上的云端验证，不能充当未来新 tag 的发布构建或真实 Mac 验收。
 

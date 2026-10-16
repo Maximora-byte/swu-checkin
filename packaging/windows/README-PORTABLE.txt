@@ -1,4 +1,4 @@
-SWU Checkin · Windows x64 免安装预览版
+SWU Checkin · Windows x64 免安装版
 ====================================
 
 这是完整应用目录的 ZIP，不是单文件 EXE，也不是 GitHub 的 Source code ZIP。
@@ -19,8 +19,9 @@ SWU Checkin · Windows x64 免安装预览版
 若 Windows、SmartScreen 或单位安全策略阻止运行，请停止并核实来源、向维护者报告；
 不要关闭安全防护、修改执行策略或绕过安全警告。构建/下载来源见上面的官方仓库。
 本说明随当前源码构建的 Portable.zip 分发；已发布 v2.0.0 的原始 win-x64.zip
-不包含所有后续改动。当前候选源码已提升到 2.1.0，仍须核对 commit 和 SHA256。
-各平台与下一版发布条件：https://github.com/Maximora-byte/swu-checkin/blob/main/docs/releases/release-readiness.md
+不包含所有后续改动。当前 Python/Windows 版本为 2.1.1，仍须核对包内 commit 和 SHA256。
+本说明的更新不会替换既有 Release ZIP；使用已下载版本时以其包内来源和说明为准。
+当前发行与平台限制：https://github.com/Maximora-byte/swu-checkin/releases/tag/v2.1.1
 
 账号、数据与“便携”的边界
 ----------------------
