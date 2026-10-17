@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import json
 import os
+import signal
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 from .status import CheckinStatus
@@ -13,6 +15,27 @@ from .time_utils import today_shanghai
 
 SUCCESS_CODES = {int(CheckinStatus.SUCCESS), int(CheckinStatus.ALREADY_CHECKED_IN)}
 LEAVE_CODE = int(CheckinStatus.ON_LEAVE)
+SEND_TIMEOUT = 60
+TERMINATE_GRACE = 2
+
+
+def _stop_send(process: subprocess.Popen) -> None:
+    """Stop the original POSIX group only; detached descendants need external containment."""
+    if os.name == "posix":
+        try:
+            os.killpg(process.pid, signal.SIGTERM)
+        except ProcessLookupError:
+            pass
+        # Do not reap the leader before KILL: keep its PID reserved as the PGID.
+        time.sleep(TERMINATE_GRACE)
+        try:
+            os.killpg(process.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+    else:
+        # The notifier is deployed on Linux; other platforms only kill the child.
+        process.kill()
+    process.wait(timeout=TERMINATE_GRACE)
 
 
 def _load_status(path: Path, today: str) -> tuple[list[dict], str]:
@@ -50,7 +73,7 @@ def main() -> int:
     today = today_shanghai()
     marker = state_dir / f"notified-{today}"
     if marker.exists():
-        print(f"{today} 已发送过通知，跳过")
+        print(f"{today} CLI 完成标记已存在，跳过；平台送达未核验")
         return 0
 
     attempts, error = _load_status(state_dir / "status.json", today)
@@ -77,19 +100,68 @@ def main() -> int:
     if os.getenv("SWUDK_NOTIFY_DRY_RUN") == "1":
         command.append("--dry-run")
 
+    # Claim before spawning: an interrupted or failed CLI may already have sent.
+    # This is a conservative replay quarantine, never a platform delivery receipt.
+    attempt = state_dir / f"notify-attempt-{today}"
     try:
-        result = subprocess.run(command, capture_output=True, text=True, timeout=60, check=False)
-    except subprocess.TimeoutExpired:
-        print("Telegram 通知发送超时", file=sys.stderr)
+        state_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
+        fd = os.open(attempt, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8") as stream:
+            stream.write("delivery_unverified\n")
+            stream.flush()
+            os.fsync(stream.fileno())
+    except FileExistsError:
+        print("notify stage=guard reason=attempt_exists outcome=delivery_unverified", file=sys.stderr)
         return 1
-    if result.returncode != 0:
-        print(f"Telegram 通知发送失败（退出码 {result.returncode}）", file=sys.stderr)
+    except OSError:
+        print("notify stage=guard reason=state_error outcome=not_sent", file=sys.stderr)
         return 1
 
-    state_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
-    marker.write_text("sent\n", encoding="utf-8")
-    os.chmod(marker, 0o600)
-    print(f"{today} Telegram 通知发送成功")
+    started = time.monotonic()
+    try:
+        # Never retain untrusted CLI output (secrets, unbounded data or held pipes).
+        process = subprocess.Popen(
+            command,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            start_new_session=os.name == "posix",
+        )
+    except OSError:
+        elapsed_ms = min(999999, max(0, int((time.monotonic() - started) * 1000)))
+        print(f"notify stage=spawn reason=spawn_error outcome=not_sent elapsed_ms={elapsed_ms}", file=sys.stderr)
+        return 1
+    try:
+        returncode = process.wait(timeout=SEND_TIMEOUT)
+    except subprocess.TimeoutExpired:
+        reason = "timeout"
+        try:
+            _stop_send(process)
+        except subprocess.TimeoutExpired:
+            reason = "cleanup_timeout"
+        elapsed_ms = min(999999, max(0, int((time.monotonic() - started) * 1000)))
+        print(
+            f"notify stage=send reason={reason} outcome=unknown_after_send elapsed_ms={elapsed_ms}",
+            file=sys.stderr,
+        )
+        return 1
+    if returncode != 0:
+        elapsed_ms = min(999999, max(0, int((time.monotonic() - started) * 1000)))
+        reason = "signal_exit" if returncode < 0 else "nonzero_exit"
+        exit_detail = f"signal={-returncode}" if returncode < 0 else f"exit={returncode}"
+        print(
+            f"notify stage=send reason={reason} outcome=unknown_after_send {exit_detail} elapsed_ms={elapsed_ms}",
+            file=sys.stderr,
+        )
+        return 1
+
+    try:
+        marker.write_text("sent\n", encoding="utf-8")
+        os.chmod(marker, 0o600)
+    except OSError:
+        print("notify stage=state reason=marker_error outcome=delivery_unverified", file=sys.stderr)
+        return 1
+    print(f"{today} CLI 已退出 0；平台送达未核验")
     return 0
 
 

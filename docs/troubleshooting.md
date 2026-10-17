@@ -115,6 +115,26 @@ GitHub cron 不保证准点。先查看 workflow 的实际开始时间，不要�
 
 当前 workflow 已修复“成功业务 JSON 配合非零退出码仍显示正常”的判定边界。只有执行 step 成功、CLI 退出 `0` 且结构校验后的正式业务码为 `1`、`2` 或 `5`，才跳过异常通知并让最终检查通过。任何一项不成立，均按异常处理；邮件缺少配置或发送失败不会改写签到的失败结论。旧 v2.0.0 tag 未包含 [PR #42](https://github.com/Maximora-byte/swu-checkin/pull/42)，升级 fork 时应同步完整 workflow 与源码，而不是只拷贝 JSON 解析器。
 
+## Telegram 汇总失败或超时
+
+通知包装器只读取本地签到状态；它不重新签到，也不调用模型。检查 notifier 自己的固定诊断，而不是把通知失败归为签到失败：
+
+- `stage=spawn reason=spawn_error outcome=not_sent`：本次 CLI 未启动；只给安全分类，不输出 OSError 正文。
+- `stage=send reason=nonzero_exit` / `signal_exit`：CLI 非零/信号退出，附 `exit` 或 `signal` 与有界 `elapsed_ms`。
+- `stage=send reason=timeout`：60 秒发送预算用尽；POSIX 独立进程组收到 TERM，等待 2 秒后整组 KILL，并限时 2 秒 wait 直接子进程。若 wait 仍超时，分类为 `cleanup_timeout`，由服务管理器继续兜底；非 POSIX 只保证处理直接子进程。主动脱离该进程组的后代不在应用层保证内。
+
+启动后的这些失败都记为 `outcome=unknown_after_send`：消息可能已经被平台接收，甚至用户已确认收到；CLI 生命周期失败与平台送达是两条独立结论。启动之前以 `0600` 排他创建并 flush/fsync `notify-attempt-YYYY-MM-DD`，不存目标、正文或凭据。该记录（包括空文件）阻止同日后续调用再次启动 CLI，返回 `stage=guard reason=attempt_exists outcome=delivery_unverified` 和退出 `1`；不能将其当成成功 marker。状态不可写返回 `stage=guard reason=state_error outcome=not_sent`，不启动 CLI。保守起见，启动失败也保留 attempt，需人工核实而不是自动删除。成功 marker 写入失败返回 `stage=state reason=marker_error outcome=delivery_unverified`，仍保留 attempt。旧版 `notified-YYYY-MM-DD` 兼容跳过且返回 `0`，新 CLI 正常退出也沿用该标记；两者都仅表示 CLI 完成，不校验平台送达。dry-run 沿用既有 marker 语义，且不能在真实状态目录试发。无自动重试/过期清理，也不追溯补造历史 attempt；任何人工处理必须先经授权并核实收件端，禁止盲删记录补跑。
+
+`killpg` 只覆盖原组，并非整树清理：离线实际 `setsid` 孙进程在原组 TERM/KILL 后仍存活（包含组长提前退出和忽略 TERM 两种情况）。普通非交互启动器也可能通过 detached spawn 创建新组；不能仅称其为特殊恶意行为。独立运行 Python/CLI、非 systemd 平台、旧 unit 或修改过 KillMode 的 unit **不提供整树保证**；保留兼容的进程组/直接子进程路径，不会自动调用需要权限的 systemd-run，也不自动放宽 cgroup 保护。
+
+仓库通知 unit 提供外部托管合同：`Type=oneshot`、不保留 active 状态，`KillMode=control-group`、`TimeoutStopSec=3`、`SendSIGKILL=yes`。应用正常/失败退出后，systemd 先向所有 remaining cgroup workers 发 TERM，再在 3 秒 stop 预算后 KILL；detached/setsid 不会脱离 cgroup。`TimeoutStartSec=90` 保留服务启动硬预算，异常主程序也由 manager 停止。60 秒 CLI 预算不变；常规超时约 62 秒应用返回，再最多 3 秒服务 stop；异常启动路径为 90 秒启动预算加 3 秒 stop（加调度延迟，不保证内核不可中断任务的实时消失）。保持 ProtectControlGroups、空 CapabilityBoundingSet 和 NoNewPrivileges，禁止后代迁移 cgroup 的权限；管理员主动迁移/授予额外权限不在合同内。
+
+**应用 return / marker 不代表 unit 已完成。** 等待 oneshot start job 完成后，再只读核对 `ActiveState` 已不为 activating/active/deactivating，并记录 `Result`、`ExecMainStatus`、`ControlGroup`；cgroup 如仍存在应无成员，不能因 CLI exit 0 将尚在 stopping 的服务称为成功。TERM-resistant worker 导致 manager stop-timeout 时，服务可为 failed，即使 CLI 已退出 0；这不是发送失败或重发许可。整树保证依赖安装此版本 unit，单独更新 Python 包无效；本 PR 未部署。真实验收以 `tests/test_notify_service_lifecycle.py` 的显式 opt-in 为准：只启动 `swu-fixture-*` 隔离 HOME/state、禁网的合成 CLI，检查完整 unit 生命周期后 cgroup 空及 owned pidfd 已退出、无余 PID；普通 CI 无权限时跳过真实单元验收，不能冒充已执行。
+
+历史残留进程缺少 PGID/SID，不能断言那一次一定走了 detached 分支；原 60 秒卡在回执、cleanup 还是句柄也尚未证实。
+
+所有 CLI stdout/stderr 都直接丢弃，不缓存无限输出、不等待继承的输出管道、不尝试从任意文本推断 API 故障。日志仅包含固定分类和数值，不能据此定位 OpenClaw/Telegram 内部根因。不要为诊断打开命令、target、message、token 或原始日志输出，也不要放宽沙箱或凭据权限。
+
 ## Windows 任务：Desktop 与旧版 Daily
 
 图形桌面版任务叫 `SWUCheckin-Desktop`，旧 PowerShell 安装方案叫 `SWUCheckin-Daily`。查看对应任务，而不是只查旧名：
