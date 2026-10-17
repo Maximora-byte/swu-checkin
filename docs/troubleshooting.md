@@ -125,7 +125,13 @@ GitHub cron 不保证准点。先查看 workflow 的实际开始时间，不要�
 
 启动后的这些失败都记为 `outcome=unknown_after_send`：消息可能已经被平台接收，甚至用户已确认收到；CLI 生命周期失败与平台送达是两条独立结论。启动之前以 `0600` 排他创建并 flush/fsync `notify-attempt-YYYY-MM-DD`，不存目标、正文或凭据。该记录（包括空文件）阻止同日后续调用再次启动 CLI，返回 `stage=guard reason=attempt_exists outcome=delivery_unverified` 和退出 `1`；不能将其当成成功 marker。状态不可写返回 `stage=guard reason=state_error outcome=not_sent`，不启动 CLI。保守起见，启动失败也保留 attempt，需人工核实而不是自动删除。成功 marker 写入失败返回 `stage=state reason=marker_error outcome=delivery_unverified`，仍保留 attempt。旧版 `notified-YYYY-MM-DD` 兼容跳过且返回 `0`，新 CLI 正常退出也沿用该标记；两者都仅表示 CLI 完成，不校验平台送达。dry-run 沿用既有 marker 语义，且不能在真实状态目录试发。无自动重试/过期清理，也不追溯补造历史 attempt；任何人工处理必须先经授权并核实收件端，禁止盲删记录补跑。
 
-`killpg` 只覆盖原组，并非整树清理：离线实际 `setsid` 孙进程在原组 TERM/KILL 后仍存活（包含组长提前退出和忽略 TERM 两种情况）。普通非交互启动器也可能通过 detached spawn 创建新组；不能仅称其为“主动逃逸”的特殊恶意行为。此边界测试是已知缺口的证明，不是整树清理验收通过。现有 systemd control-group 最终兜底，但应用返回不保证该 cgroup 已空；有界、兼容的托管生命周期仍待实现，不要因本地测试通过就标为完整修复。历史残留进程缺少 PGID/SID，不能断言那一次一定走了 detached 分支；原 60 秒卡在回执、cleanup 还是句柄也尚未证实。
+`killpg` 只覆盖原组，并非整树清理：离线实际 `setsid` 孙进程在原组 TERM/KILL 后仍存活（包含组长提前退出和忽略 TERM 两种情况）。普通非交互启动器也可能通过 detached spawn 创建新组；不能仅称其为特殊恶意行为。独立运行 Python/CLI、非 systemd 平台、旧 unit 或修改过 KillMode 的 unit **不提供整树保证**；保留兼容的进程组/直接子进程路径，不会自动调用需要权限的 systemd-run，也不自动放宽 cgroup 保护。
+
+仓库通知 unit 提供外部托管合同：`Type=oneshot`、不保留 active 状态，`KillMode=control-group`、`TimeoutStopSec=3`、`SendSIGKILL=yes`。应用正常/失败退出后，systemd 先向所有 remaining cgroup workers 发 TERM，再在 3 秒 stop 预算后 KILL；detached/setsid 不会脱离 cgroup。`TimeoutStartSec=90` 保留服务启动硬预算，异常主程序也由 manager 停止。60 秒 CLI 预算不变；常规超时约 62 秒应用返回，再最多 3 秒服务 stop；异常启动路径为 90 秒启动预算加 3 秒 stop（加调度延迟，不保证内核不可中断任务的实时消失）。保持 ProtectControlGroups、空 CapabilityBoundingSet 和 NoNewPrivileges，禁止后代迁移 cgroup 的权限；管理员主动迁移/授予额外权限不在合同内。
+
+**应用 return / marker 不代表 unit 已完成。** 等待 oneshot start job 完成后，再只读核对 `ActiveState` 已不为 activating/active/deactivating，并记录 `Result`、`ExecMainStatus`、`ControlGroup`；cgroup 如仍存在应无成员，不能因 CLI exit 0 将尚在 stopping 的服务称为成功。TERM-resistant worker 导致 manager stop-timeout 时，服务可为 failed，即使 CLI 已退出 0；这不是发送失败或重发许可。整树保证依赖安装此版本 unit，单独更新 Python 包无效；本 PR 未部署。真实验收以 `tests/test_notify_service_lifecycle.py` 的显式 opt-in 为准：只启动 `swu-fixture-*` 隔离 HOME/state、禁网的合成 CLI，检查完整 unit 生命周期后 cgroup 空及 owned pidfd 已退出、无余 PID；普通 CI 无权限时跳过真实单元验收，不能冒充已执行。
+
+历史残留进程缺少 PGID/SID，不能断言那一次一定走了 detached 分支；原 60 秒卡在回执、cleanup 还是句柄也尚未证实。
 
 所有 CLI stdout/stderr 都直接丢弃，不缓存无限输出、不等待继承的输出管道、不尝试从任意文本推断 API 故障。日志仅包含固定分类和数值，不能据此定位 OpenClaw/Telegram 内部根因。不要为诊断打开命令、target、message、token 或原始日志输出，也不要放宽沙箱或凭据权限。
 
