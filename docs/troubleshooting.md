@@ -123,7 +123,9 @@ GitHub cron 不保证准点。先查看 workflow 的实际开始时间，不要�
 - `stage=send reason=nonzero_exit` / `signal_exit`：CLI 非零/信号退出，附 `exit` 或 `signal` 与有界 `elapsed_ms`。
 - `stage=send reason=timeout`：60 秒发送预算用尽；POSIX 独立进程组收到 TERM，等待 2 秒后整组 KILL，并限时 2 秒 wait 直接子进程。若 wait 仍超时，分类为 `cleanup_timeout`，由服务管理器继续兜底；非 POSIX 只保证处理直接子进程。主动脱离该进程组的后代不在应用层保证内。
 
-启动后的这些失败都记为 `outcome=unknown_after_send`：消息可能已经被平台接收。包装器不会自动重试，也不会写成功 marker；之后的独立手动调用仍可能重发，务必先核实收件端，不要直接补跑或删除 marker。成功 marker 仍仅表示 CLI 退出 0，并不校验 Telegram 送达回执；dry-run 的既有 marker 语义不变。
+启动后的这些失败都记为 `outcome=unknown_after_send`：消息可能已经被平台接收，甚至用户已确认收到；CLI 生命周期失败与平台送达是两条独立结论。启动之前以 `0600` 排他创建并 flush/fsync `notify-attempt-YYYY-MM-DD`，不存目标、正文或凭据。该记录（包括空文件）阻止同日后续调用再次启动 CLI，返回 `stage=guard reason=attempt_exists outcome=delivery_unverified` 和退出 `1`；不能将其当成成功 marker。状态不可写返回 `stage=guard reason=state_error outcome=not_sent`，不启动 CLI。保守起见，启动失败也保留 attempt，需人工核实而不是自动删除。成功 marker 写入失败返回 `stage=state reason=marker_error outcome=delivery_unverified`，仍保留 attempt。旧版 `notified-YYYY-MM-DD` 兼容跳过且返回 `0`，新 CLI 正常退出也沿用该标记；两者都仅表示 CLI 完成，不校验平台送达。dry-run 沿用既有 marker 语义，且不能在真实状态目录试发。无自动重试/过期清理，也不追溯补造历史 attempt；任何人工处理必须先经授权并核实收件端，禁止盲删记录补跑。
+
+`killpg` 只覆盖原组，并非整树清理：离线实际 `setsid` 孙进程在原组 TERM/KILL 后仍存活（包含组长提前退出和忽略 TERM 两种情况）。普通非交互启动器也可能通过 detached spawn 创建新组；不能仅称其为“主动逃逸”的特殊恶意行为。此边界测试是已知缺口的证明，不是整树清理验收通过。现有 systemd control-group 最终兜底，但应用返回不保证该 cgroup 已空；有界、兼容的托管生命周期仍待实现，不要因本地测试通过就标为完整修复。历史残留进程缺少 PGID/SID，不能断言那一次一定走了 detached 分支；原 60 秒卡在回执、cleanup 还是句柄也尚未证实。
 
 所有 CLI stdout/stderr 都直接丢弃，不缓存无限输出、不等待继承的输出管道、不尝试从任意文本推断 API 故障。日志仅包含固定分类和数值，不能据此定位 OpenClaw/Telegram 内部根因。不要为诊断打开命令、target、message、token 或原始日志输出，也不要放宽沙箱或凭据权限。
 

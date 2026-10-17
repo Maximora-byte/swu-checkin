@@ -20,7 +20,7 @@ TERMINATE_GRACE = 2
 
 
 def _stop_send(process: subprocess.Popen) -> None:
-    """Terminate this send's POSIX group, even if its leader exits on TERM."""
+    """Stop the original POSIX group only; detached descendants need external containment."""
     if os.name == "posix":
         try:
             os.killpg(process.pid, signal.SIGTERM)
@@ -73,7 +73,7 @@ def main() -> int:
     today = today_shanghai()
     marker = state_dir / f"notified-{today}"
     if marker.exists():
-        print(f"{today} 已发送过通知，跳过")
+        print(f"{today} CLI 完成标记已存在，跳过；平台送达未核验")
         return 0
 
     attempts, error = _load_status(state_dir / "status.json", today)
@@ -99,6 +99,23 @@ def main() -> int:
     ]
     if os.getenv("SWUDK_NOTIFY_DRY_RUN") == "1":
         command.append("--dry-run")
+
+    # Claim before spawning: an interrupted or failed CLI may already have sent.
+    # This is a conservative replay quarantine, never a platform delivery receipt.
+    attempt = state_dir / f"notify-attempt-{today}"
+    try:
+        state_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
+        fd = os.open(attempt, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8") as stream:
+            stream.write("delivery_unverified\n")
+            stream.flush()
+            os.fsync(stream.fileno())
+    except FileExistsError:
+        print("notify stage=guard reason=attempt_exists outcome=delivery_unverified", file=sys.stderr)
+        return 1
+    except OSError:
+        print("notify stage=guard reason=state_error outcome=not_sent", file=sys.stderr)
+        return 1
 
     started = time.monotonic()
     try:
@@ -138,10 +155,13 @@ def main() -> int:
         )
         return 1
 
-    state_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
-    marker.write_text("sent\n", encoding="utf-8")
-    os.chmod(marker, 0o600)
-    print(f"{today} Telegram 通知发送成功")
+    try:
+        marker.write_text("sent\n", encoding="utf-8")
+        os.chmod(marker, 0o600)
+    except OSError:
+        print("notify stage=state reason=marker_error outcome=delivery_unverified", file=sys.stderr)
+        return 1
+    print(f"{today} CLI 已退出 0；平台送达未核验")
     return 0
 
 
