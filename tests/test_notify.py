@@ -213,3 +213,82 @@ def test_notifier_timeout_does_not_mark_day_as_sent(fake_cli, monkeypatch, tmp_p
     assert notify.main() == 1
     assert "reason=timeout outcome=unknown_after_send" in capsys.readouterr().err
     assert not (tmp_path / "notified-2026-09-17").exists()
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX process groups")
+@pytest.mark.parametrize("probe_error", [None, ProcessLookupError(), PermissionError(), OSError()])
+def test_kill_permission_error_requires_group_absence_after_reaping(monkeypatch, probe_error):
+    """Darwin may reject KILL of a zombie-only group; an exited leader alone is insufficient."""
+    process = Mock(pid=12345)
+    denied = PermissionError("synthetic cleanup denial")
+    events = []
+
+    def killpg(pid, sig):
+        assert pid == process.pid
+        events.append(sig)
+        if sig == signal.SIGKILL:
+            raise denied
+        if sig == 0 and probe_error is not None:
+            raise probe_error
+
+    def wait(*, timeout):
+        assert timeout == notify.TERMINATE_GRACE
+        events.append("reap")
+        return -signal.SIGTERM
+
+    process.wait.side_effect = wait
+    monkeypatch.setattr(notify.os, "killpg", killpg)
+    monkeypatch.setattr(notify.time, "sleep", Mock())
+    if isinstance(probe_error, ProcessLookupError):
+        notify._stop_send(process)
+    else:
+        with pytest.raises(PermissionError) as exc:
+            notify._stop_send(process)
+        assert exc.value is denied
+    # No destructive signals after reaping releases the leader's PID reservation.
+    assert events == [signal.SIGTERM, signal.SIGKILL, "reap", 0]
+    process.wait.assert_called_once_with(timeout=notify.TERMINATE_GRACE)
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX process groups")
+def test_kill_permission_error_does_not_skip_bounded_reap(monkeypatch):
+    process = Mock(pid=12345)
+    process.wait.side_effect = subprocess.TimeoutExpired("synthetic", notify.TERMINATE_GRACE)
+    killpg = Mock(side_effect=[None, PermissionError()])
+    monkeypatch.setattr(notify.os, "killpg", killpg)
+    monkeypatch.setattr(notify.time, "sleep", Mock())
+    with pytest.raises(subprocess.TimeoutExpired):
+        notify._stop_send(process)
+    process.wait.assert_called_once_with(timeout=notify.TERMINATE_GRACE)
+    assert [call.args[1] for call in killpg.call_args_list] == [signal.SIGTERM, signal.SIGKILL]
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX process groups")
+def test_term_permission_error_is_not_suppressed(monkeypatch):
+    process = Mock(pid=12345)
+    killpg = Mock(side_effect=PermissionError())
+    monkeypatch.setattr(notify.os, "killpg", killpg)
+    with pytest.raises(PermissionError):
+        notify._stop_send(process)
+    killpg.assert_called_once_with(process.pid, signal.SIGTERM)
+    process.wait.assert_not_called()
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX process groups")
+@pytest.mark.parametrize("probe_error", [None, PermissionError(), OSError()])
+def test_denied_group_cleanup_preserves_quarantine(fake_cli, monkeypatch, tmp_path, probe_error):
+    fake_cli("raise AssertionError('must not run')")
+    process = Mock(pid=12345)
+    process.wait.side_effect = [subprocess.TimeoutExpired("synthetic", 60), -signal.SIGTERM]
+    launch = Mock(return_value=process)
+    denied = PermissionError("synthetic cleanup denial")
+    monkeypatch.setattr(notify.subprocess, "Popen", launch)
+    monkeypatch.setattr(notify.os, "killpg", Mock(side_effect=[None, denied, probe_error]))
+    monkeypatch.setattr(notify.time, "sleep", Mock())
+    with pytest.raises(PermissionError) as exc:
+        notify.main()
+    assert exc.value is denied
+    assert not (tmp_path / "notified-2026-09-17").exists()
+    assert (tmp_path / "notify-attempt-2026-09-17").read_text() == "delivery_unverified\n"
+    assert notify.main() == 1
+    launch.assert_called_once()

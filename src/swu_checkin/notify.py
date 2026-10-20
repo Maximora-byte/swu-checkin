@@ -32,6 +32,20 @@ def _stop_send(process: subprocess.Popen) -> None:
             os.killpg(process.pid, signal.SIGKILL)
         except ProcessLookupError:
             pass
+        except PermissionError:
+            # Darwin can report EPERM for a group containing only an unreaped
+            # zombie. Reap the leader, then require proof the entire group is
+            # gone; leader exit alone does not prove descendants have stopped.
+            process.wait(timeout=TERMINATE_GRACE)
+            try:
+                os.killpg(process.pid, 0)
+            except ProcessLookupError:
+                return
+            except OSError:
+                pass
+            # Never send another destructive signal after releasing the PID.
+            # A surviving/reused group or inconclusive probe remains a failure.
+            raise
     else:
         # The notifier is deployed on Linux; other platforms only kill the child.
         process.kill()
