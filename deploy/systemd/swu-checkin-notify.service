@@ -21,6 +21,11 @@ CacheDirectory=swu-checkin
 CacheDirectoryMode=0700
 UMask=0077
 TimeoutStartSec=90
+# Application return is not unit completion: stop every remaining cgroup member,
+# including ordinary detached/setsid launcher descendants, before the job ends.
+KillMode=control-group
+TimeoutStopSec=3
+SendSIGKILL=yes
 NoNewPrivileges=true
 PrivateTmp=true
 PrivateDevices=true

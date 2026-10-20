@@ -121,9 +121,9 @@ sudo swu-checkin-set-credentials --sync-notify
 
 通知服务以 `root:swu-checkin` 运行，以读取 root 的 OpenClaw 配置并通过组权限读取状态；unit 清空 capabilities、启用 `NoNewPrivileges` 并限制可写路径。不要把主签到或 probe 服务改成 root，或放宽凭据/状态目录权限来修复通知。
 
-### 通知入口与核对基线
+### 通知入口与历史核对基线
 
-本节记录 2026-10-16 对 Python 2.1.1 源码 `main@6ea33233f939f7367152e5a8570e0dcf2466423c` 的静态核对。之后的修复状态与具体行为应以实际使用的 commit 为准；版本字符串本身不证明某项修复已包含。
+以下为历史记录，不是当前实现的行为说明。记录 2026-10-16 对 Python 2.1.1 源码 `main@6ea33233f939f7367152e5a8570e0dcf2466423c` 的静态核对。之后的修复状态与具体行为应以实际使用的 commit 为准；版本字符串本身不证明某项修复已包含。
 
 `swu-checkin-notify` 使用环境变量配置，没有 `--target`、`--dry-run` 等应用自身参数；不要把它当作 OpenClaw CLI 直接传参。
 
@@ -139,9 +139,13 @@ sudo swu-checkin-set-credentials --sync-notify
 
 截至 2026-10-16，[Issue #56](https://github.com/Maximora-byte/swu-checkin/issues/56) 的通知失败原因仍未定位；增加安全诊断与进程组清理的 [PR #57](https://github.com/Maximora-byte/swu-checkin/pull/57) 仍是未合并。后续请以该 PR 的合并状态和所用 commit 为准；合并不代表生产实例已部署。排查见 [通知与送达不确定性](docs/troubleshooting.md#telegram-通知未到或超时)。
 
-### 通知汇总与送达边界
+### 当前通知汇总与送达边界
 
-通知按上海日期汇总已有运行记录：当天任一条状态 1/2 优先报告成功；否则有状态 5 时报告请假；否则报告最后失败，缺失或过期状态也会发出提醒。OpenClaw 命令返回 0 后写入 `notified-YYYY-MM-DD`（`0600`），当天后续执行跳过；这不等同于收件人已读。失败或超时不写标记。手动提前运行会占用当天通知机会；`SWUDK_NOTIFY_DRY_RUN=1` 也会在命令返回 0 后写标记，不应在正式状态目录中用它试发。
+以下隔离记录与 cgroup 生命周期保护要求使用包含 PR #57 的源码 commit，并同时安装该 commit 的通知 unit；上文 `v2.1.1` tag 安装示例不包含这些后续修复。不要仅按版本字符串判断保护已生效。
+
+通知按上海日期汇总已有运行记录：当天任一条状态 1/2 优先报告成功；否则有状态 5 时报告请假；否则报告最后失败，缺失或过期状态也会发出提醒。启动 CLI **之前**以排他创建方式写入 `notify-attempt-YYYY-MM-DD`（`0600`，内容为 `delivery_unverified`，文件 flush/fsync）；它是保守的防重发隔离记录，不是送达回执。存在该记录时，即使为空、上次启动失败或进程中断，也拒绝再次发送并退出 `1`；状态不可写则不启动 CLI。OpenClaw 命令返回 0 后仍按既有契约写入 `notified-YYYY-MM-DD`（`0600`），已有该完成标记则跳过并退出 `0`；它只表示 CLI 曾正常退出，不代表平台送达或收件人已读。失败或超时不写成功标记，保留 attempt。手动提前运行会占用当天通知机会；`SWUDK_NOTIFY_DRY_RUN=1` 沿用既有成功标记语义，也会创建 attempt，不应在正式状态目录中试发。没有自动过期或重试；只有经授权且核实收件端后才可人工处理 attempt，不能通过删除记录盲目补发。此机制不追溯拦截升级前没有 attempt 的历史调用，也不承诺跨文件系统故障/掉电的 exactly-once 送达。
+
+发送失败诊断与进程清理边界见 [Telegram 汇总排障](docs/troubleshooting.md#telegram-汇总失败或超时)：启动后的非零退出/超时保守视为送达未知，不自动重试；CLI 原始输出不进入日志。应用内 POSIX 清理仍只覆盖原进程组，**应用返回不是整树生命周期完成**。此版本通知 unit 明确设置 `KillMode=control-group`、`TimeoutStopSec=3`、`SendSIGKILL=yes`；oneshot 主程序退出后，systemd 在短 stop 预算内清理所有 remaining workers，包括普通 detached/setsid 后代，再完成 unit。保留 60 秒发送预算与 `TimeoutStartSec=90` 服务启动上限，不放宽沙箱、不委托 cgroup、不默认调用 root systemd-run。需要同时安装新版 unit；独立 Python、非 systemd 或旧 unit 仅保留组/子进程兼容路径，绝不宣称整树保证。保证限于不能特权迁移出本 cgroup 的可信 CLI；不是对恶意 root 代码的安全隔离承诺。必须等待完整服务 job、核对终态与 cgroup 已空，不能仅以 marker 或 CLI exit 0 判定。合成真实 systemd 验收见 `tests/test_notify_service_lifecycle.py`（维护者显式 `SWU_TEST_SYSTEMD=1 uv run --locked pytest tests/test_notify_service_lifecycle.py -q`，仅禁网 `swu-fixture-*`，不读取真实配置或发送）。不要全局设置第三方 no-respawn 标志、增加发送超时或把 exit 0 冒充平台回执来制造成功。
 
 ## 6. 验证
 
