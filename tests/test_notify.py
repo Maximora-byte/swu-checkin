@@ -276,7 +276,7 @@ def test_term_permission_error_is_not_suppressed(monkeypatch):
 
 @pytest.mark.skipif(os.name != "posix", reason="POSIX process groups")
 @pytest.mark.parametrize("probe_error", [None, PermissionError(), OSError()])
-def test_denied_group_cleanup_preserves_quarantine(fake_cli, monkeypatch, tmp_path, probe_error):
+def test_denied_group_cleanup_preserves_quarantine(fake_cli, monkeypatch, tmp_path, capsys, probe_error):
     fake_cli("raise AssertionError('must not run')")
     process = Mock(pid=12345)
     process.wait.side_effect = [subprocess.TimeoutExpired("synthetic", 60), -signal.SIGTERM]
@@ -285,10 +285,76 @@ def test_denied_group_cleanup_preserves_quarantine(fake_cli, monkeypatch, tmp_pa
     monkeypatch.setattr(notify.subprocess, "Popen", launch)
     monkeypatch.setattr(notify.os, "killpg", Mock(side_effect=[None, denied, probe_error]))
     monkeypatch.setattr(notify.time, "sleep", Mock())
-    with pytest.raises(PermissionError) as exc:
-        notify.main()
-    assert exc.value is denied
+    assert notify.main() == 1
+    assert "reason=cleanup_error outcome=unknown_after_send" in capsys.readouterr().err
     assert not (tmp_path / "notified-2026-09-17").exists()
     assert (tmp_path / "notify-attempt-2026-09-17").read_text() == "delivery_unverified\n"
     assert notify.main() == 1
     launch.assert_called_once()
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX process groups")
+@pytest.mark.parametrize("failure", ["term", "alive", "probe_permission", "probe_oserror", "reap", "timeout"])
+def test_cleanup_failure_cli_does_not_leak_chained_command(tmp_path, failure):
+    """Exercise the module entrypoint with Python's real uncaught-exception reporting."""
+    target = "synthetic-private-target"
+    message = "synthetic-private-message"
+    _write_status(tmp_path, message=message)
+    source = """
+import os
+import runpy
+import signal
+import subprocess
+import sys
+from pathlib import Path
+from unittest.mock import Mock, patch
+from swu_checkin import time_utils
+
+failure = sys.argv[1]
+state = Path(os.environ["SWUDK_STATE_DIR"])
+time_utils.today_shanghai = lambda: "2026-09-17"
+
+def launch(command, **kwargs):
+    with (state / "launches").open("a") as stream:
+        stream.write("launch\\n")
+    timeout = subprocess.TimeoutExpired(command, 60)
+    reap = OSError("synthetic-private-cleanup") if failure == "reap" else -signal.SIGTERM
+    if failure == "timeout":
+        reap = timeout
+    return Mock(pid=12345, wait=Mock(side_effect=[timeout, reap]))
+
+def killpg(pid, sig):
+    assert pid == 12345
+    if sig == signal.SIGTERM and failure == "term":
+        raise PermissionError("synthetic-private-cleanup")
+    if sig == signal.SIGKILL:
+        raise PermissionError("synthetic-private-cleanup")
+    if sig == 0 and failure == "probe_permission":
+        raise PermissionError("synthetic-private-cleanup")
+    if sig == 0 and failure == "probe_oserror":
+        raise OSError("synthetic-private-cleanup")
+
+with patch("subprocess.Popen", side_effect=launch), patch("os.killpg", side_effect=killpg), patch("time.sleep"):
+    runpy.run_module("swu_checkin.notify", run_name="__main__")
+"""
+    env = {
+        **os.environ,
+        "SWUDK_STATE_DIR": str(tmp_path),
+        "SWUDK_NOTIFY_TARGET": target,
+        "PYTHONPATH": str(Path(notify.__file__).resolve().parents[1]),
+    }
+    command = [sys.executable, "-c", source, failure]
+    first = subprocess.run(command, env=env, capture_output=True, text=True, timeout=10)
+    assert first.returncode == 1
+    reason = "cleanup_timeout" if failure == "timeout" else "cleanup_error"
+    assert f"reason={reason} outcome=unknown_after_send" in first.stderr
+    assert first.stdout == ""
+    assert len(first.stderr) < 256
+    for secret in (target, message, "synthetic-private-cleanup", "Traceback"):
+        assert secret not in first.stdout + first.stderr
+    assert not (tmp_path / "notified-2026-09-17").exists()
+    assert (tmp_path / "notify-attempt-2026-09-17").read_text() == "delivery_unverified\n"
+    second = subprocess.run(command, env=env, capture_output=True, text=True, timeout=10)
+    assert second.returncode == 1
+    assert "reason=attempt_exists outcome=delivery_unverified" in second.stderr
+    assert (tmp_path / "launches").read_text() == "launch\n"

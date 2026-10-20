@@ -153,6 +153,10 @@ def main() -> int:
             _stop_send(process)
         except subprocess.TimeoutExpired:
             reason = "cleanup_timeout"
+        except OSError:
+            # Never render cleanup exceptions: their chained timeout contains
+            # the private command. Preserve quarantine and report failure only.
+            reason = "cleanup_error"
         elapsed_ms = min(999999, max(0, int((time.monotonic() - started) * 1000)))
         print(
             f"notify stage=send reason={reason} outcome=unknown_after_send elapsed_ms={elapsed_ms}",
