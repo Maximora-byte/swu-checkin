@@ -15,5 +15,5 @@ alongside its distribution. The shared collector includes Tk 8.6.15 separately,
 preserves the official Python 3.13.15 license and nested wheel notices, and fails
 when a component has no original notice. See the
 [native license sources](../../licenses/README.md) and
-[release readiness](../../../docs/releases/release-readiness.md). This file
+[current release notes](../../../docs/releases/v2.1.1.md). This file
 does not replace original third-party licenses or change historical assets.

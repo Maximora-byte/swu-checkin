@@ -129,7 +129,7 @@ swu-checkin probe --json   # probe 的 schema v1 JSON，不提交签到
 
 - [快速上手](docs/quickstart.md)：安装、首次只读验证、正式运行和升级
 - [CLI 与状态码参考](docs/cli-reference.md)：命令、环境变量、JSON schema v1 和退出码
-- [Windows 桌面预览版](docs/windows-desktop.md)：EXE、DPAPI、显式授权、构建与验收
+- [Windows 桌面版](docs/windows-desktop.md)：EXE、DPAPI、显式授权、构建与验收
 - [Windows 免安装版](docs/windows-portable.md)：ZIP 解压运行、数据边界、移动与升级
 - [macOS 桌面预览](docs/macos-desktop.md)：手动窗口、系统钥匙串、双架构与未公证限制
 - [Android 手动客户端](docs/android-client.md)：人工验证码、加密账号、先查询再确认提交
@@ -141,7 +141,8 @@ swu-checkin probe --json   # probe 的 schema v1 JSON，不提交签到
 - [安全模型](docs/security.md)：认证、TokenStore、提交安全、日志与支持边界
 - [v2.0.0 发布说明](docs/releases/v2.0.0.md)：已发布资产、相对 v1.1.5 的变化与该版本限制
 - [v2.1.0 预发布说明](docs/releases/v2.1.0.md)：版本变化、交付资产与平台限制
-- [新版本发布评估](docs/releases/release-readiness.md)：当前 main 的变化、证据和发布待办
+- [v2.1.1 正式发行说明](docs/releases/v2.1.1.md)：当前下载、Android 1.0.0、升级与支持范围
+- [v2.1.0 历史发布评估](docs/releases/release-readiness.md)：当时的候选来源、证据和待办
 - [开发、CI 与发布](docs/development.md)：模块分工、离线验证、发布边界
 - [贡献指南](CONTRIBUTING.md) / [维护与归属](MAINTAINERS.md)
 
@@ -156,7 +157,7 @@ uv run --locked mypy src/swu_checkin
 uv lock --check
 ```
 
-普通 CI 的 `quality` 汇总 Linux、Windows 与 Python 包三组门禁，包括 PowerShell/DPAPI、跨进程运行锁、Actions 语法、systemd units、Unix 状态权限、wheel/sdist 安装与锁定生产依赖审计。各原生构建支持独立运行，也由 Release 预检按精确同一 SHA 调用；预检仅生成审核材料，PR/手动运行不会发布。文档变更是否触发完整预检依路径规则而定。详见 [开发、CI 与发布](docs/development.md)。
+普通修改由 `quality` 汇总 Linux、Windows 与 Python 包三组门禁，包括 PowerShell/DPAPI、跨进程运行锁、Actions 语法、systemd units、Unix 状态权限、wheel/sdist 安装与锁定生产依赖审计。仅可信 ImgBot 对指定预览 PNG 的原地修改走独立图片门禁；Markdown 修改仍运行完整三组检查。原生构建支持手动运行，PR 则由 Release 预检的路径规则统一选取，并按精确同一 SHA 调用；PR/手动预检只生成审核材料，不发布。详见 [开发、CI 与发布](docs/development.md)。
 
 ## 支持、署名与许可证
 

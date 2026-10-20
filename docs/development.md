@@ -113,16 +113,18 @@ uv export --locked --no-dev --no-emit-project --format requirements-txt \
 
 ## 4. 普通 CI 的门禁
 
-[`ci.yml`](../.github/workflows/ci.yml) 在所有 PR 和 `main` push 触发，没有文档路径排除规则。默认权限为 `contents: read`，不需要学校账号 Secrets。
+[`ci.yml`](../.github/workflows/ci.yml) 在所有 PR 和 `main` push 触发，没有 Markdown 路径排除规则。`changes` 使用 [`ci_preview_scope.py`](../scripts/ci_preview_scope.py) 选择检查范围：仅作者身份精确匹配可信 ImgBot、且只原地修改五个白名单预览 PNG 时走图片门禁；新增、删除、重命名、混入其他文件或其他作者均走完整检查。默认权限为 `contents: read`；Linux job 另有 Codecov OIDC 所需 `id-token: write`，不需要学校账号 Secrets。
 
 | job | 执行内容 |
 | --- | --- |
-| `linux-quality`（Ubuntu 24.04） | 全部 pytest、Ruff lint/format、mypy、PowerShell 基础检查、actionlint、systemd unit 校验、真实 Unix DAC 检查与锁定生产依赖审计 |
+| `changes` | 验证事件、ImgBot 身份与实际 Git 文件差异，输出 `preview_only` |
+| `preview-quality`（仅图片路径） | 预览验证器的接受/拒绝用例，以及实际像素和颜色配置无损检查 |
+| `linux-quality`（Ubuntu 24.04） | 全部 pytest（复用同一轮测试生成 coverage）、一次 Codecov OIDC 上传、Ruff lint/format、mypy、PowerShell 基础检查、actionlint、systemd unit 校验、真实 Unix DAC 检查与锁定生产依赖审计 |
 | `windows-quality`（windows-latest） | PowerShell 5.1/7 集成检查；locked 非 editable 安装后临时隐藏源码，验证安装后的 CLI 可用；Windows 跨进程锁、Python ctypes DPAPI smoke 与显式 Git for Windows Bash 的 Actions 分支回归 |
 | `package-quality`（Ubuntu 24.04） | 构建 wheel/sdist、检查归档内容，并分别在干净环境安装和验证版本/CLI |
-| `quality` | `always()` 运行并依赖以上三个 job，要求三者都为 `success`，不会把跳过或取消视作通过 |
+| `quality` | `always()` 汇总；要求 `changes` 成功。图片路径要求 `preview-quality` 成功且三组常规 job 均跳过；常规路径要求 Linux、Windows、package 全部成功 |
 
-`quality` **不包含** Windows desktop、macOS desktop preview 或 Android feasibility 的构建/设备 job。纯文档 PR 会运行普通 CI；是否触发平台验证以各独立 workflow 的路径规则为准。具体是否要求某个 check 由仓库分支规则决定，不要仅凭工作流名称推断分支保护配置。
+`quality` **不包含** Windows desktop、macOS desktop preview 或 Android feasibility 的构建/设备 job。普通 Markdown PR 运行常规三组检查；是否触发原生平台验证由 `release.yml` 的路径规则统一决定。三份原生工作流仅支持手动和可复用调用，不再各自重复触发 PR。具体是否要求某个 check 由仓库分支规则决定，不要仅凭工作流名称推断分支保护配置。
 
 ## 5. Python 打包与 Release
 
@@ -139,7 +141,7 @@ uv run --locked python scripts/release/verify_artifacts.py \
 
 [`verify_artifacts.py`](../scripts/release/verify_artifacts.py) 拒绝危险归档路径和已列出的私密文件/目录，分别安装 wheel 与 sdist，执行 `--help`、`status --help` 并核对项目/分发包版本。干净安装通过 `uv pip install` 解析分发包依赖，可能联网；这项检查证明包可安装，不等同于部署时按 `uv.lock` 安装，也不是完整敏感内容扫描。
 
-归档路径现在独立解析 POSIX/Windows 语义，拒绝绝对路径、盘符/UNC、反斜杠、ADS、控制字符、遍历、Windows 尾随点/空格别名及重复路径；wheel 符号链接和 sdist 链接/特殊文件也会失败。Windows 本机 `/absolute/path` 既有缺陷已经修复；初期发布定向回归 70 项通过；最终 [CI 37031346637](https://github.com/Maximora-byte/swu-checkin/actions/runs/37031346637) 为 1218 passed / 1 skipped。之前 31 passed / 1 failed 保留为历史记录，不能将新结果倒写成旧包已经通过。
+归档路径现在独立解析 POSIX/Windows 语义，拒绝绝对路径、盘符/UNC、反斜杠、ADS、控制字符、遍历、Windows 尾随点/空格别名及重复路径；wheel 符号链接和 sdist 链接/特殊文件也会失败。Windows 本机 `/absolute/path` 既有缺陷已经修复；v2.1.0 准备阶段的定向回归曾有 70 项通过；该阶段 [CI 37031346637](https://github.com/Maximora-byte/swu-checkin/actions/runs/37031346637) 为 1218 passed / 1 skipped。之前 31 passed / 1 failed 保留为历史记录，不能将新结果倒写成旧包已经通过。
 
 [`release.yml`](../.github/workflows/release.yml) 支持路径过滤 PR、手动 `workflow_dispatch` 和 `v*` tag push。PR/手动运行只生成可审核材料，tag 才可能发布：
 
@@ -150,7 +152,7 @@ uv run --locked python scripts/release/verify_artifacts.py \
 5. 生成保留 14 天的 `release-staged-<SHA>`：六个用户包、各平台来源/许可清单、`ASSET-MANIFEST.json`、MIT、固定发行说明和整体 `SHA256SUMS.txt`
 6. 仅 tag push 的 `release-publish` 取得 `contents: write`；它不 checkout 或执行项目代码，仅下载同一次 run 的暂存集，复核最终哈希/数量。prerelease 创建非 latest 预发布；stable 创建非 latest 草稿，待维护者加入持久签名 Android 包和报告、复核后公开。已有同名 Release 拒绝覆盖；不上传 PyPI
 
-自动暂存的六个用户包是 Python wheel/sdist、Windows x64 Setup/Portable、macOS 15 arm64/x86_64 preview ZIP；Actions 外层 artifact ZIP 不作为用户安装包。Android CI 使用临时 debug 证书，只证明对应包的运行，不公开为 Release APK。本机持久签名 APK、公开证书、来源与许可/验收报告单独准备；公开前仍需完成该资产的审核和签名保管。本轮 [预检 37031347112](https://github.com/Maximora-byte/swu-checkin/actions/runs/37031347112) 已完成全部平台构建、三组 debug 运行验证和 17 文件暂存；六个实际用户包也已独立下载复核。持久签名 APK 另通过 60 项生产模拟器验收。来源、哈希、保留的失败和边界见 [发布准备](releases/release-readiness.md)及 [验收清单](releases/v2.1.0-acceptance.json)。
+自动暂存的六个用户包是 Python wheel/sdist、Windows x64 Setup/Portable、macOS 15 arm64/x86_64 preview ZIP；Actions 外层 artifact ZIP 不作为用户安装包。Android CI 使用临时 debug 证书，只证明对应包的运行，不公开为 Release APK。本机持久签名 APK、公开证书、来源与许可/验收报告单独准备；公开前仍需完成该资产的审核和签名保管。历史 v2.1.0 [预检 37031347112](https://github.com/Maximora-byte/swu-checkin/actions/runs/37031347112) 已完成全部平台构建、三组 debug 运行验证和 17 文件暂存；六个实际用户包也已独立下载复核。当时的持久签名候选 APK 另通过 60 项生产模拟器验收。该历史包的来源、哈希、失败和边界见 [v2.1.0 发布准备](releases/release-readiness.md)及 [验收清单](releases/v2.1.0-acceptance.json)；这些通过数不能用于证明当前 v2.1.1 发行包。
 
 本轮使用数字 2.1.1 配合配置 channel="stable"；Android 使用 versionName=1.0.0 / versionCode=5。stable tag 自动建立草稿，待同源持久签名 Android APK 和逐项验收加入并核对后公开、设为 latest；prerelease 仍明确非 latest。Android CI debug 不作为公开 APK。历史 tag/资产不移动，最终包须按所选 main/tag commit 构建，不能仅凭源码树相同改写来源。
 
@@ -160,13 +162,14 @@ Release 自身不会重跑普通 CI 的所有平台/systemd/DAC/漏洞审计 job
 
 ## 6. Windows desktop 构建与验收
 
-[`windows-desktop.yml`](../.github/workflows/windows-desktop.yml) 有三个入口：
+[`windows-desktop.yml`](../.github/workflows/windows-desktop.yml) 保留两个入口：
 
-- `workflow_dispatch` 手动选择 revision
-- `workflow_call(ref)` 由发布预检传入精确 SHA；单独 PR/手动构建默认也检出 `github.sha`，artifact 名与实际 HEAD 对齐
-- PR 修改 `src/**`、`tests/**`、`packaging/windows/**`、`scripts/windows/build.ps1`、`scripts/windows/verify-install.ps1`、`scripts/windows/verify-portable.ps1`、`pyproject.toml`、`uv.lock` 或该 workflow 时触发
+- `workflow_dispatch` 手动选择 revision，默认检出该次 `github.sha`
+- `workflow_call(ref)` 由 Release 预检传入精确 SHA，artifact 名与实际 HEAD 对齐
 
-它不在普通 push 时自动运行；根目录和 `docs/` 的 Markdown 修改通常不命中 Windows 构建规则，但 `packaging/windows/**` 内的说明或许可文档会命中。合入 `main` 也不会自动发布桌面 Release。
+PR 统一由 `release.yml` 的路径规则触发全部原生预检，不在三个原生工作流中重复声明 `pull_request`。当前预检覆盖源码、测试、packaging、平台/发行脚本、Android、`docs/releases/**`、`docs/macos-desktop.md`、版本/锁文件、LICENSE 和相关原生/Release workflow，并排除五个白名单预览 PNG。普通 README、部署指南等 Markdown 修改不会单独触发这组预检；发行说明或 macOS 指南修改会。精确规则以 [release.yml](../.github/workflows/release.yml) 为准。
+
+普通 `main` push 不会直接构建原生包，也不会自动发布桌面 Release；发行只由满足门禁的 tag push 进入发布流程。
 
 构建运行在 `windows-2022`，使用官方 Python 3.13.15 x64（含 Tcl/Tk）、uv 0.12.15、校验固定 SHA256 的 Inno Setup 6.7.3。`build.ps1` 建立独立构建环境，安装 locked 生产依赖与精确版本的构建工具，执行只读原生任务查询、冻结 EXE 离线自测，输出 onedir 应用、当前用户安装包、包含相同 onedir 的 Portable ZIP、来源元数据和 SHA256 清单。Portable ZIP 自带说明、许可和 payload 校验清单，需独立验证解压后的应用。
 
@@ -186,7 +189,7 @@ PR 描述应区分“已通过”“平台跳过”“因环境无法运行”�
 
 Android 已有[手动客户端](android-client.md)，使用 Compose、Chaquopy 17/Python 3.13，共享原始 OAuth/CAS、身份与任务校验和提交回查。单账号、人工验证码、显式 Keystore 保存、查询/只读诊断和确认后的单次签到均有 UI；不提供 OCR、GPS 或后台自动签到。历史[可行性验证](android-feasibility.md)只描述环境诊断基线，不代表当前客户端。
 
-[`android-feasibility.yml`](../.github/workflows/android-feasibility.yml) 名称保留历史命名，实际构建当前客户端 debug APK、测试包和 lint，以同一组包在 API 24/4 KB、API 35/4 KB、API 35/16 KB 模拟器执行每行七项 × 三安装状态。支持路径过滤 PR、手动运行和发布预检的 `workflow_call(ref)`；具体触发范围见 workflow。artifact 保留 14 天，不会自动公开 APK。
+[`android-feasibility.yml`](../.github/workflows/android-feasibility.yml) 名称保留历史命名，实际构建当前客户端 debug APK、测试包和 lint，以同一组包在 API 24/4 KB、API 35/4 KB、API 35/16 KB 模拟器执行每行七项 × 三安装状态。支持手动运行和发布预检的 `workflow_call(ref)`；PR 的路径过滤与调用统一由 `release.yml` 负责。artifact 保留 14 天，不会自动公开 APK。
 
 持久签名候选用 `scripts/android/build-signed-preview.ps1 -IncludeTests` 构建 release APK 与相同证书的 release 测试包。`verify_signed_apk.py` 核对正式包名、版本、非 debuggable、证书、版权材料以及所有 ELF/ZIP 的 16 KB 对齐。`verify_release_device.py` 仅接受一次性模拟器和未安装正式包名的环境；每行六项生产包测试 × 首装/覆盖/清数据，加合成账号保存/覆盖后读取两项共 20，验证同版本持久证书重装。跨进程第二进程测试仅在 debug 变体，不向生产包引入测试服务。命令、密钥保管与迁移限制见 [Android 指南](android-client.md)。
 
@@ -198,4 +201,4 @@ Android 已有[手动客户端](android-client.md)，使用 Compose、Chaquopy 1
 
 [macOS 指南](macos-desktop.md) 说明原生 arm64/x86_64 CI、Keychain 合成测试、冻结 GUI/OCR smoke 和未公证交付限制。共享 `desktop_operations.py` 负责正式/只读服务调用与运行锁；`desktop_backend.py` 保留 Windows DPAPI/Task Scheduler，`macos_backend.py` 提供内存 token 与显式 Keychain 操作。macOS 不注册后台任务，`--scheduled` 明确拒绝执行；无参数启动 GUI 不读取钥匙串或访问学校。
 
-[`macos-desktop.yml`](../.github/workflows/macos-desktop.yml) 分别在 `macos-15` arm64 和 `macos-15-intel` x86_64 上构建，并检查全部 pytest、生产依赖审计、合成 Keychain 写/读/删、冻结 GUI/OCR 与来源元数据。支持路径过滤 PR、手动运行与精确 SHA 的 `workflow_call(ref)`；不是普通 `quality` 的一部分。新增实际 CPython/Tcl/Tk 与 vendor 许可原文/hash，ZIP 文件名带项目版本；版权与来源资源在签名前冻结，签名后不修改 `.app`。两个架构须分别成功，artifact 保留 14 天，经发布预检审核后才可进入六包暂存集。ad-hoc 签名不等于 Developer ID 或 Apple 公证，CI smoke 不等于干净标准用户 Mac 的 Gatekeeper 验收。
+[`macos-desktop.yml`](../.github/workflows/macos-desktop.yml) 分别在 `macos-15` arm64 和 `macos-15-intel` x86_64 上构建，并检查全部 pytest、生产依赖审计、合成 Keychain 写/读/删、冻结 GUI/OCR 与来源元数据。支持手动运行与精确 SHA 的 `workflow_call(ref)`；PR 由 `release.yml` 路径规则统一调用，不是普通 `quality` 的一部分。新增实际 CPython/Tcl/Tk 与 vendor 许可原文/hash，ZIP 文件名带项目版本；版权与来源资源在签名前冻结，签名后不修改 `.app`。两个架构须分别成功，artifact 保留 14 天，经发布预检审核后才可进入六包暂存集。ad-hoc 签名不等于 Developer ID 或 Apple 公证，CI smoke 不等于干净标准用户 Mac 的 Gatekeeper 验收。

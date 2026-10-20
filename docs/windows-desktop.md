@@ -88,7 +88,7 @@ Windows x64 桌面版由 MatchAll 维护，项目版本 **2.1.1**；安装器与
 
 ## CI 与离线冒烟测试
 
-[Windows desktop 工作流](../.github/workflows/windows-desktop.yml) 支持路径过滤 PR、手动运行和发布预检的 `workflow_call(ref)`：运行冻结 EXE 离线自测，生成 Setup/Portable，再验收受限 token 解压 GUI/重开及隔离安装/GUI/卸载，上传保留 14 天的 artifact。默认或调用 ref 均与实际 HEAD/文件名一致。它不单独发布、不注入学校 secret，也不执行真实签到；新版六包 Release 集须另过统一同源 stage。普通 CI 与发布职责见 [开发与发布](development.md)。
+[Windows desktop 工作流](../.github/workflows/windows-desktop.yml) 支持手动运行和发布预检的 `workflow_call(ref)`；PR 的路径过滤由 `release.yml` 统一负责，再调用本工作流：运行冻结 EXE 离线自测，生成 Setup/Portable，再验收受限 token 解压 GUI/重开及隔离安装/GUI/卸载，上传保留 14 天的 artifact。默认或调用 ref 均与实际 HEAD/文件名一致。它不单独发布、不注入学校 secret，也不执行真实签到；新版六包 Release 集须另过统一同源 stage。普通 CI 与发布职责见 [开发与发布](development.md)。
 
 `--self-test` 使用合成数据检查 Tk、OCR、时区、证书、DPAPI 往返和临时运行锁，并只读查询随机任务名以确认“确实不存在”；不读取账号或连接学校。构建在非零退出或 180 秒超时时失败。`scripts/windows/verify-install.ps1` 仅允许在一次性的 GitHub-hosted Windows runner 运行。它先调用独立的 `task_scheduler_smoke.py`：使用生产 XML 生成器，将动作替换为系统 `cmd.exe /d /c exit 0`，触发时间推迟至少六天，以随机 `SWUCheckin-CI-*` 名称注册无害任务，验证 COM 有效属性和 UTF-16 注册流程，然后删除并确认不存在；不执行该任务、不注册真实 `--scheduled` 任务。
 
@@ -109,7 +109,7 @@ Windows x64 桌面版由 MatchAll 维护，项目版本 **2.1.1**；安装器与
 
 正式下载入口以本仓库 [Releases](https://github.com/Maximora-byte/swu-checkin/releases) 中实际列出的资产为准；Release 资产必须对应其说明中的 tag commit 与构建 run。若该版本未列出桌面资产，不要假设 Python 发布工作流已经生成 EXE。
 
-开发者可从 [Actions](https://github.com/Maximora-byte/swu-checkin/actions/workflows/windows-desktop.yml) 手动选择受信任 ref。下载相应 `swu-checkin-windows-x64-<commit>` 或 `swu-checkin-windows-portable-x64-<commit>` 后，核对 BUILD-INFO 的 commit、dirty、版本及许可/哈希。当前 PR 默认使用临时 merge-test `github.sha`，发布预检用精确 `workflow_call(ref)`，artifact 名跟随实际来源；历史 head-SHA 构建仍按旧报告记录。artifact 保留 14 天，并非永久地址。最终发行须从所选已合入 main 的 commit/tag 重建或重新运行，不用旧包重命名，也不把 PR merge commit 改写为不同 main commit。
+开发者可从 [Actions](https://github.com/Maximora-byte/swu-checkin/actions/workflows/windows-desktop.yml) 手动选择受信任 ref。下载相应 `swu-checkin-windows-x64-<commit>` 或 `swu-checkin-windows-portable-x64-<commit>` 后，核对 BUILD-INFO 的 commit、dirty、版本及许可/哈希。PR 经 Release 预检调用时使用精确的临时 merge-test SHA；手动运行默认使用所选 ref 的 `github.sha`，artifact 名跟随实际来源；历史 head-SHA 构建仍按旧报告记录。artifact 保留 14 天，并非永久地址。最终发行须从所选已合入 main 的 commit/tag 重建或重新运行，不用旧包重命名，也不把 PR merge commit 改写为不同 main commit。
 
 ## 体积审查
 

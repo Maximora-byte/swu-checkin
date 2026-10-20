@@ -2,7 +2,7 @@
 
 > 本页保留 v2.1.0 发布准备时的历史判断与证据。当前 v2.1.1、MatchAll 和 Android 1.0.0 的发行范围见 [新版说明](v2.1.1.md)，不把本页旧限制或旧包通过数改写为新版结果。
 
-本轮预发布工程门槛已通过，采用 **数字版本 2.1.0 + GitHub Pre-release** 发行流程。实际发布与下载状态见 [v2.1.0 发布页](https://github.com/Maximora-byte/swu-checkin/releases/tag/v2.1.0)，来源、run 与哈希以该次 tag 构建的公开清单为准。最新稳定版仍是 [v2.0.0](https://github.com/Maximora-byte/swu-checkin/releases/tag/v2.0.0)，其源码 `ccedc7b642f6391d86ba7ddfc7e42e69467c2e64` 和历史资产保持原样。Windows/macOS 保留预览声明；Android 持久签名候选单独审验，离机签名保管未完成前不公开 APK。
+本轮预发布工程门槛已通过，采用 **数字版本 2.1.0 + GitHub Pre-release** 发行流程。实际发布与下载状态见 [v2.1.0 发布页](https://github.com/Maximora-byte/swu-checkin/releases/tag/v2.1.0)，来源、run 与哈希以该次 tag 构建的公开清单为准。当时的最新稳定版为 [v2.0.0](https://github.com/Maximora-byte/swu-checkin/releases/tag/v2.0.0)，其源码 `ccedc7b642f6391d86ba7ddfc7e42e69467c2e64` 和历史资产保持原样。Windows/macOS 保留预览声明；Android 持久签名候选单独审验，离机签名保管未完成前不公开 APK。
 
 ## 候选范围与精确来源
 
@@ -58,7 +58,7 @@ Android 持久公开证书 SHA256 为 `77ad72b44323fa7917470442e21fb258b5b8bc8a3
 
 Windows Authenticode、macOS Developer ID/公证和真实用户环境验收仍缺失，因此保留预览。哈希清单证明完整性与所记录来源，不替代平台可信数字签名。
 
-## 稳定版额外验收
+## 当时列出的稳定版额外验收
 
 升级为稳定版前，仍须完成所声明支持范围内的干净用户环境、平台签名、跨版本更新及真实设备验收。真实学校账号只读登录/查询需账号持有人明确授权；实际签到由本人在符合规则时主动操作，不作为自动发布测试。公共 HTTPS、合成业务、模拟器和云端 runner 不能替代这些项目。
 
