@@ -1299,7 +1299,7 @@
       "sha256": "55b4d8d4b1e5bc86d10efac91b74c87bcb77526b0f5b9edaf8b9cd2adc7397b2"
     },
     {
-      "path": "assets/chaquopy/requirements-common.imy!/certifi-2026.7.22.dist-info/licenses/LICENSE",
+      "path": "assets/chaquopy/requirements-common.imy!/certifi-2026.10.18.dist-info/licenses/LICENSE",
       "sha256": "e93716da6b9c0d5a4a1df60fe695b370f0695603d21f6f83f053e42cfc10caf7"
     },
     {
@@ -1353,13 +1353,13 @@
     },
     {
       "name": "certifi",
-      "version": "2026.7.22",
-      "metadata_path": "assets/chaquopy/requirements-common.imy!/certifi-2026.7.22.dist-info/METADATA",
-      "metadata_sha256": "ef5af1638fbb23676ac3c5777dfcfc2cd9c348fe4172ed5ba3d277655b248090",
+      "version": "2026.10.18",
+      "metadata_path": "assets/chaquopy/requirements-common.imy!/certifi-2026.10.18.dist-info/METADATA",
+      "metadata_sha256": "5f23b0cfb71be0a44970eb5d3ad49ba3db52616d7a583d594697bd9ee1bf2065",
       "declared_license_files": [
         "LICENSE"
       ],
-      "source": "https://pypi.org/project/certifi/2026.7.22/"
+      "source": "https://pypi.org/project/certifi/2026.10.18/"
     },
     {
       "name": "charset-normalizer",
