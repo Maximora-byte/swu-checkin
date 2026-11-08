@@ -1,5 +1,7 @@
 # SWU 查寝打卡（MatchAll 独立维护版）
 
+简体中文 | [English](README.en.md)
+
 [![CI](https://github.com/Maximora-byte/swu-checkin/actions/workflows/ci.yml/badge.svg)](https://github.com/Maximora-byte/swu-checkin/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/Maximora-byte/swu-checkin)](https://github.com/Maximora-byte/swu-checkin/releases/latest)
 [![License](https://img.shields.io/github/license/Maximora-byte/swu-checkin)](LICENSE)
