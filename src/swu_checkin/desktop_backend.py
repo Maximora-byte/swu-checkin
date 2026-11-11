@@ -352,9 +352,9 @@ class DesktopBackend(DesktopOperations):
         import tkinter
 
         import certifi
-        import ddddocr
         from PIL import Image
 
+        from .login import ocr_engine
         from .time_utils import today_shanghai
 
         ssl.create_default_context(cafile=certifi.where())
@@ -366,7 +366,7 @@ class DesktopBackend(DesktopOperations):
             window.destroy()
         today_shanghai()
         image = Image.new("RGB", (100, 40), "white")
-        ddddocr.DdddOcr(show_ad=False, use_gpu=False).classification(image)
+        ocr_engine().classification(image)
         if sys.platform == "win32":
             protector = WindowsDpapiProtector()
             if protector.unprotect(protector.protect(b"synthetic-self-test")) != b"synthetic-self-test":

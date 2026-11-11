@@ -58,7 +58,6 @@ def _service(client: Mock, *, diagnostic: Mock, sleep: Mock | None = None) -> Ch
     [
         ("leave", "get_leave_record_set"),
         ("transition", "get_transition"),
-        ("student_profile", "get_student_profile"),
         ("dormitory", "get_dormitory_info"),
     ],
 )
@@ -365,12 +364,57 @@ def test_diagnostics_never_include_exception_or_payload_secrets():
 
 def test_probe_keeps_read_only_semantics_with_safe_stage_diagnostic():
     client = _pending_client()
-    client.get_student_profile.side_effect = requests.ConnectionError("token-secret")
+    client.get_dormitory_info.side_effect = requests.ConnectionError("token-secret")
     diagnostic = Mock()
 
     result = _service(client, diagnostic=diagnostic).run_probe("student", "password")
 
     assert result.status == "data_error"
     assert result.attempts == 1
-    assert diagnostic.call_args_list == [call("签到检测失败（stage=student_profile，连接异常）")]
+    assert diagnostic.call_args_list == [call("签到检测失败（stage=dormitory，连接异常）")]
     client.submit_checkin_form.assert_not_called()
+
+
+def test_pre_submit_reuses_validated_student_without_second_profile_request():
+    client = _pending_client()
+    diagnostic = Mock()
+
+    result = _service(client, diagnostic=diagnostic).run_checkin("student", "password")
+
+    assert result.status == "data_error"  # read-back never confirms in this fixture
+    assert client.submit_checkin_form.call_count == 1
+    client.get_student_id.assert_called_once_with()
+    client.get_student_profile.assert_not_called()
+    assert client.submit_checkin_form.call_args.kwargs["payload"]["xh"] == "student"
+
+
+def test_retry_jitter_is_added_to_backoff_when_configured():
+    client = _pending_client()
+    client.get_leave_record_set.side_effect = requests.Timeout("secret")
+    sleep = Mock()
+    service = CheckinService(
+        token_provider=Mock(return_value="token"),
+        client_factory=Mock(return_value=client),
+        token_store=_store(),
+        diagnostic=Mock(),
+        sleep=sleep,
+        retry_jitter=lambda wait: wait / 8,
+    )
+
+    service.run_checkin("student", "password", max_attempts=3, retry_delay=8)
+
+    assert sleep.call_args_list == [call(9.0), call(18.0)]
+
+
+def test_submit_session_expiry_is_classified_without_http_detail():
+    client = _pending_client()
+    client.submit_checkin_form.side_effect = SessionExpiredError("token-secret")
+    client.get_transition.side_effect = [Transition("record", "form", "未签到")] + [
+        SessionExpiredError("token-secret")
+    ] * 4
+    diagnostic = Mock()
+
+    result = _service(client, diagnostic=diagnostic).run_checkin("student", "password", max_attempts=1)
+
+    assert result.status == "data_error"
+    assert call("签到失败（stage=submit，认证会话失效）") in diagnostic.call_args_list

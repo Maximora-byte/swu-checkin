@@ -1,157 +1,25 @@
+"""DES-style credential encoding used by the SWU IDM login page.
+
+A port of the site's ``des.js`` ``strEnc(data, key, "", "")``: the text is split
+into 4-character blocks (16 bits per UTF-16 code unit, zero padded), each block
+is DES-encrypted once per 4-character slice of the key, and the result is
+upper-case hex. Only the single-key encrypt path the login form uses is kept.
+"""
+
 from __future__ import annotations
 
 
-def strEnc(data: str, firstKey: str, secondKey: str, thirdKey: str) -> str:
-    leng = len(data)
-    encData = ""
-    firstKeyBt: list[list[int]] = []
-    secondKeyBt: list[list[int]] = []
-    thirdKeyBt: list[list[int]] = []
-    firstLength = secondLength = thirdLength = 0
-    if firstKey:
-        firstKeyBt = getKeyBytes(firstKey)
-        firstLength = len(firstKeyBt)
-    if secondKey:
-        secondKeyBt = getKeyBytes(secondKey)
-        secondLength = len(secondKeyBt)
-    if thirdKey:
-        thirdKeyBt = getKeyBytes(thirdKey)
-        thirdLength = len(thirdKeyBt)
+def strEnc(data: str, key: str) -> str:
+    """Encrypt ``data`` with the login page's per-session ``key`` (empty key: no encryption)."""
 
-    if leng > 0:
-        if leng < 4:
-            bt = strToBt(data)
-            if firstKey and secondKey and thirdKey:
-                tempBt = bt
-                for x in range(firstLength):
-                    tempBt = enc(tempBt, firstKeyBt[x])
-                for y in range(secondLength):
-                    tempBt = enc(tempBt, secondKeyBt[y])
-                for z in range(thirdLength):
-                    tempBt = enc(tempBt, thirdKeyBt[z])
-                encByte = tempBt
-            elif firstKey and secondKey:
-                tempBt = bt
-                for x in range(firstLength):
-                    tempBt = enc(tempBt, firstKeyBt[x])
-                for y in range(secondLength):
-                    tempBt = enc(tempBt, secondKeyBt[y])
-                encByte = tempBt
-            elif firstKey:
-                tempBt = bt
-                for x in range(firstLength):
-                    tempBt = enc(tempBt, firstKeyBt[x])
-                encByte = tempBt
-            else:
-                encByte = bt
-            encData = bt64ToHex(encByte)
-        else:
-            iterator = leng // 4
-            remainder = leng % 4
-            for i in range(iterator):
-                tempData = data[i * 4 : (i + 1) * 4]
-                tempByte = strToBt(tempData)
-                if firstKey and secondKey and thirdKey:
-                    tempBt = tempByte
-                    for x in range(firstLength):
-                        tempBt = enc(tempBt, firstKeyBt[x])
-                    for y in range(secondLength):
-                        tempBt = enc(tempBt, secondKeyBt[y])
-                    for z in range(thirdLength):
-                        tempBt = enc(tempBt, thirdKeyBt[z])
-                    encByte = tempBt
-                elif firstKey and secondKey:
-                    tempBt = tempByte
-                    for x in range(firstLength):
-                        tempBt = enc(tempBt, firstKeyBt[x])
-                    for y in range(secondLength):
-                        tempBt = enc(tempBt, secondKeyBt[y])
-                    encByte = tempBt
-                elif firstKey:
-                    tempBt = tempByte
-                    for x in range(firstLength):
-                        tempBt = enc(tempBt, firstKeyBt[x])
-                    encByte = tempBt
-                else:
-                    encByte = tempByte
-                encData += bt64ToHex(encByte)
-            if remainder > 0:
-                remainderData = data[iterator * 4 : leng]
-                tempByte = strToBt(remainderData)
-                if firstKey and secondKey and thirdKey:
-                    tempBt = tempByte
-                    for x in range(firstLength):
-                        tempBt = enc(tempBt, firstKeyBt[x])
-                    for y in range(secondLength):
-                        tempBt = enc(tempBt, secondKeyBt[y])
-                    for z in range(thirdLength):
-                        tempBt = enc(tempBt, thirdKeyBt[z])
-                    encByte = tempBt
-                elif firstKey and secondKey:
-                    tempBt = tempByte
-                    for x in range(firstLength):
-                        tempBt = enc(tempBt, firstKeyBt[x])
-                    for y in range(secondLength):
-                        tempBt = enc(tempBt, secondKeyBt[y])
-                    encByte = tempBt
-                elif firstKey:
-                    tempBt = tempByte
-                    for x in range(firstLength):
-                        tempBt = enc(tempBt, firstKeyBt[x])
-                    encByte = tempBt
-                else:
-                    encByte = tempByte
-                encData += bt64ToHex(encByte)
-    return encData
-
-
-def strDec(data: str, firstKey: str, secondKey: str, thirdKey: str) -> str:
-    leng = len(data)
-    decStr = ""
-    firstKeyBt: list[list[int]] = []
-    secondKeyBt: list[list[int]] = []
-    thirdKeyBt: list[list[int]] = []
-    firstLength = secondLength = thirdLength = 0
-    if firstKey:
-        firstKeyBt = getKeyBytes(firstKey)
-        firstLength = len(firstKeyBt)
-    if secondKey:
-        secondKeyBt = getKeyBytes(secondKey)
-        secondLength = len(secondKeyBt)
-    if thirdKey:
-        thirdKeyBt = getKeyBytes(thirdKey)
-        thirdLength = len(thirdKeyBt)
-
-    iterator = leng // 16
-    for i in range(iterator):
-        tempData = data[i * 16 : (i + 1) * 16]
-        strByte = hexToBt64(tempData)
-        intByte = [int(ch) for ch in strByte]
-        if firstKey and secondKey and thirdKey:
-            tempBt = intByte
-            for x in range(thirdLength - 1, -1, -1):
-                tempBt = dec(tempBt, thirdKeyBt[x])
-            for y in range(secondLength - 1, -1, -1):
-                tempBt = dec(tempBt, secondKeyBt[y])
-            for z in range(firstLength - 1, -1, -1):
-                tempBt = dec(tempBt, firstKeyBt[z])
-            decByte = tempBt
-        elif firstKey and secondKey:
-            tempBt = intByte
-            for x in range(secondLength - 1, -1, -1):
-                tempBt = dec(tempBt, secondKeyBt[x])
-            for y in range(firstLength - 1, -1, -1):
-                tempBt = dec(tempBt, firstKeyBt[y])
-            decByte = tempBt
-        elif firstKey:
-            tempBt = intByte
-            for x in range(firstLength - 1, -1, -1):
-                tempBt = dec(tempBt, firstKeyBt[x])
-            decByte = tempBt
-        else:
-            decByte = intByte
-        decStr += byteToString(decByte)
-    return decStr
+    key_blocks = getKeyBytes(key) if key else []
+    encrypted = []
+    for start in range(0, len(data), 4):
+        block = strToBt(data[start : start + 4])
+        for key_block in key_blocks:
+            block = enc(block, key_block)
+        encrypted.append(bt64ToHex(block))
+    return "".join(encrypted)
 
 
 def getKeyBytes(key: str) -> list[list[int]]:
@@ -167,31 +35,13 @@ def getKeyBytes(key: str) -> list[list[int]]:
 
 
 def strToBt(s: str) -> list[int]:
-    leng = len(s)
+    """Pack up to 4 characters as big-endian 16-bit values into 64 bits, zero padded."""
+
     bt = [0] * 64
-    if leng < 4:
-        for i in range(leng):
-            k = ord(s[i])
-            for j in range(16):
-                powv = 1
-                for _m in range(15, j, -1):
-                    powv *= 2
-                bt[16 * i + j] = (k // powv) % 2
-        for p in range(leng, 4):
-            k = 0
-            for q in range(16):
-                powv = 1
-                for _m in range(15, q, -1):
-                    powv *= 2
-                bt[16 * p + q] = (k // powv) % 2
-    else:
-        for i in range(4):
-            k = ord(s[i])
-            for j in range(16):
-                powv = 1
-                for _m in range(15, j, -1):
-                    powv *= 2
-                bt[16 * i + j] = (k // powv) % 2
+    for i, char in enumerate(s[:4]):
+        code = ord(char)
+        for j in range(16):
+            bt[16 * i + j] = (code >> (15 - j)) & 1
     return bt
 
 
@@ -217,61 +67,12 @@ def bt4ToHex(binary: str) -> str:
     return mapping[binary]
 
 
-def hexToBt4(hexch: str) -> str:
-    mapping = {
-        "0": "0000",
-        "1": "0001",
-        "2": "0010",
-        "3": "0011",
-        "4": "0100",
-        "5": "0101",
-        "6": "0110",
-        "7": "0111",
-        "8": "1000",
-        "9": "1001",
-        "A": "1010",
-        "B": "1011",
-        "C": "1100",
-        "D": "1101",
-        "E": "1110",
-        "F": "1111",
-        "a": "1010",
-        "b": "1011",
-        "c": "1100",
-        "d": "1101",
-        "e": "1110",
-        "f": "1111",
-    }
-    return mapping[hexch]
-
-
-def byteToString(byteData):
-    s = []
-    for i in range(4):
-        count = 0
-        for j in range(16):
-            powv = 1
-            for _m in range(15, j, -1):
-                powv *= 2
-            count += byteData[16 * i + j] * powv
-        if count != 0:
-            s.append(chr(count))
-    return "".join(s)
-
-
 def bt64ToHex(byteData):
     hexs = []
     for i in range(16):
         bt = "".join(str(bit) for bit in byteData[i * 4 : i * 4 + 4])
         hexs.append(bt4ToHex(bt))
     return "".join(hexs)
-
-
-def hexToBt64(hexstr: str) -> str:
-    binary = []
-    for i in range(16):
-        binary.append(hexToBt4(hexstr[i]))
-    return "".join(binary)
 
 
 def enc(dataByte, keyByte):
@@ -281,26 +82,6 @@ def enc(dataByte, keyByte):
     ipRight = ipByte[32:]
 
     for i in range(16):
-        tempLeft = ipLeft[:]
-        ipLeft = ipRight[:]
-        key = keys[i][:]
-        tempRight = xor_(pPermute(sBoxPermute(xor_(expandPermute(ipRight), key))), tempLeft)
-        ipRight = tempRight[:]
-
-    finalData = [0] * 64
-    for i in range(32):
-        finalData[i] = ipRight[i]
-        finalData[32 + i] = ipLeft[i]
-    return finallyPermute(finalData)
-
-
-def dec(dataByte, keyByte):
-    keys = generateKeys(keyByte)
-    ipByte = initPermute(dataByte)
-    ipLeft = ipByte[:32]
-    ipRight = ipByte[32:]
-
-    for i in range(15, -1, -1):
         tempLeft = ipLeft[:]
         ipLeft = ipRight[:]
         key = keys[i][:]
@@ -618,18 +399,5 @@ def generateKeys(keyByte):
     return keys
 
 
-def des(username, password, random):
-    enc_user = strEnc(username, random, "", "")
-    enc_pass = strEnc(password, random, "", "")
-    return enc_user, enc_pass
-
-
-def des_encrypt(decrypted_password):
-    random = "OqxQ1Iea4njSROH/N06Tuw=="
-    return strEnc(decrypted_password, random, "", "")
-
-
-def des_decrypt(encrypted_password):
-    """解密DES加密的密码"""
-    random = "OqxQ1Iea4njSROH/N06Tuw=="
-    return strDec(encrypted_password, random, "", "")
+def des(username: str, password: str, random: str) -> tuple[str, str]:
+    return strEnc(username, random), strEnc(password, random)

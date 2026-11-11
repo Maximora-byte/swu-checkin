@@ -362,7 +362,7 @@ def test_normal_run_and_probe_still_use_valid_cache(method_name: str):
 
 @pytest.mark.parametrize(
     "failing_method",
-    ["get_leave_record_set", "get_transition", "get_student_profile", "get_dormitory_info"],
+    ["get_leave_record_set", "get_transition", "get_dormitory_info"],
 )
 def test_cached_session_expiry_during_pre_submit_fresh_authenticates_once(failing_method: str):
     store = Mock()
@@ -419,7 +419,6 @@ def test_fresh_auth_failure_after_cached_session_expiry_is_terminal():
     [
         ("get_leave_record_set", "leave"),
         ("get_transition", "transition"),
-        ("get_student_profile", "student_profile"),
         ("get_dormitory_info", "dormitory"),
     ],
 )

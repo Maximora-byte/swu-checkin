@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
-import os
 from datetime import datetime
 
+from ._compat import deprecated
 from .cache import CheckinContext
+from .cli import _env_int
 from .client import SwuClient
 from .service import (
     DEFAULT_MAX_ATTEMPTS,
@@ -28,17 +29,6 @@ _business_response_succeeded = business_response_succeeded
 _parse_coordinate = parse_coordinate
 _parse_dormitory_data = parse_dormitory_data
 _record_run_status = record_run_status
-
-
-def _env_int(name: str, default: int) -> int:
-    raw = os.getenv(name, "").strip()
-    if not raw:
-        return default
-    try:
-        value = int(raw)
-    except ValueError:
-        return default
-    return value if value > 0 else default
 
 
 def _check_vacation_status(
@@ -76,18 +66,21 @@ def _submit_checkin(ctx: CheckinContext, timeout: int) -> CheckinStatus:
         return CheckinStatus.DATA_ERROR
 
 
+@deprecated("swu_checkin.run_checkin")
 def check_in(username: str, password: str, timeout: int = 10) -> CheckinStatus:
     """Execute one check-in attempt and return the historical status enum."""
 
     return CheckinService(timeout=timeout).check_in_once(username, password)
 
 
+@deprecated("swu_checkin.run_probe")
 def probe_check_in(username: str, password: str, timeout: int = 10) -> CheckinStatus:
     """Execute one read-only probe and return the historical status enum."""
 
     return CheckinService(timeout=timeout).probe_once(username, password)
 
 
+@deprecated("swu_checkin.run_checkin")
 def check_in_with_retry(
     username: str,
     password: str,

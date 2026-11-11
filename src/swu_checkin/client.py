@@ -7,12 +7,13 @@ from typing import cast
 
 import requests
 
+from ._compat import deprecated
 from .api_models import ApiSchemaError, DormitoryInfo, LeaveRecords, StudentProfile, Transition
 from .status import VacationStatus
 
 USER_INFO_URL = "https://of.swu.edu.cn/gateway/fighter-middle/api/auth/user"
 DORMITORY_URL = "https://of.swu.edu.cn/gateway/fighter-baida/api/cqlc/getDormitory"
-TRANSITION_TODAY_URL = "https://of.swu.edu.cn//gateway/fighter-baida/api/cqtj/getTransitionByToday"
+TRANSITION_TODAY_URL = "https://of.swu.edu.cn/gateway/fighter-baida/api/cqtj/getTransitionByToday"
 LEAVE_RECORDS_URL = "https://of.swu.edu.cn/gateway/fighter-baida/api/xsqjxj/listSelfLeaveData"
 CHECKIN_FORM_URL = "https://of.swu.edu.cn/gateway/fighter-baida/api/form-instance/save"
 LEAVE_PAGE_SIZE = 100
@@ -46,7 +47,8 @@ class SwuClient:
             raise requests.HTTPError("Unexpected business API redirect", response=response)
 
     @staticmethod
-    def _json_object(response: requests.Response, *, label: str) -> dict[str, object]:
+    def _raise_for_status(response: requests.Response) -> None:
+        """Reject redirects and map explicit 401/403 rejections to SessionExpiredError."""
         SwuClient._reject_redirect(response)
         try:
             response.raise_for_status()
@@ -54,6 +56,10 @@ class SwuClient:
             if response.status_code in {401, 403}:
                 raise SessionExpiredError(response=response) from error
             raise
+
+    @staticmethod
+    def _json_object(response: requests.Response, *, label: str) -> dict[str, object]:
+        SwuClient._raise_for_status(response)
         payload: object = response.json()
         if not isinstance(payload, dict) or not all(isinstance(key, str) for key in payload):
             raise ValueError(f"{label} response is not an object")
@@ -94,6 +100,7 @@ class SwuClient:
     def get_dormitory_info(self) -> DormitoryInfo:
         return DormitoryInfo.from_response(self._dormitory_payload())
 
+    @deprecated("SwuClient.get_dormitory_info")
     def get_dormitory(self) -> dict[str, object]:
         """Compatibility wrapper returning the historical response object."""
 
@@ -112,6 +119,7 @@ class SwuClient:
     def get_transition(self) -> Transition | None:
         return Transition.from_response(self._transition_payload())
 
+    @deprecated("SwuClient.get_transition")
     def get_transition_today(self) -> dict[str, object] | None:
         """Compatibility wrapper returning the historical transition mapping."""
 
@@ -161,6 +169,9 @@ class SwuClient:
             )
             if stop_on_active_leave and parsed_records.evaluate() is VacationStatus.ACTIVE_LEAVE:
                 return raw_records, parsed_records
+            # Completeness is proven only by an empty page: the server may cap
+            # pageSize below LEAVE_PAGE_SIZE, so a short page is not a safe end
+            # marker and stopping there could miss an active leave record.
             if not page_items:
                 return raw_records, parsed_records
         raise ApiSchemaError("leave pagination completeness cannot be confirmed")
@@ -168,6 +179,7 @@ class SwuClient:
     def get_leave_record_set(self) -> LeaveRecords:
         return self._paginated_leave_records(stop_on_active_leave=True)[1]
 
+    @deprecated("SwuClient.get_leave_record_set")
     def get_leave_records(self) -> list[object]:
         """Compatibility wrapper returning the historical records list."""
 
@@ -182,6 +194,5 @@ class SwuClient:
             timeout=self.timeout,
             allow_redirects=False,
         )
-        self._reject_redirect(response)
-        response.raise_for_status()
+        self._raise_for_status(response)
         return response.json()
