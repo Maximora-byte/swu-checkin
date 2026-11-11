@@ -1,6 +1,6 @@
 # Windows 桌面版
 
-Windows x64 桌面版由 MatchAll 维护，项目版本 **2.1.1**；安装器与免安装 ZIP 见 [v2.1.1](https://github.com/Maximora-byte/swu-checkin/releases/tag/v2.1.1)。内置 Python、OCR 模型及运行资源，无需开发环境，安装器默认仅为当前用户安装。Windows 包尚未获得 Authenticode 签名，干净 Windows 10/11 实机覆盖有限；不要把云端构建和 GUI smoke 当作所有用户环境保证。见 [版本说明](releases/v2.1.1.md)。
+Windows x64 桌面版由 MatchAll 维护，项目版本 **2.2.0**；安装器与免安装 ZIP 见 [v2.2.0](https://github.com/Maximora-byte/swu-checkin/releases/tag/v2.2.0)。内置 Python、OCR 模型及运行资源，无需开发环境，安装器默认仅为当前用户安装。Windows 包尚未获得 Authenticode 签名，干净 Windows 10/11 实机覆盖有限；不要把云端构建和 GUI smoke 当作所有用户环境保证。见 [版本说明](releases/v2.2.0.md)。
 
 历史基础界面的验证记录：[Windows Server 2022 x64 构建与冒烟测试](https://github.com/Maximora-byte/swu-checkin/actions/runs/36897730511)、[合并后普通 CI](https://github.com/Maximora-byte/swu-checkin/actions/runs/36901319136)。当前功能合并前的 [Windows 构建与冒烟测试](https://github.com/Maximora-byte/swu-checkin/actions/runs/37019007437) 也已通过。每个记录只证明对应源码 commit 的检查结果，不构成学校认证、Windows 10/11 全面支持或未来候选 tag 资产的验证。
 
@@ -8,7 +8,7 @@ Windows x64 桌面版由 MatchAll 维护，项目版本 **2.1.1**；安装器与
 
 ## 面向使用者
 
-安装程序文件为 `SWUCheckin-2.1.1-win-x64-Setup.exe`。从本仓库 Releases 核对资产和 SHA256 后安装，并从开始菜单打开 **SWU Checkin**；开发者显示为 **MatchAll**。无需另装 Python、uv 或 OCR 模型。支持目标为 Windows 10/11 x64，其他架构未验收。GitHub 自动生成的源码 ZIP 不是安装包。
+安装程序文件为 `SWUCheckin-2.2.0-win-x64-Setup.exe`。从本仓库 Releases 核对资产和 SHA256 后安装，并从开始菜单打开 **SWU Checkin**；开发者显示为 **MatchAll**。无需另装 Python、uv 或 OCR 模型。支持目标为 Windows 10/11 x64，其他架构未验收。GitHub 自动生成的源码 ZIP 不是安装包。
 
 - 默认安装到 `%LOCALAPPDATA%\Programs\SWUCheckin`，仅当前用户可用，无需管理员权限
 - 默认打开图形窗口；安装程序不会登录账号、注册计划任务或自动启动程序

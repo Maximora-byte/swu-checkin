@@ -31,14 +31,14 @@ def test_release_acceptance_preserves_existing_data(text, code):
 
 def test_release_manifest_rejects_debug_and_old_versions():
     manifest = (
-        "package: name='io.github.maximorabyte.swucheckin' versionCode='5' versionName='1.0.0'\n"
+        "package: name='io.github.maximorabyte.swucheckin' versionCode='6' versionName='1.1.0'\n"
         "sdkVersion:'24'\ntargetSdkVersion:'36'\n"
     )
     verify_manifest(manifest)
     verify_manifest(manifest.replace("sdkVersion:", "minSdkVersion:"))
     with pytest.raises(ValueError):
         verify_manifest(manifest + "minSdkVersion:'23'\n")
-    for bad in (manifest + "application-debuggable", manifest.replace("versionCode='5'", "versionCode='4'")):
+    for bad in (manifest + "application-debuggable", manifest.replace("versionCode='6'", "versionCode='5'")):
         with pytest.raises(ValueError):
             verify_manifest(bad)
 
@@ -131,12 +131,14 @@ def test_release_device_stops_on_adb_failure_even_with_complete_test_output(tmp_
     assert (arguments.evidence_dir / "instrumentation-fresh-install.txt").exists()
 
 
-def test_signed_preview_rejects_source_changes_after_metadata_generation(tmp_path, monkeypatch):
+@pytest.mark.parametrize("host,suffix", [("posix", ""), ("nt", ".exe")])
+def test_signed_preview_rejects_source_changes_after_metadata_generation(tmp_path, monkeypatch, host, suffix):
     """A matching HEAD alone does not prove the files built stayed unchanged."""
     import argparse
     import hashlib
     import json
     import subprocess
+    from types import SimpleNamespace
     from zipfile import ZipFile
 
     verifier = apk_verifier
@@ -148,7 +150,7 @@ def test_signed_preview_rejects_source_changes_after_metadata_generation(tmp_pat
     certificate.write_bytes(b"fixture DER certificate")
     cert_digest = hashlib.sha256(certificate.read_bytes()).hexdigest()
     manifest = (
-        "package: name='io.github.maximorabyte.swucheckin' versionCode='5' versionName='1.0.0'\n"
+        "package: name='io.github.maximorabyte.swucheckin' versionCode='6' versionName='1.1.0'\n"
         "sdkVersion:'24'\ntargetSdkVersion:'36'\n"
     )
     native = bytearray(120)
@@ -160,9 +162,9 @@ def test_signed_preview_rejects_source_changes_after_metadata_generation(tmp_pat
         "source_commit": commit,
         "source_tree": tree,
         "source_dirty": False,
-        "project_version": "2.1.1",
-        "android_version": "1.0.0",
-        "android_version_code": 5,
+        "project_version": "2.2.0",
+        "android_version": "1.1.0",
+        "android_version_code": 6,
         "developer": "MatchAll",
         "preview": False,
         "uv_lock_sha256": hashlib.sha256(lock.read_bytes()).hexdigest(),
@@ -173,6 +175,7 @@ def test_signed_preview_rejects_source_changes_after_metadata_generation(tmp_pat
         package.writestr("lib/x86_64/fixture.so", native)
     dirty = []
     debug_components = []
+    commands = []
 
     def git(command, **kwargs):
         if "status" in command:
@@ -180,6 +183,7 @@ def test_signed_preview_rejects_source_changes_after_metadata_generation(tmp_pat
         return commit + "\n" if command[-1] == "HEAD" else tree + "\n"
 
     def run(command, **kwargs):
+        commands.append(command)
         output = ""
         if "badging" in command:
             output = manifest
@@ -190,11 +194,14 @@ def test_signed_preview_rejects_source_changes_after_metadata_generation(tmp_pat
         return subprocess.CompletedProcess(command, 0, stdout=output, stderr="")
 
     monkeypatch.setattr(verifier, "ROOT", tmp_path)
+    monkeypatch.setattr(verifier, "os", SimpleNamespace(name=host))
     monkeypatch.setattr(verifier, "inspect_apk", lambda _: {})
     monkeypatch.setattr(verifier.subprocess, "run", run)
     monkeypatch.setattr(verifier.subprocess, "check_output", git)
     arguments = argparse.Namespace(apk=apk, sdk=tmp_path, java=tmp_path / "java", certificate=certificate)
     assert verifier.verify(arguments)["passed"]
+    assert Path(commands[0][0]).name == f"aapt2{suffix}"
+    assert Path(commands[-1][0]).name == f"zipalign{suffix}"
     for component in ("LockProbeService", "DesignPreviewActivity"):
         debug_components.append(component)
         with pytest.raises(ValueError, match="debug component"):

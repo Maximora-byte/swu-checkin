@@ -20,7 +20,7 @@
 
 ## 版本与交付渠道
 
-- 当前发行系列为 **v2.1.1**，Python/Windows 项目版本 2.1.1，Android 1.0.0；软件开发者和发行者统一为 MatchAll。仓库名、包名与原有签名身份保持连续；原始 MIT 版权与第三方署名保留。说明见 [v2.1.1](docs/releases/v2.1.1.md)。
+- 当前发行系列为 **v2.2.0**，Python/Windows 项目版本 2.2.0，Android 1.1.0；软件开发者和发行者统一为 MatchAll。仓库名、包名与原有签名身份保持连续；原始 MIT 版权与第三方署名保留。说明见 [v2.2.0](docs/releases/v2.2.0.md)。
 - macOS 附件继续为 ad-hoc 签名、未公证预览。Windows 尚未获得 Authenticode 签名。Android CI debug 包仅供测试；正式分发使用仓库外受保护的持久签名。
 - 原生平台 Actions artifacts 保留 14 天；旧 tag 和 Release 资产不随 main 更新。各版本证据以对应来源与实际文件为准。
 

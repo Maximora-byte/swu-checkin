@@ -22,9 +22,9 @@
 
 ## 版本与下载
 
-当前发行系列为 **v2.1.1**，开发者与发行者为 **MatchAll**。下载和校验文件见 [v2.1.1 发布页](https://github.com/Maximora-byte/swu-checkin/releases/tag/v2.1.1)。Windows x64 安装器和免安装 ZIP 内置 Python、OCR 与全部运行资源；Android **1.0.0 / versionCode=5** 可直接安装，不需要开发环境。macOS 15 两架构仍提供未公证的预览附件。旧版 v2.1.0 Pre-release 及历史资产保持原样。
+当前发行系列为 **v2.2.0**，开发者与发行者为 **MatchAll**。下载和校验文件见 [v2.2.0 发布页](https://github.com/Maximora-byte/swu-checkin/releases/tag/v2.2.0)。Windows x64 安装器和免安装 ZIP 内置 Python、OCR 与全部运行资源；Android **1.1.0 / versionCode=6** 可直接安装，不需要开发环境。macOS 15 两架构仍提供未公证的预览附件。旧版 v2.1.0 Pre-release 及历史资产保持原样。
 
-安装入口：Android 下载 `SWUCheckin-1.0.0-android.apk`；Windows 下载 `SWUCheckin-2.1.1-win-x64-Setup.exe`，或完整解压 `SWUCheckin-2.1.1-win-x64-Portable.zip`。首次打开后自行输入校园账号并先做只读查询；默认不会签到或启用后台任务。版本范围、升级与校验见 [v2.1.1 说明](docs/releases/v2.1.1.md)。
+安装入口：Android 下载 `SWUCheckin-1.1.0-android.apk`；Windows 下载 `SWUCheckin-2.2.0-win-x64-Setup.exe`，或完整解压 `SWUCheckin-2.2.0-win-x64-Portable.zip`。首次打开后自行输入校园账号并先做只读查询；默认不会签到或启用后台任务。版本范围、升级与校验见 [v2.2.0 说明](docs/releases/v2.2.0.md)。
 
 ## Windows 桌面版
 
@@ -44,7 +44,7 @@ Windows 桌面版仍未获得 Authenticode 签名，系统可能显示下载或�
 
 ## 选择运行方式
 
-Android **1.0.0** 支持校园账号登录、人工验证码、可选加密保存、只读查询与诊断，以及明确确认后的单次手动签到。开发者显示为 MatchAll，采用原创图标和浅深色卡片界面；最低 Android 7.0，仅支持 arm64-v8a / x86_64。持久签名正式包沿用原包名，可从 0.1.2-preview 直接覆盖升级。安装与验收范围见 [Android 指南](docs/android-client.md)。
+Android **1.1.0** 支持校园账号登录、人工验证码、可选加密保存、只读查询与诊断，以及明确确认后的单次手动签到。开发者显示为 MatchAll，采用原创图标和浅深色卡片界面；最低 Android 7.0，仅支持 arm64-v8a / x86_64。持久签名正式包沿用原包名，可从 0.1.2-preview 直接覆盖升级。安装与验收范围见 [Android 指南](docs/android-client.md)。
 
 | 场景 | 推荐方式 | 特点 |
 | --- | --- | --- |
@@ -82,7 +82,7 @@ uv run --locked --no-dev swu-checkin run
 `run` / `probe` / `doctor` 的环境凭据缺失时会交互询问；`setup` 总是交互输入。密码无回显，`setup` 不保存凭据。无人值守运行必须使用 GitHub Secrets、Windows DPAPI 或权限受限的 systemd 环境文件。
 
 > [!TIP]
-> 上例检出当前默认分支。需要本次发行时，选择 `v2.1.1`，同时使用该 tag 的代码、文档和 `uv.lock`；下载见 [Releases](https://github.com/Maximora-byte/swu-checkin/releases)。旧 [v1.1.5](https://github.com/Maximora-byte/swu-checkin/releases/tag/v1.1.5) 只有 wheel/sdist，不含桌面功能。桌面和 Android 包须核对 commit、`BUILD-INFO.json`、签名与校验清单。
+> 上例检出当前默认分支。需要本次发行时，选择 `v2.2.0`，同时使用该 tag 的代码、文档和 `uv.lock`；下载见 [Releases](https://github.com/Maximora-byte/swu-checkin/releases)。旧 [v1.1.5](https://github.com/Maximora-byte/swu-checkin/releases/tag/v1.1.5) 只有 wheel/sdist，不含桌面功能。桌面和 Android 包须核对 commit、`BUILD-INFO.json`、签名与校验清单。
 
 ## 常用命令
 
@@ -141,7 +141,7 @@ swu-checkin probe --json   # probe 的 schema v1 JSON，不提交签到
 - [安全模型](docs/security.md)：认证、TokenStore、提交安全、日志与支持边界
 - [v2.0.0 发布说明](docs/releases/v2.0.0.md)：已发布资产、相对 v1.1.5 的变化与该版本限制
 - [v2.1.0 预发布说明](docs/releases/v2.1.0.md)：版本变化、交付资产与平台限制
-- [v2.1.1 正式发行说明](docs/releases/v2.1.1.md)：当前下载、Android 1.0.0、升级与支持范围
+- [v2.2.0 正式发行说明](docs/releases/v2.2.0.md)：当前下载、Android 1.1.0、升级与支持范围
 - [v2.1.0 历史发布评估](docs/releases/release-readiness.md)：当时的候选来源、证据和待办
 - [开发、CI 与发布](docs/development.md)：模块分工、离线验证、发布边界
 - [贡献指南](CONTRIBUTING.md) / [维护与归属](MAINTAINERS.md)

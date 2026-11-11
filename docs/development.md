@@ -4,9 +4,9 @@
 
 ## 1. 版本与分发边界
 
-当前发行系列为 [`v2.1.1`](https://github.com/Maximora-byte/swu-checkin/releases/tag/v2.1.1)，开发者为 MatchAll。Python/Windows 版本 2.1.1，Android 1.0.0 / code5；macOS 15 两架构继续为预览。见 [本次说明](releases/v2.1.1.md)。
+当前发行系列为 [`v2.2.0`](https://github.com/Maximora-byte/swu-checkin/releases/tag/v2.2.0)，开发者为 MatchAll。Python/Windows 版本 2.2.0，Android 1.1.0 / code6；macOS 15 两架构继续为预览。见 [本次说明](releases/v2.2.0.md)。
 
-- pyproject.toml、包内 __version__ 与 uv.lock 的项目版本同步为 2.1.1；Android 独立版本为 1.0.0 / code5。
+- pyproject.toml、包内 __version__ 与 uv.lock 的项目版本同步为 2.2.0；Android 独立版本为 1.1.0 / code6。
 - Windows 安装器 Publisher、冻结 EXE 公司信息和桌面窗口，Android 使用说明/清单和包内来源，以及 macOS 应用信息均显示 MatchAll。
 - 原始 LICENSE、第三方许可、仓库地址、应用 ID 和持久签名不因开发者显示名变更而重写。
 - Windows 仍未获得 Authenticode 签名，macOS 未公证且保留 preview；支持边界按平台指南说明。
@@ -152,9 +152,9 @@ uv run --locked python scripts/release/verify_artifacts.py \
 5. 生成保留 14 天的 `release-staged-<SHA>`：六个用户包、各平台来源/许可清单、`ASSET-MANIFEST.json`、MIT、固定发行说明和整体 `SHA256SUMS.txt`
 6. 仅 tag push 的 `release-publish` 取得 `contents: write`；它不 checkout 或执行项目代码，仅下载同一次 run 的暂存集，复核最终哈希/数量。prerelease 创建非 latest 预发布；stable 创建非 latest 草稿，待维护者加入持久签名 Android 包和报告、复核后公开。已有同名 Release 拒绝覆盖；不上传 PyPI
 
-自动暂存的六个用户包是 Python wheel/sdist、Windows x64 Setup/Portable、macOS 15 arm64/x86_64 preview ZIP；Actions 外层 artifact ZIP 不作为用户安装包。Android CI 使用临时 debug 证书，只证明对应包的运行，不公开为 Release APK。本机持久签名 APK、公开证书、来源与许可/验收报告单独准备；公开前仍需完成该资产的审核和签名保管。历史 v2.1.0 [预检 37031347112](https://github.com/Maximora-byte/swu-checkin/actions/runs/37031347112) 已完成全部平台构建、三组 debug 运行验证和 17 文件暂存；六个实际用户包也已独立下载复核。当时的持久签名候选 APK 另通过 60 项生产模拟器验收。该历史包的来源、哈希、失败和边界见 [v2.1.0 发布准备](releases/release-readiness.md)及 [验收清单](releases/v2.1.0-acceptance.json)；这些通过数不能用于证明当前 v2.1.1 发行包。
+自动暂存的六个用户包是 Python wheel/sdist、Windows x64 Setup/Portable、macOS 15 arm64/x86_64 preview ZIP；Actions 外层 artifact ZIP 不作为用户安装包。Android CI 使用临时 debug 证书，只证明对应包的运行，不公开为 Release APK。本机持久签名 APK、公开证书、来源与许可/验收报告单独准备；公开前仍需完成该资产的审核和签名保管。历史 v2.1.0 [预检 37031347112](https://github.com/Maximora-byte/swu-checkin/actions/runs/37031347112) 已完成全部平台构建、三组 debug 运行验证和 17 文件暂存；六个实际用户包也已独立下载复核。当时的持久签名候选 APK 另通过 60 项生产模拟器验收。该历史包的来源、哈希、失败和边界见 [v2.1.0 发布准备](releases/release-readiness.md)及 [验收清单](releases/v2.1.0-acceptance.json)；这些通过数不能用于证明当前 v2.2.0 发行包。
 
-本轮使用数字 2.1.1 配合配置 channel="stable"；Android 使用 versionName=1.0.0 / versionCode=5。stable tag 自动建立草稿，待同源持久签名 Android APK 和逐项验收加入并核对后公开、设为 latest；prerelease 仍明确非 latest。Android CI debug 不作为公开 APK。历史 tag/资产不移动，最终包须按所选 main/tag commit 构建，不能仅凭源码树相同改写来源。
+本轮使用数字 2.2.0 配合配置 channel="stable"；Android 使用 versionName=1.1.0 / versionCode=6。stable tag 自动建立草稿，待同源持久签名 Android APK 和逐项验收加入并核对后公开、设为 latest；prerelease 仍明确非 latest。Android CI debug 不作为公开 APK。历史 tag/资产不移动，最终包须按所选 main/tag commit 构建，不能仅凭源码树相同改写来源。
 
 Android 已新增项目、Chaquopy、Python 和依赖的版权原文与许可清单，APK 检查器要求内嵌原文/hash 完整；桌面构建同样收集实际 CPython、Tcl/Tk、依赖和包内 vendor 的材料。每次最终包仍须执行实际检查，源码有原文不能代替包内完整性验证。旧 debug APK 的许可缺失仍按历史记录保留，不能因源码补齐后把旧包直接公开。
 
@@ -189,13 +189,13 @@ PR 描述应区分“已通过”“平台跳过”“因环境无法运行”�
 
 Android 已有[手动客户端](android-client.md)，使用 Compose、Chaquopy 17/Python 3.13，共享原始 OAuth/CAS、身份与任务校验和提交回查。单账号、人工验证码、显式 Keystore 保存、查询/只读诊断和确认后的单次签到均有 UI；不提供 OCR、GPS 或后台自动签到。历史[可行性验证](android-feasibility.md)只描述环境诊断基线，不代表当前客户端。
 
-[`android-feasibility.yml`](../.github/workflows/android-feasibility.yml) 名称保留历史命名，实际构建当前客户端 debug APK、测试包和 lint，以同一组包在 API 24/4 KB、API 35/4 KB、API 35/16 KB 模拟器执行每行七项 × 三安装状态。支持手动运行和发布预检的 `workflow_call(ref)`；PR 的路径过滤与调用统一由 `release.yml` 负责。artifact 保留 14 天，不会自动公开 APK。
+[`android-feasibility.yml`](../.github/workflows/android-feasibility.yml) 名称保留历史命名，实际构建当前客户端 debug APK、测试包和 lint，以同一组包在 API 24/4 KB、API 35/4 KB、API 35/16 KB 模拟器执行每行十项 × 三安装状态。支持手动运行和发布预检的 `workflow_call(ref)`；PR 的路径过滤与调用统一由 `release.yml` 负责。artifact 保留 14 天，不会自动公开 APK。
 
-持久签名候选用 `scripts/android/build-signed-preview.ps1 -IncludeTests` 构建 release APK 与相同证书的 release 测试包。`verify_signed_apk.py` 核对正式包名、版本、非 debuggable、证书、版权材料以及所有 ELF/ZIP 的 16 KB 对齐。`verify_release_device.py` 仅接受一次性模拟器和未安装正式包名的环境；每行六项生产包测试 × 首装/覆盖/清数据，加合成账号保存/覆盖后读取两项共 20，验证同版本持久证书重装。跨进程第二进程测试仅在 debug 变体，不向生产包引入测试服务。命令、密钥保管与迁移限制见 [Android 指南](android-client.md)。
+持久签名候选用 `scripts/android/build-signed-preview.ps1 -IncludeTests` 构建 release APK 与相同证书的 release 测试包。`verify_signed_apk.py` 核对正式包名、版本、非 debuggable、证书、版权材料以及所有 ELF/ZIP 的 16 KB 对齐。`verify_release_device.py` 仅接受一次性模拟器和未安装正式包名的环境；每行九项生产包测试 × 首装/覆盖/清数据，加合成账号保存/覆盖后读取两项共 29，验证同版本持久证书重装。跨进程第二进程测试仅在 debug 变体，不向生产包引入测试服务。命令、密钥保管与迁移限制见 [Android 指南](android-client.md)。
 
 设备验收必须记录真实 API、ABI、`getpagesize()`、源码 commit 与 APK SHA256，并逐一验证规定的 instrumentation 测试身份；首次安装、替换安装和清除本应用数据后的冷启动都需完成。测试会操作/安装/卸载本应用，仅可在授权的测试设备上运行；发现已有加密账号或无法可靠判断时，验证器拒绝破坏式安装流程。业务链测试使用合成账号和传输数据，公网站点 HTTPS 验证不访问学校，不应把这类通过结果写成真实 SWU 登录成功。
 
-历史 0.1.0 debug、0.1.1/0.1.2 生产候选保留各自的包哈希、通过数与失败记录，不用于证明新的 1.0.0 APK。最终版本按自己的来源和字节记录验收；用户真实只读查询反馈另行注明，实际签到、16 KB 真机、旧 debug 账号自动迁移和另一个物理电脑恢复仍未验证。
+历史 0.1.0 debug、0.1.1/0.1.2 生产候选保留各自的包哈希、通过数与失败记录，不用于证明新的 1.1.0 APK。最终版本按自己的来源和字节记录验收；用户真实只读查询反馈另行注明，实际签到、16 KB 真机、旧 debug 账号自动迁移和另一个物理电脑恢复仍未验证。
 
 ## 9. macOS 桌面预览验证
 
