@@ -106,17 +106,17 @@ class MacOSBackend(DesktopOperations):
         from types import ModuleType
 
         import certifi
-        import ddddocr
         from PIL import Image
 
         from .desktop import MACOS_PRESENTATION, DesktopApp
+        from .login import ocr_engine
         from .runtime_lock import RuntimeLock
         from .time_utils import today_shanghai
 
         ssl.create_default_context(cafile=certifi.where())
         today_shanghai()
         image = Image.new("RGB", (100, 40), "white")
-        ddddocr.DdddOcr(show_ad=False, use_gpu=False).classification(image)
+        ocr_engine().classification(image)
         with tempfile.TemporaryDirectory(prefix="swu-macos-offline-") as directory:
             with RuntimeLock(Path(directory) / "test.lock"):
                 pass

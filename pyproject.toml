@@ -44,6 +44,11 @@ developer = "MatchAll"
 [tool.hatchling.build.targets.wheel]
 packages = ["src/swu_checkin"]
 
+[tool.pytest.ini_options]
+# Compatibility tests exercise deprecated wrappers on purpose; pytest.warns
+# still asserts the warning where it matters.
+filterwarnings = ["ignore:swu_checkin\\..* is deprecated:DeprecationWarning"]
+
 [tool.ruff]
 target-version = "py313"
 line-length = 120
@@ -76,9 +81,11 @@ warn_unused_ignores = true
 
 [[tool.mypy.overrides]]
 module = [
+    "swu_checkin._compat",
     "swu_checkin.api_models",
     "swu_checkin.auth",
     "swu_checkin.client",
+    "swu_checkin.login",
     "swu_checkin.service",
     "swu_checkin.token_store",
 ]

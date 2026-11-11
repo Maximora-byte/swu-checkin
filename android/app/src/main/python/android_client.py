@@ -12,7 +12,7 @@ from typing import cast
 
 from swu_checkin.auth import AuthError
 from swu_checkin.client import SwuClient
-from swu_checkin.get_info import authenticate_token
+from swu_checkin.login import authenticate_token
 from swu_checkin.runtime_lock import RuntimeLock, RuntimeLockBusy
 from swu_checkin.service import CheckinService
 from swu_checkin.token_store import CachedToken

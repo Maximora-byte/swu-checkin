@@ -153,6 +153,9 @@ status = probe_check_in(
 
 `check_in` 执行一次业务尝试，`check_in_with_retry` 使用外层重试策略，`probe_check_in` 只读；三者返回 `CheckinStatus`。`probe_check_in` 不在包根导出。
 
+> [!NOTE]
+> 以上三个函数以及 `swu_checkin.get_info`（现为 `swu_checkin.login` 的别名）中的 `get_token` / `get_student_id` / `get_dormitory` / `get_transition_today` 已标记弃用，调用时会发出 `DeprecationWarning`，行为不变。新代码请使用返回 `CheckinResult` 的 `run_checkin` / `run_probe`，以及 `swu_checkin.login.authenticate_token`。
+
 结构化接口从包根导入：
 
 ```python

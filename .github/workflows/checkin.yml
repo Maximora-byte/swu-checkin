@@ -112,14 +112,15 @@ jobs:
           fi
 
           echo "exit_code=$exit_code" >> "$GITHUB_OUTPUT"
-          status_code=$(uv run --locked --no-dev python -c 'import json; print(json.load(open("checkin_result.json", encoding="utf-8"))["code"])')
-          status_msg=$(uv run --locked --no-dev python -c 'import json; print(json.load(open("checkin_result.json", encoding="utf-8"))["message"])')
+          # actions_result 已校验 schema；用 runner 自带的 jq 读取，避免再启动两次 Python
+          status_code=$(jq -r '.code' checkin_result.json)
+          status_msg=$(jq -r '.message' checkin_result.json)
 
           echo ""
           echo "========================================="
           echo "签到结果"
           echo "========================================="
-          uv run --locked --no-dev python -m json.tool checkin_result.json
+          jq . checkin_result.json
           echo ""
 
           echo "========================================="

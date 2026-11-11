@@ -38,7 +38,7 @@ GitHub Release 资产、临时 Actions artifact 和源码 checkout 是不同交�
 
 ### 手工验证码前端接入
 
-共享认证入口 `authenticate_token(username, password, timeout, *, captcha_provider=None)` 支持可选的同步回调 `Callable[[bytes], str | None]`；兼容入口 `get_token` 接受相同的关键字参数，失败仍返回空字符串。可用 `functools.partial(authenticate_token, captcha_provider=callback)` 作为现有 `CheckinService(token_provider=...)` 的认证函数，不应在前端复制 OAuth/CAS 流程。
+共享认证入口 `authenticate_token(username, password, timeout, *, captcha_provider=None)` 支持可选的同步回调 `Callable[[bytes], str | None]`（位于 `swu_checkin.login`，旧模块名 `get_info` 保留为别名）；已弃用的兼容入口 `get_token` 接受相同的关键字参数，失败仍返回空字符串。可用 `functools.partial(authenticate_token, captcha_provider=callback)` 作为现有 `CheckinService(token_provider=...)` 的认证函数，不应在前端复制 OAuth/CAS 流程。
 
 - 回调只收到当前验证码图片的原始 bytes；图片由核心通过当前登录的同一个 `requests.Session` 获取，回调不接收账号、密码、cookie 或认证 URL
 - 回调返回至少 3 位 ASCII 字母/数字答案；返回 `None` 表示取消。空值、无效答案、空图片与回调异常（包括 UI 超时）均以 `CAPTCHA_FAILED` 终止本次认证，不提交登录、不回退到 OCR，也不触发服务层完整登录重试
