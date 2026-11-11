@@ -4,7 +4,7 @@
 
 ## 1. 版本与分发边界
 
-当前发行系列为 [`v2.2.0`](https://github.com/Maximora-byte/swu-checkin/releases/tag/v2.2.0)，开发者为 MatchAll。Python/Windows 版本 2.2.0，Android 1.1.0 / code6；macOS 15 两架构继续为预览。见 [本次说明](releases/v2.2.0.md)。
+当前源码面向 [`v2.2.0`](https://github.com/Maximora-byte/swu-checkin/releases/tag/v2.2.0)，开发者为 MatchAll。Python/Windows 版本 2.2.0，Android 1.1.0 / code6；macOS 15 两架构继续为预览。见 [本次说明](releases/v2.2.0.md)。实际最新公开版以 [Latest Release](https://github.com/Maximora-byte/swu-checkin/releases/latest) 为准，版本 PR、tag 和草稿均不代表已经公开。
 
 - pyproject.toml、包内 __version__ 与 uv.lock 的项目版本同步为 2.2.0；Android 独立版本为 1.1.0 / code6。
 - Windows 安装器 Publisher、冻结 EXE 公司信息和桌面窗口，Android 使用说明/清单和包内来源，以及 macOS 应用信息均显示 MatchAll。
