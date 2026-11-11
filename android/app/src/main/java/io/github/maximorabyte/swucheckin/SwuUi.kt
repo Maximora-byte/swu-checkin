@@ -29,6 +29,9 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 @Composable
 internal fun SwuIcon(@DrawableRes resource: Int, description: String? = null,
@@ -85,7 +88,11 @@ internal fun CheckinScreen(state: CheckinUiState, actions: CheckinUiActions, pre
                 .padding(22.dp), verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(7.dp)) {
-                    Text("SWU 查寝", style = MaterialTheme.typography.bodySmall, color = Color(0xFFCEE3D3))
+                    val today = remember { SimpleDateFormat("M月d日 EEEE", Locale.CHINA).format(Date()) }
+                    Surface(shape = RoundedCornerShape(50), color = Color.White.copy(alpha = 0.14f)) {
+                        Text("SWU 查寝 · $today", style = MaterialTheme.typography.bodySmall, color = Color(0xFFE4F0E7),
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp))
+                    }
                     Text("今日查寝", style = MaterialTheme.typography.headlineMedium, color = Color.White)
                     Text("先查询，再安心确认。", style = MaterialTheme.typography.bodyMedium, color = Color(0xFFDCEADF))
                 }
@@ -138,22 +145,27 @@ internal fun CheckinScreen(state: CheckinUiState, actions: CheckinUiActions, pre
             }
         }
         SwuCard {
+            Text("今日操作", style = MaterialTheme.typography.titleMedium)
+            StepHint(number = 1, text = "查询今日状态（只读，不提交）", active = !state.pending)
             Button(enabled = ready, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp), onClick = {
                 revealPassword = false; keyboard?.hide(); focus.clearFocus(); actions.query()
             }) {
                 SwuIcon(R.drawable.ic_search); Spacer(Modifier.width(8.dp)); Text("查询今日状态")
             }
-            OutlinedButton(enabled = ready && state.pending, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = colors.primary),
-                border = BorderStroke(1.dp, if (ready && state.pending) colors.primary.copy(alpha = 0.65f) else colors.outlineVariant),
-                onClick = { keyboard?.hide(); focus.clearFocus(); actions.checkin() }) {
+            StepHint(number = 2, text = "确认本人在寝后，手动提交一次", active = state.pending)
+            val checkinReady = ready && state.pending
+            val checkinClick = { keyboard?.hide(); focus.clearFocus(); actions.checkin() }
+            if (checkinReady) FilledTonalButton(onClick = checkinClick, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
+                colors = ButtonDefaults.filledTonalButtonColors(containerColor = colors.tertiaryContainer,
+                    contentColor = colors.onTertiaryContainer)) {
+                SwuIcon(R.drawable.ic_check); Spacer(Modifier.width(8.dp)); Text("手动签到")
+            } else OutlinedButton(enabled = false, onClick = checkinClick, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
+                border = BorderStroke(1.dp, colors.outlineVariant)) {
                 SwuIcon(R.drawable.ic_check); Spacer(Modifier.width(8.dp)); Text("手动签到")
             }
             if (state.busy) TextButton(onClick = actions.cancel, modifier = Modifier.align(Alignment.CenterHorizontally)) {
                 SwuIcon(R.drawable.ic_close, modifier = Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text("取消操作")
             }
-            Text("查询不会提交签到。手动签到需要你再次确认。", style = MaterialTheme.typography.bodySmall,
-                color = colors.onSurfaceVariant)
         }
         SwuCard {
             Text("帮助与检测", style = MaterialTheme.typography.titleMedium)
@@ -187,19 +199,40 @@ private fun StatusCard(state: CheckinUiState) {
     val icon = if (complete) R.drawable.ic_check else if (failure) R.drawable.ic_info else R.drawable.ic_clock
     val accent = if (failure) colors.error else if (state.pending) colors.tertiary else colors.primary
     val background = if (failure) colors.errorContainer else if (state.pending) colors.tertiaryContainer else colors.primaryContainer
-    SwuCard {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-            Box(Modifier.size(46.dp).clip(RoundedCornerShape(16.dp)).background(background), contentAlignment = Alignment.Center) {
-                if (state.busy) CircularProgressIndicator(Modifier.size(22.dp), color = accent, strokeWidth = 2.dp)
-                else SwuIcon(icon, tint = accent)
+    val onBackground = if (failure) colors.onErrorContainer else if (state.pending) colors.onTertiaryContainer
+        else colors.onPrimaryContainer
+    Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(24.dp), color = background,
+        border = BorderStroke(1.dp, accent.copy(alpha = 0.22f))) {
+        Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                Box(Modifier.size(50.dp).clip(RoundedCornerShape(16.dp)).background(colors.surface),
+                    contentAlignment = Alignment.Center) {
+                    if (state.busy) CircularProgressIndicator(Modifier.size(24.dp), color = accent, strokeWidth = 2.dp)
+                    else SwuIcon(icon, tint = accent, modifier = Modifier.size(26.dp))
+                }
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text("今日状态", style = MaterialTheme.typography.bodySmall, color = onBackground.copy(alpha = 0.75f))
+                    Text(title, style = MaterialTheme.typography.titleLarge, color = onBackground)
+                }
             }
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                Text("今日状态", style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant)
-                Text(title, style = MaterialTheme.typography.titleMedium)
-            }
+            Text(state.result, style = MaterialTheme.typography.bodyMedium, color = onBackground,
+                modifier = Modifier.testTag("result"))
         }
-        Text(state.result, style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant,
-            modifier = Modifier.testTag("result"))
+    }
+}
+
+@Composable
+private fun StepHint(number: Int, text: String, active: Boolean) {
+    val colors = MaterialTheme.colorScheme
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        Box(Modifier.size(22.dp).clip(RoundedCornerShape(50))
+            .background(if (active) colors.primary else colors.surfaceVariant), contentAlignment = Alignment.Center) {
+            Text(number.toString(), style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold,
+                color = if (active) colors.onPrimary else colors.onSurfaceVariant)
+        }
+        Text(text, style = MaterialTheme.typography.bodySmall,
+            color = if (active) colors.onSurface else colors.onSurfaceVariant,
+            fontWeight = if (active) FontWeight.Medium else FontWeight.Normal)
     }
 }
 
