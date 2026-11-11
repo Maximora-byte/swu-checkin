@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import re
 import struct
 import subprocess
@@ -19,8 +20,8 @@ else:
 
 APP_ID = "io.github.maximorabyte.swucheckin"
 ROOT = Path(__file__).resolve().parents[2]
-VERSION_NAME = "1.0.0"
-VERSION_CODE = 5
+VERSION_NAME = "1.1.0"
+VERSION_CODE = 6
 
 
 def verify_elf(data: bytes) -> None:
@@ -66,13 +67,14 @@ def certificate_digest(text: str) -> str:
 def verify(args: argparse.Namespace) -> dict:
     inventory = inspect_apk(args.apk)
     tools = args.sdk / "build-tools" / "35.0.0"
+    suffix = ".exe" if os.name == "nt" else ""
 
     def run(*command: object) -> str:
         return subprocess.run([str(part) for part in command], check=True, capture_output=True, encoding="utf-8").stdout
 
-    badging = run(tools / "aapt2.exe", "dump", "badging", args.apk)
+    badging = run(tools / f"aapt2{suffix}", "dump", "badging", args.apk)
     verify_manifest(badging)
-    manifest = run(tools / "aapt2.exe", "dump", "xmltree", args.apk, "--file", "AndroidManifest.xml")
+    manifest = run(tools / f"aapt2{suffix}", "dump", "xmltree", args.apk, "--file", "AndroidManifest.xml")
     if any(component in manifest for component in ("LockProbeService", "DesignPreviewActivity")):
         raise ValueError("debug component in production APK")
     signature = run(
@@ -82,7 +84,7 @@ def verify(args: argparse.Namespace) -> dict:
     expected = hashlib.sha256(args.certificate.read_bytes()).hexdigest()
     if digest != expected:
         raise ValueError("APK does not use the expected persistent certificate")
-    run(tools / "zipalign.exe", "-c", "-P", "16", "4", args.apk)
+    run(tools / f"zipalign{suffix}", "-c", "-P", "16", "4", args.apk)
     native = {}
 
     def inspect(name: str, data: bytes) -> None:
@@ -105,7 +107,7 @@ def verify(args: argparse.Namespace) -> dict:
             provenance.get("source_commit") != commit
             or provenance.get("source_tree") != tree
             or provenance.get("source_dirty") is not False
-            or provenance.get("project_version") != "2.1.1"
+            or provenance.get("project_version") != "2.2.0"
             or provenance.get("android_version") != VERSION_NAME
             or provenance.get("android_version_code") != VERSION_CODE
             or provenance.get("developer") != "MatchAll"

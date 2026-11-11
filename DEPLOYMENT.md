@@ -56,10 +56,10 @@ sudo env UV_PYTHON_INSTALL_DIR=/opt/swu-checkin-python \
 
 ## 2. 安装稳定 release
 
-以下使用已于 2026-10-03 公开的稳定版 [`v2.1.1`](https://github.com/Maximora-byte/swu-checkin/releases/tag/v2.1.1)。部署前先在发布页核对实际 tag、资产与限制，并使用该 tag 的完整代码、文档、锁文件与 units。版本相同不代表某台服务器已经升级；构建与离线检查也不能替代部署后的只读 probe。升级已有实例时先按下文停用调度、等待现有任务结束，勿直接重复执行首次安装命令。版本范围见 [发行说明](docs/releases/v2.1.1.md)。
+以下示例固定使用稳定发行系列 [`v2.2.0`](https://github.com/Maximora-byte/swu-checkin/releases/tag/v2.2.0)，实际公开状态以发布页为准。部署前先在发布页核对实际 tag、资产与限制，并使用该 tag 的完整代码、文档、锁文件与 units。版本相同不代表某台服务器已经升级；构建与离线检查也不能替代部署后的只读 probe。升级已有实例时先按下文停用调度、等待现有任务结束，勿直接重复执行首次安装命令。版本范围见 [发行说明](docs/releases/v2.2.0.md)。
 
 ```bash
-release_tag=v2.1.1
+release_tag=v2.2.0
 release_dir="/opt/swu-checkin-releases/$release_tag"
 
 sudo git clone --branch "$release_tag" --depth 1 \
@@ -141,7 +141,7 @@ sudo swu-checkin-set-credentials --sync-notify
 
 ### 当前通知汇总与送达边界
 
-以下隔离记录与 cgroup 生命周期保护要求使用包含 PR #57 的源码 commit，并同时安装该 commit 的通知 unit；上文 `v2.1.1` tag 安装示例不包含这些后续修复。不要仅按版本字符串判断保护已生效。
+以下隔离记录与 cgroup 生命周期保护要求使用包含 PR #57 的源码 commit，并同时安装该 commit 的通知 unit；旧 `v2.1.1` tag 不包含这些后续修复；本文 `v2.2.0` 安装示例已包含。不要仅按版本字符串判断保护已生效。
 
 通知按上海日期汇总已有运行记录：当天任一条状态 1/2 优先报告成功；否则有状态 5 时报告请假；否则报告最后失败，缺失或过期状态也会发出提醒。启动 CLI **之前**以排他创建方式写入 `notify-attempt-YYYY-MM-DD`（`0600`，内容为 `delivery_unverified`，文件 flush/fsync）；它是保守的防重发隔离记录，不是送达回执。存在该记录时，即使为空、上次启动失败或进程中断，也拒绝再次发送并退出 `1`；状态不可写则不启动 CLI。OpenClaw 命令返回 0 后仍按既有契约写入 `notified-YYYY-MM-DD`（`0600`），已有该完成标记则跳过并退出 `0`；它只表示 CLI 曾正常退出，不代表平台送达或收件人已读。失败或超时不写成功标记，保留 attempt。手动提前运行会占用当天通知机会；`SWUDK_NOTIFY_DRY_RUN=1` 沿用既有成功标记语义，也会创建 attempt，不应在正式状态目录中试发。没有自动过期或重试；只有经授权且核实收件端后才可人工处理 attempt，不能通过删除记录盲目补发。此机制不追溯拦截升级前没有 attempt 的历史调用，也不承诺跨文件系统故障/掉电的 exactly-once 送达。
 

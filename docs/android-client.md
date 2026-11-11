@@ -1,14 +1,14 @@
-# Android 手动客户端（1.0.0）
+# Android 手动客户端（1.1.0）
 
 Android 客户端已经接入仓库原有认证与签到核心。打开应用不会联网，也不会自动读取账号或签到。需要网络时由你主动点击查询、诊断或确认提交。
 
 ## 安装与使用
 
-最低 Android 7.0 / API24，仅支持 arm64-v8a 和 x86_64 的 64 位设备。开发者为 **MatchAll**，当前版本 **1.0.0 / versionCode=5**，下载 `SWUCheckin-1.0.0-android.apk`，见 [v2.1.1](https://github.com/Maximora-byte/swu-checkin/releases/tag/v2.1.1)。手机安装即可使用，无需 Python、SDK 或电脑；首次使用自己输入校园账号，出现验证码时自行填写。采用浅深色卡片界面与原创矢量图标，正式包名 io.github.maximorabyte.swucheckin、持久证书均保持连续。
+最低 Android 7.0 / API24，仅支持 arm64-v8a 和 x86_64 的 64 位设备。开发者为 **MatchAll**，当前版本 **1.1.0 / versionCode=6**，下载 `SWUCheckin-1.1.0-android.apk`，见 [v2.2.0](https://github.com/Maximora-byte/swu-checkin/releases/tag/v2.2.0)。手机安装即可使用，无需 Python、SDK 或电脑；首次使用自己输入校园账号，出现验证码时自行填写。采用浅深色卡片界面与原创矢量图标，正式包名 io.github.maximorabyte.swucheckin、持久证书均保持连续。
 
 云端 [Android 工作流](https://github.com/Maximora-byte/swu-checkin/actions/workflows/android-feasibility.yml)继续提供保留 14 天的 debug 验证 artifact。`app-debug.apk` 使用旧 `.feasibility` 包名与临时 debug 证书，版本带 `-debug`；测试 APK 只供开发验收，日常使用不用安装。持久签名候选来自 `android/app/build/outputs/apk/release/app-release.apk`，有独立的证书、来源与验收报告，不由 CI debug artifact 自动发布。核对具体包的 SHA256、内嵌来源、签名指纹与实际测试；不要混用不同运行的包。
 
-APK 内保留项目 MIT、Chaquopy、CPython、原生库、Python/Maven 依赖与 vendor 原文及逐文件许可清单；版本更新必须复核。当前发行与校验见 [v2.1.1](releases/v2.1.1.md)，历史说明和验收文件保留原始来源。仓库不提交 APK、私钥或密码。
+APK 内保留项目 MIT、Chaquopy、CPython、原生库、Python/Maven 依赖与 vendor 原文及逐文件许可清单；版本更新必须复核。当前发行与校验见 [v2.2.0](releases/v2.2.0.md)，历史说明和验收文件保留原始来源。仓库不提交 APK、私钥或密码。
 
 1. 安装后打开 **SWU 查寝**，输入校园账号和密码。
 2. 点击 **查询今日状态**。出现验证码时，输入图片中的英文字母和数字；当前验证码与同一登录会话绑定，两分钟未填写会取消。
