@@ -22,7 +22,7 @@
 
 ## 版本与下载
 
-当前发行系列为 **v2.2.0**，开发者与发行者为 **MatchAll**。下载和校验文件见 [v2.2.0 发布页](https://github.com/Maximora-byte/swu-checkin/releases/tag/v2.2.0)。Windows x64 安装器和免安装 ZIP 内置 Python、OCR 与全部运行资源；Android **1.1.0 / versionCode=6** 可直接安装，不需要开发环境。macOS 15 两架构仍提供未公证的预览附件。旧版 v2.1.0 Pre-release 及历史资产保持原样。
+当前源码面向 **v2.2.0**，开发者与发行者为 **MatchAll**。发行准备和公开下载状态分别记录：实际最新公开版见 [Latest Release](https://github.com/Maximora-byte/swu-checkin/releases/latest)，本系列说明见 [v2.2.0](docs/releases/v2.2.0.md)。只有公开发布页中实际列出的文件才是可下载发行资产。Windows x64 安装器和免安装 ZIP 内置 Python、OCR 与全部运行资源；Android **1.1.0 / versionCode=6** 可直接安装，不需要开发环境。macOS 15 两架构仍提供未公证的预览附件。旧版 v2.1.0 Pre-release 及历史资产保持原样。
 
 安装入口：Android 下载 `SWUCheckin-1.1.0-android.apk`；Windows 下载 `SWUCheckin-2.2.0-win-x64-Setup.exe`，或完整解压 `SWUCheckin-2.2.0-win-x64-Portable.zip`。首次打开后自行输入校园账号并先做只读查询；默认不会签到或启用后台任务。版本范围、升级与校验见 [v2.2.0 说明](docs/releases/v2.2.0.md)。
 
