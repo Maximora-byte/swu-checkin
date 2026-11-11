@@ -14,7 +14,15 @@ from typing import TextIO
 from . import formal_execution
 from .models import CheckinResult
 from .runtime_lock import RuntimeLockBusy, RuntimeLockError
-from .service import DEFAULT_MAX_ATTEMPTS, DEFAULT_RETRY_DELAY, CheckinService, DoctorReport, run_checkin, run_probe
+from .service import (
+    DEFAULT_MAX_ATTEMPTS,
+    DEFAULT_RETRY_DELAY,
+    CheckinService,
+    DoctorReport,
+    random_retry_jitter,
+    run_checkin,
+    run_probe,
+)
 from .status import SUCCESSFUL_CHECKIN_STATUSES, SUCCESSFUL_PROBE_STATUSES, CheckinStatus
 from .storage import StatusStorageError, load_run_status, record_run_status
 
@@ -102,6 +110,7 @@ def _execute(*, probe_only: bool, json_output: bool) -> int:
                     10,
                     max_attempts=_env_int("SWUDK_MAX_ATTEMPTS", DEFAULT_MAX_ATTEMPTS),
                     retry_delay=_env_int("SWUDK_RETRY_DELAY", DEFAULT_RETRY_DELAY),
+                    retry_jitter=random_retry_jitter,
                 )
     except (KeyboardInterrupt, SystemExit):
         raise

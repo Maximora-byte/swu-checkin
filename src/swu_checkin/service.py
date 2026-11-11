@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import random
 import time
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
@@ -25,7 +26,7 @@ from .api_models import (
 from .auth import AuthError, AuthFailureReason, auth_failure_status
 from .cache import CheckinContext
 from .client import SessionExpiredError, SwuClient
-from .get_info import authenticate_token
+from .login import authenticate_token
 from .models import CheckinResult
 from .status import CheckinStatus, VacationStatus, status_message
 from .time_utils import epoch_milliseconds, today_shanghai
@@ -52,7 +53,6 @@ class _FailureStage(StrEnum):
     TOKEN_VALIDATION = "token_validation"
     LEAVE = "leave"
     TRANSITION = "transition"
-    STUDENT_PROFILE = "student_profile"
     DORMITORY = "dormitory"
     SUBMIT = "submit"
     CONFIRM = "confirm"
@@ -115,9 +115,10 @@ class _AttemptOutcome:
 
 @dataclass(frozen=True)
 class _AuthenticatedSession:
-    """An authenticated client and whether it came from the token cache."""
+    """An authenticated client, its validated student, and whether it came from the token cache."""
 
     client: SwuClient
+    student: StudentProfile
     from_cache: bool
 
 
@@ -154,11 +155,15 @@ def parse_dormitory_response(dormitory: object) -> tuple[dict[str, float], str, 
     return {"latitude": info.latitude, "longitude": info.longitude}, info.building, info.room
 
 
-def business_response_succeeded(payload: object) -> bool:
-    """Return true only when the response contains an explicit success signal."""
+_FAILURE_RESULT_TEXT = frozenset({"false", "0", "fail", "failed", "error"})
+_SUCCESS_RESULT_TEXT = frozenset({"success", "ok", "true", "1"})
+
+
+def _business_signals(payload: object) -> tuple[object, object] | None:
+    """Extract (code, result) from a submit response; None when it is not a string-keyed object."""
 
     if not isinstance(payload, dict) or not all(isinstance(key, str) for key in payload):
-        return False
+        return None
     root = cast("Mapping[str, object]", payload)
     nested_value = root.get("data")
     nested = cast("Mapping[str, object]", nested_value) if isinstance(nested_value, dict) else {}
@@ -167,39 +172,44 @@ def business_response_succeeded(payload: object) -> bool:
         "success",
         root.get("result", root.get("ok", nested.get("success", nested.get("result", nested.get("ok"))))),
     )
+    return code_value, result_value
+
+
+def _is_explicit_failure(result_value: object) -> bool:
+    if result_value is False or result_value == 0:
+        return True
+    return isinstance(result_value, str) and result_value.strip().lower() in _FAILURE_RESULT_TEXT
+
+
+def business_response_succeeded(payload: object) -> bool:
+    """Return true only when the response contains an explicit success signal."""
+
+    signals = _business_signals(payload)
+    if signals is None:
+        return False
+    code_value, result_value = signals
     if code_value is not None and str(code_value).strip().lower() not in SUCCESS_CODES:
         return False
-    if result_value is False or result_value == 0:
-        return False
-    if isinstance(result_value, str) and result_value.strip().lower() in {"false", "0", "fail", "failed", "error"}:
+    if _is_explicit_failure(result_value):
         return False
     return (
         code_value is not None
         or result_value is True
         or result_value == 1
-        or (isinstance(result_value, str) and result_value.strip().lower() in {"success", "ok", "true", "1"})
+        or (isinstance(result_value, str) and result_value.strip().lower() in _SUCCESS_RESULT_TEXT)
     )
 
 
 def _business_response_diagnostic(payload: object) -> str:
     """Classify a submit response without logging its body or message."""
 
-    if not isinstance(payload, dict) or not all(isinstance(key, str) for key in payload):
+    signals = _business_signals(payload)
+    if signals is None:
         return "响应结构异常"
-    root = cast("Mapping[str, object]", payload)
-    nested_value = root.get("data")
-    nested = cast("Mapping[str, object]", nested_value) if isinstance(nested_value, dict) else {}
-    code_value = root.get("code", root.get("status", nested.get("code", nested.get("status"))))
+    code_value, result_value = signals
     if code_value is not None:
         return "业务码已返回"
-
-    result_value = root.get(
-        "success",
-        root.get("result", root.get("ok", nested.get("success", nested.get("result", nested.get("ok"))))),
-    )
-    if result_value is False or result_value == 0:
-        return "显式失败标志"
-    if isinstance(result_value, str) and result_value.strip().lower() in {"false", "0", "fail", "failed", "error"}:
+    if _is_explicit_failure(result_value):
         return "显式失败标志"
     return "缺少明确业务码或成功标志"
 
@@ -207,6 +217,8 @@ def _business_response_diagnostic(payload: object) -> str:
 def _request_failure_diagnostic(error: requests.exceptions.RequestException) -> str:
     """Return a fixed, non-sensitive transport failure classification."""
 
+    if isinstance(error, SessionExpiredError):
+        return "认证会话失效"
     if isinstance(error, requests.exceptions.HTTPError) and error.response is not None:
         return f"HTTP {error.response.status_code}"
     if isinstance(error, requests.exceptions.Timeout):
@@ -318,6 +330,17 @@ class ServiceOptions(TypedDict, total=False):
     clock: Callable[[], float]
     diagnostic: Callable[[str], None]
     token_store: TokenStoreProtocol
+    retry_jitter: Callable[[float], float]
+
+
+def random_retry_jitter(wait: float) -> float:
+    """Spread concurrent retries (e.g. an Actions account matrix) over up to 25% extra wait."""
+
+    return random.uniform(0, wait * 0.25)
+
+
+def _no_retry_jitter(_wait: float) -> float:
+    return 0.0
 
 
 class CheckinService:
@@ -333,6 +356,7 @@ class CheckinService:
         clock: Callable[[], float] = time.perf_counter,
         diagnostic: Callable[[str], None] = print,
         token_store: TokenStoreProtocol | None = None,
+        retry_jitter: Callable[[float], float] = _no_retry_jitter,
     ):
         self.timeout = timeout
         self._token_provider = token_provider or authenticate_token
@@ -341,6 +365,7 @@ class CheckinService:
         self._clock = clock
         self._diagnostic = diagnostic
         self._token_store = token_store or TokenStore()
+        self._retry_jitter = retry_jitter
 
     def _delete_cached_token(self, username: str) -> None:
         try:
@@ -395,32 +420,19 @@ class CheckinService:
             student_id = client.get_student_id()
         except SessionExpiredError:
             raise _TokenInvalid from None
-        except requests.exceptions.HTTPError as error:
-            status_code = error.response.status_code if error.response is not None else None
-            if status_code in {401, 403}:
-                raise _TokenInvalid from None
-            reason = (
-                AuthFailureReason.NETWORK_ERROR
-                if self._is_transient_request_error(error)
-                else AuthFailureReason.TOKEN_EXCHANGE_FAILED
-            )
-            raise _StagedAuthError(
-                reason,
-                _FailureStage.TOKEN_VALIDATION,
-                _request_failure_diagnostic(error),
-                retryable=self._is_transient_request_error(error),
-            ) from None
         except requests.exceptions.RequestException as error:
-            reason = (
-                AuthFailureReason.NETWORK_ERROR
-                if self._is_transient_request_error(error)
-                else AuthFailureReason.TOKEN_EXCHANGE_FAILED
-            )
+            # SwuClient maps 401/403 to SessionExpiredError; this guard keeps
+            # injected clients that raise a bare HTTPError on the same path.
+            if isinstance(error, requests.exceptions.HTTPError) and (
+                error.response is not None and error.response.status_code in {401, 403}
+            ):
+                raise _TokenInvalid from None
+            transient = self._is_transient_request_error(error)
             raise _StagedAuthError(
-                reason,
+                AuthFailureReason.NETWORK_ERROR if transient else AuthFailureReason.TOKEN_EXCHANGE_FAILED,
                 _FailureStage.TOKEN_VALIDATION,
                 _request_failure_diagnostic(error),
-                retryable=self._is_transient_request_error(error),
+                retryable=transient,
             ) from None
         except (json.JSONDecodeError, KeyError, ValueError, TypeError, ApiSchemaError) as error:
             raise _StagedAuthError(
@@ -452,7 +464,7 @@ class CheckinService:
                 self._delete_cached_token(username)
             else:
                 if student_id == cached.student_id == username:
-                    return _AuthenticatedSession(client=client, from_cache=True)
+                    return _AuthenticatedSession(client=client, student=StudentProfile(student_id), from_cache=True)
                 self._delete_cached_token(username)
 
         try:
@@ -482,7 +494,7 @@ class CheckinService:
                 self._token_store.save(username, token, student_id)
             except (OSError, TokenStoreError):
                 pass
-        return _AuthenticatedSession(client=client, from_cache=False)
+        return _AuthenticatedSession(client=client, student=StudentProfile(student_id), from_cache=False)
 
     def _authenticated_client(
         self,
@@ -499,11 +511,14 @@ class CheckinService:
             write_token_cache=write_token_cache,
         ).client
 
-    def _prepare_context(self, client: SwuClient, transition: Transition) -> CheckinSubmission:
+    def _prepare_context(self, session: _AuthenticatedSession, transition: Transition) -> CheckinSubmission:
+        # The student identity was already read from the profile endpoint and
+        # matched against the username during token validation; reuse it
+        # instead of issuing a second identical request.
         pending = self._run_stage(_FailureStage.TRANSITION, transition.require_pending)
         return CheckinSubmission(
-            student=self._run_stage(_FailureStage.STUDENT_PROFILE, client.get_student_profile),
-            dormitory=self._run_stage(_FailureStage.DORMITORY, client.get_dormitory_info),
+            student=session.student,
+            dormitory=self._run_stage(_FailureStage.DORMITORY, session.client.get_dormitory_info),
             transition=pending,
         )
 
@@ -525,8 +540,6 @@ class CheckinService:
                 write_token_cache=write_token_cache,
             )
         except (AuthError, _StageFailure, *EXPECTED_DATA_ERRORS):
-            client = None
-        if client is None:
             return DoctorReport(False, False, False, False, False)
 
         try:
@@ -535,11 +548,9 @@ class CheckinService:
         except EXPECTED_DATA_ERRORS:
             leave_policy = False
 
-        try:
-            client.get_student_profile()
-            student_profile = True
-        except EXPECTED_DATA_ERRORS:
-            student_profile = False
+        # Authentication already parsed the student profile and matched it
+        # against the username, so a separate profile request adds nothing.
+        student_profile = True
 
         try:
             client.get_dormitory_info()
@@ -599,9 +610,10 @@ class CheckinService:
             self._diagnostic(f"签到失败（stage=submit，{classification}），且服务端状态未变更")
         return CheckinStatus.DATA_ERROR
 
-    def _prepare_pre_submit_with_client(
-        self, client: SwuClient
+    def _prepare_pre_submit_with_session(
+        self, session: _AuthenticatedSession
     ) -> tuple[CheckinStatus | None, SwuClient, CheckinSubmission | None]:
+        client = session.client
         vacation_status = self._run_stage(
             _FailureStage.LEAVE,
             lambda: client.get_leave_record_set().evaluate(),
@@ -616,7 +628,7 @@ class CheckinService:
             return CheckinStatus.NO_TASK, client, None
         if transition.is_checked_in:
             return CheckinStatus.ALREADY_CHECKED_IN, client, None
-        return None, client, self._prepare_context(client, transition)
+        return None, client, self._prepare_context(session, transition)
 
     def _prepare_pre_submit(
         self,
@@ -627,7 +639,7 @@ class CheckinService:
     ) -> tuple[CheckinStatus | None, SwuClient, CheckinSubmission | None]:
         session = self._authenticated_session(username, password)
         try:
-            return self._prepare_pre_submit_with_client(session.client)
+            return self._prepare_pre_submit_with_session(session)
         except _StagedSessionExpired as failure:
             if not session.from_cache or not allow_cached_session_recovery:
                 raise _StageFailure(
@@ -638,7 +650,7 @@ class CheckinService:
         self._delete_cached_token(username)
         fresh = self._authenticated_session(username, password, read_token_cache=False)
         try:
-            return self._prepare_pre_submit_with_client(fresh.client)
+            return self._prepare_pre_submit_with_session(fresh)
         except _StagedSessionExpired as failure:
             self._delete_cached_token(username)
             raise _StageFailure(
@@ -713,7 +725,7 @@ class CheckinService:
             self._diagnostic(
                 f"第 {attempt}/{max_attempts} 次失败（{status_message(last_outcome.status)}），{wait} 秒后重试"
             )
-            self._sleep(wait)
+            self._sleep(wait + self._retry_jitter(wait))
         duration_ms = max(0, int((self._clock() - started) * 1000))
         return CheckinResult.from_status(
             last_outcome.status,

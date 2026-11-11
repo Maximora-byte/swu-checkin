@@ -64,3 +64,17 @@ def test_legacy_module_entrypoint_accepts_new_cli_arguments():
     assert completed.returncode == 0
     assert "--json" in completed.stdout
     assert "--probe" in completed.stdout
+
+
+def test_legacy_entry_points_emit_deprecation_warning(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(check_in_module.CheckinService, "check_in_once", Mock(return_value=CheckinStatus.SUCCESS))
+
+    with pytest.warns(DeprecationWarning, match="swu_checkin.run_checkin"):
+        assert check_in("student", "password") is CheckinStatus.SUCCESS
+
+
+def test_get_info_is_an_alias_of_login():
+    from swu_checkin import get_info, login
+
+    assert get_info is login
+    assert importlib.import_module("swu_checkin.get_info") is login

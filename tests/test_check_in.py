@@ -446,7 +446,7 @@ def test_probe_preflight_validates_dormitory_and_student_without_submitting():
 
     assert _service(client).probe_once("student", "password") == CheckinStatus.PROBE_PENDING
     client.get_dormitory_info.assert_called_once_with()
-    client.get_student_profile.assert_called_once_with()
+    client.get_student_profile.assert_not_called()
     assert client.submit_calls == 0
 
 
