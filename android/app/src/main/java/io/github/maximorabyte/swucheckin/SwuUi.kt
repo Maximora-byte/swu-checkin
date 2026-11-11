@@ -30,9 +30,16 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.repeatOnLifecycle
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Date
 import java.util.Locale
+import java.util.TimeZone
 
 @Composable
 internal fun SwuIcon(@DrawableRes resource: Int, description: String? = null,
@@ -89,12 +96,7 @@ internal fun CheckinScreen(state: CheckinUiState, actions: CheckinUiActions, pre
                 .padding(22.dp), verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(7.dp)) {
-                    val today = remember { SimpleDateFormat("M月d日 EEE", Locale.CHINA).format(Date()) }
-                    Surface(shape = RoundedCornerShape(50), color = Color.White.copy(alpha = 0.14f)) {
-                        Text("SWU 查寝 · $today", style = MaterialTheme.typography.bodySmall, color = Color(0xFFE4F0E7),
-                            maxLines = 1, overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp))
-                    }
+                    CheckinDateLabel()
                     Text("今日查寝", style = MaterialTheme.typography.headlineMedium, color = Color.White)
                     Text("先查询，再安心确认。", style = MaterialTheme.typography.bodyMedium, color = Color(0xFFDCEADF))
                 }
@@ -180,6 +182,38 @@ internal fun CheckinScreen(state: CheckinUiState, actions: CheckinUiActions, pre
             Spacer(Modifier.width(6.dp)); Text("使用前请确认本人在寝", style = MaterialTheme.typography.bodySmall)
         }
         Spacer(Modifier.height(8.dp))
+    }
+}
+
+@Composable
+internal fun CheckinDateLabel(now: () -> Long = System::currentTimeMillis) {
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    val formatter = remember {
+        SimpleDateFormat("M月d日 EEE", Locale.CHINA).apply { timeZone = TimeZone.getTimeZone("Asia/Shanghai") }
+    }
+    val today by produceState(formatter.format(Date(now())), lifecycle, now) {
+        // A retained Activity must refresh as soon as it returns to the foreground.
+        lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+            while (isActive) {
+                val timestamp = now()
+                value = formatter.format(Date(timestamp))
+                val midnight = Calendar.getInstance(formatter.timeZone).apply {
+                    timeInMillis = timestamp
+                    add(Calendar.DAY_OF_MONTH, 1)
+                    set(Calendar.HOUR_OF_DAY, 0)
+                    set(Calendar.MINUTE, 0)
+                    set(Calendar.SECOND, 0)
+                    set(Calendar.MILLISECOND, 0)
+                }.timeInMillis
+                // Wake at Shanghai midnight; bound the wait to catch wall-clock adjustments.
+                delay((midnight - timestamp).coerceIn(1L, 60_000L))
+            }
+        }
+    }
+    Surface(shape = RoundedCornerShape(50), color = Color.White.copy(alpha = 0.14f)) {
+        Text("SWU 查寝 · $today", style = MaterialTheme.typography.bodySmall, color = Color(0xFFE4F0E7),
+            maxLines = 1, overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.testTag("today-date").padding(horizontal = 10.dp, vertical = 3.dp))
     }
 }
 

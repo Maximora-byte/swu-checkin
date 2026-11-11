@@ -12,11 +12,14 @@ EXPECTED_TESTS = {
     ("io.github.maximorabyte.swucheckin.AccountSecurityTest", "encryptionTamperingAndMissingKeyFailClosed"),
     ("io.github.maximorabyte.swucheckin.AccountSecurityTest", "captchaCancellationTimeoutAndStaleAnswer"),
     ("io.github.maximorabyte.swucheckin.CheckinUiTest", "manualLoginQueryConfirmationAndCancellation"),
+    ("io.github.maximorabyte.swucheckin.CheckinDateTest", "foregroundMidnightRefreshesWithoutRecreation"),
+    ("io.github.maximorabyte.swucheckin.CheckinDateTest", "resumeAfterMidnightRefreshesWithoutRecreation"),
+    ("io.github.maximorabyte.swucheckin.CheckinDateTest", "dateUsesShanghaiWhenDeviceTimezoneDiffers"),
 }
 
 # Release APKs deliberately omit the debug-only private lock-probe process.
-# Its seven-test debug gate remains mandatory in CI; the exact production APK
-# gets its own six-test gate, including synthetic auth/UI and secure storage.
+# Its ten-test debug gate remains mandatory in CI; the exact production APK
+# gets its own nine-test gate, including synthetic auth/UI and secure storage.
 RELEASE_EXPECTED_TESTS = EXPECTED_TESTS - {
     ("io.github.maximorabyte.swucheckin.CrossProcessLockTest", "lockIsSharedAndProcessDeathReleasesIt"),
 }

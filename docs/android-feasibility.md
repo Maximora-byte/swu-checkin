@@ -2,7 +2,7 @@
 
 本文记录 Android 移植的运行环境验证和历史验收。当前源码为 [1.0.0 手动客户端](android-client.md)，增加原创图标、浅深色卡片界面和可读的检测结果；沿用独立包名、持久签名非调试构建与完整许可核验。业务 UI 支持登录、人工验证码、加密账号、只读查询和确认后的手动签到。启动不会联网；环境检测页不接触账号或学校服务，公共 HTTPS 检查仅访问 `https://www.python.org/robots.txt`。
 
-0.1.0 功能版已通过 [PR #38](https://github.com/Maximora-byte/swu-checkin/pull/38) 合并；旧 debug 包本机/云端各 63 项及哈希见 [历史记录](android-client.md#2026-10-02-功能版验收记录)。此前 0.1.1-preview 在 API24/4 KB、API35/4 KB、API35/16 KB 模拟器各通过 20 项生产 APK 验收，共 60 项；精确包哈希、失败与重跑见 [候选验证状态](android-client.md#011-preview-候选验证状态)。0.1.2 新界面另见 [版本说明](releases/android-0.1.2-ui.md)，不沿用旧包测试数。当前正式发行说明见 [v2.1.1](releases/v2.1.1.md)，最终 APK 验收以该发布页的独立报告为准。下文四项/12 项明确属于旧环境 APK，不代表功能版 debug 七项或 release 六项测试。
+0.1.0 功能版已通过 [PR #38](https://github.com/Maximora-byte/swu-checkin/pull/38) 合并；旧 debug 包本机/云端各 63 项及哈希见 [历史记录](android-client.md#2026-10-02-功能版验收记录)。此前 0.1.1-preview 在 API24/4 KB、API35/4 KB、API35/16 KB 模拟器各通过 20 项生产 APK 验收，共 60 项；精确包哈希、失败与重跑见 [候选验证状态](android-client.md#011-preview-候选验证状态)。0.1.2 新界面另见 [版本说明](releases/android-0.1.2-ui.md)，不沿用旧包测试数。当前正式发行说明见 [v2.1.1](releases/v2.1.1.md)，最终 APK 验收以该发布页的独立报告为准。下文四项/12 项明确属于旧环境 APK，不代表当前功能版 debug 十项或 release 九项测试。
 
 0.1.2 持久签名生产 APK 在三组官方模拟器共 60 项通过，另于 2026-10-03 在 vivo V2405A / Android 16 / API36 / arm64-v8a / 4 KB 真机共 20 项一次通过；真机还检查浅深色、大字号、密码显隐与输入法。两组验收分开记录，不使用真实学校账号；具体包身份与证据见 [0.1.2 真机验收](releases/android-0.1.2-physical-acceptance.json)。
 
@@ -43,9 +43,9 @@ Gradle wrapper 与 distribution 都校验固定 SHA256。SDK 路径放本地 `an
 
 CI API24 保留 1536 MB / 2 核的轻量配置；API35 普通镜像固定 4096 MB 内存，16 KB 镜像固定 6144 MB，均为 4 核并记录配置。16 KB 官方 Google 镜像在默认 2560 MB 下曾触发 `lowmemorykiller`，前台测试进程被系统杀死；该失败必须保留系统日志并通过增加模拟器内存重新验证，不能忽略失败或降低测试要求。本机启动 API35 对应镜像也应显式传入 `-memory 4096` / `-memory 6144` 和 `-accel on`。
 
-[`android-feasibility.yml`](../.github/workflows/android-feasibility.yml) 分别构建双 ABI debug APK、运行 lint、核对 Python/ABI 与实际许可，并在 API24/4 KB、API35/4 KB、API35/16 KB x86_64 模拟器执行 instrumentation。它支持手动运行和 Release 预检的精确 `workflow_call(ref)`；PR 由 `release.yml` 的路径规则统一触发，原生工作流不再独立重复响应 PR。手动运行默认使用 `github.sha`。API35 实际页大小必须匹配矩阵。debug 每状态七项 × 首装/覆盖/清数据共 21 项，第二进程锁探针仅在 debug。公共 HTTPS 需网络，失败不改写为通过；各行使用 package job 的同一 APK/test APK，核对源 commit 和 SHA256。debug 临时证书包不会自动公开为 Release。
+[`android-feasibility.yml`](../.github/workflows/android-feasibility.yml) 分别构建双 ABI debug APK、运行 lint、核对 Python/ABI 与实际许可，并在 API24/4 KB、API35/4 KB、API35/16 KB x86_64 模拟器执行 instrumentation。它支持手动运行和 Release 预检的精确 `workflow_call(ref)`；PR 由 `release.yml` 的路径规则统一触发，原生工作流不再独立重复响应 PR。手动运行默认使用 `github.sha`。API35 实际页大小必须匹配矩阵。debug 每状态十项 × 首装/覆盖/清数据共 30 项，第二进程锁探针仅在 debug。公共 HTTPS 需网络，失败不改写为通过；各行使用 package job 的同一 APK/test APK，核对源 commit 和 SHA256。debug 临时证书包不会自动公开为 Release。
 
-持久签名 release 单独检查 canonical ID、版本、非 debuggable、内嵌 `assets/BUILD-INFO.json` 的干净 commit/tree、许可证清单、证书和全部 ELF/ZIP 16 KB 对齐；来源必须与当前选定源码一致，脏工作区拒绝发行构建。一次性模拟器脚本仅接受未装正式包名的环境，每行六项共享生产测试 × 三安装状态，再加合成账号同证书重装保持两项共 20。详细构建、签名保管与验收状态见 [客户端指南](android-client.md)。
+持久签名 release 单独检查 canonical ID、版本、非 debuggable、内嵌 `assets/BUILD-INFO.json` 的干净 commit/tree、许可证清单、证书和全部 ELF/ZIP 16 KB 对齐；来源必须与当前选定源码一致，脏工作区拒绝发行构建。一次性模拟器脚本仅接受未装正式包名的环境，每行九项共享生产测试 × 三安装状态，再加合成账号同证书重装保持两项共 29。详细构建、签名保管与验收状态见 [客户端指南](android-client.md)。
 
 ### Windows 本机构建与明确设备验收
 
@@ -71,7 +71,7 @@ python scripts/android/verify_device.py --adb "$env:ANDROID_HOME/platform-tools/
 
 系统日志开关仅允许一次性模拟器。脚本只卸载/清除无已保存账号的测试安装，不清除整个设备；同版本覆盖安装不代表跨版本升级迁移。普通镜像应使用 `--page-size 4096`，真实 arm64 手机应使用 `--abi arm64-v8a` 并填入实测页大小。
 
-真实手机需要解锁、保持亮屏并让验证应用留在前台；系统出现 USB 安装提示时，允许验证 APK 与测试包安装。脚本每轮会先打开验证应用，避免从后台启动页面被设备限制。Android 7 缺少 `getconf` 时读取 `/proc/self/smaps` 的真实 `KernelPageSize`；读取失败仍算失败，不假定为 4 KB。界面测试包含启动和清理阶段在内的 300 秒超时，超时仍算失败。当前客户端验收每轮七项；脚本发现已有加密账号或无法确认测试安装为空时，拒绝卸载/清数据。
+真实手机需要解锁、保持亮屏并让验证应用留在前台；系统出现 USB 安装提示时，允许验证 APK 与测试包安装。脚本每轮会先打开验证应用，避免从后台启动页面被设备限制。Android 7 缺少 `getconf` 时读取 `/proc/self/smaps` 的真实 `KernelPageSize`；读取失败仍算失败，不假定为 4 KB。界面测试包含启动和清理阶段在内的 300 秒超时，超时仍算失败。当前客户端验收每轮十项；脚本发现已有加密账号或无法确认测试安装为空时，拒绝卸载/清数据。
 
 ### 2026-10-02 原可行性 APK 真机验收（历史）
 
