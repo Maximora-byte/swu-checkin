@@ -28,6 +28,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -88,9 +89,10 @@ internal fun CheckinScreen(state: CheckinUiState, actions: CheckinUiActions, pre
                 .padding(22.dp), verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(7.dp)) {
-                    val today = remember { SimpleDateFormat("M月d日 EEEE", Locale.CHINA).format(Date()) }
+                    val today = remember { SimpleDateFormat("M月d日 EEE", Locale.CHINA).format(Date()) }
                     Surface(shape = RoundedCornerShape(50), color = Color.White.copy(alpha = 0.14f)) {
                         Text("SWU 查寝 · $today", style = MaterialTheme.typography.bodySmall, color = Color(0xFFE4F0E7),
+                            maxLines = 1, overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp))
                     }
                     Text("今日查寝", style = MaterialTheme.typography.headlineMedium, color = Color.White)
