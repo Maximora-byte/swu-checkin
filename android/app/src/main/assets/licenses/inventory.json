@@ -1319,7 +1319,7 @@
       "sha256": "f5110972dedad2b4e9d314518daf3b7d72d6e02e499acd802181de6f74571dcc"
     },
     {
-      "path": "assets/chaquopy/requirements-common.imy!/soupsieve-2.9.2.dist-info/licenses/LICENSE.md",
+      "path": "assets/chaquopy/requirements-common.imy!/soupsieve-4.1.dist-info/licenses/LICENSE.md",
       "sha256": "76a0acdb98c3a63681e20b6f096699ef8cad5fb35d56eef8387e0fa71d797a9a"
     },
     {
@@ -1412,13 +1412,13 @@
     },
     {
       "name": "soupsieve",
-      "version": "2.9.2",
-      "metadata_path": "assets/chaquopy/requirements-common.imy!/soupsieve-2.9.2.dist-info/METADATA",
-      "metadata_sha256": "25ade6580817381657a42b7c18aaa903223eb696401be3eea9850d3d4a1af182",
+      "version": "4.1",
+      "metadata_path": "assets/chaquopy/requirements-common.imy!/soupsieve-4.1.dist-info/METADATA",
+      "metadata_sha256": "1e9fc480f6fb856e8292e2b093e7d53fdfa73f99d9a0849d048622cfcf8c1009",
       "declared_license_files": [
         "LICENSE.md"
       ],
-      "source": "https://pypi.org/project/soupsieve/2.9.2/"
+      "source": "https://pypi.org/project/soupsieve/4.1/"
     },
     {
       "name": "typing_extensions",

@@ -169,8 +169,8 @@ def test_cleanup_wait_is_bounded(fake_cli, monkeypatch, tmp_path, capsys):
     assert not (tmp_path / "notified-2026-09-17").exists()
 
 
-@pytest.mark.parametrize("dry_run", [False, True])
-def test_exit_zero_preserves_cli_marker_contract(fake_cli, monkeypatch, tmp_path, capsys, dry_run):
+def test_exit_zero_preserves_cli_marker_contract(fake_cli, monkeypatch, tmp_path, capsys):
+    dry_run = False
     calls = fake_cli(f"print({SECRET!r})\n")
     monkeypatch.setenv("SWUDK_NOTIFY_DRY_RUN", "1" if dry_run else "0")
     assert notify.main() == 0
@@ -358,3 +358,49 @@ with patch("subprocess.Popen", side_effect=launch), patch("os.killpg", side_effe
     assert second.returncode == 1
     assert "reason=attempt_exists outcome=delivery_unverified" in second.stderr
     assert (tmp_path / "launches").read_text() == "launch\n"
+
+
+@pytest.mark.parametrize("child_exit", [0, 7])
+def test_dry_run_does_not_suppress_real_send(fake_cli, monkeypatch, tmp_path, child_exit):
+    calls = fake_cli(f"import sys\nsys.exit({child_exit})\n")
+    monkeypatch.setenv("SWUDK_NOTIFY_DRY_RUN", "1")
+    assert notify.main() == (0 if child_exit == 0 else 1)
+    assert not (tmp_path / "notified-2026-09-17").exists()
+    assert not (tmp_path / "notify-attempt-2026-09-17").exists()
+    monkeypatch.setenv("SWUDK_NOTIFY_DRY_RUN", "0")
+    fake_cli("pass\n")
+    assert notify.main() == 0
+    assert len(calls) == 2
+
+
+def test_dry_run_ignores_existing_real_markers(fake_cli, monkeypatch, tmp_path):
+    calls = fake_cli("pass\n")
+    for name in ["notified-2026-09-17", "notify-attempt-2026-09-17"]:
+        (tmp_path / name).write_text("original")
+    monkeypatch.setenv("SWUDK_NOTIFY_DRY_RUN", "1")
+    assert notify.main() == 0
+    assert len(calls) == 1
+    assert all(p.read_text() == "original" for p in tmp_path.glob("*-2026-09-17"))
+
+
+@pytest.mark.parametrize("value,expected", [(None, 120), ("30", 30), ("180", 180)])
+def test_configurable_timeout(fake_cli, monkeypatch, value, expected):
+    fake_cli("pass\n")
+    if value is None:
+        monkeypatch.delenv("SWUDK_NOTIFY_SEND_TIMEOUT", raising=False)
+    else:
+        monkeypatch.setenv("SWUDK_NOTIFY_SEND_TIMEOUT", value)
+    process = Mock(wait=Mock(return_value=0))
+    monkeypatch.setattr(notify.subprocess, "Popen", Mock(return_value=process))
+    assert notify.main() == 0
+    process.wait.assert_called_once_with(timeout=expected)
+
+
+@pytest.mark.parametrize("value", ["0", "29", "181", "nan", "1.5", "synthetic-secret"])
+def test_invalid_timeout_does_not_spawn_or_write(fake_cli, monkeypatch, tmp_path, capsys, value):
+    calls = fake_cli("pass\n")
+    monkeypatch.setenv("SWUDK_NOTIFY_SEND_TIMEOUT", value)
+    assert notify.main() == 2
+    assert not calls
+    assert not list(tmp_path.glob("*-2026-09-17"))
+    assert value not in capsys.readouterr().err
