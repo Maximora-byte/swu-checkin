@@ -15,7 +15,7 @@ from .time_utils import today_shanghai
 
 SUCCESS_CODES = {int(CheckinStatus.SUCCESS), int(CheckinStatus.ALREADY_CHECKED_IN)}
 LEAVE_CODE = int(CheckinStatus.ON_LEAVE)
-SEND_TIMEOUT = 60
+SEND_TIMEOUT = 120
 TERMINATE_GRACE = 2
 
 
@@ -83,10 +83,19 @@ def _build_message(attempts: list[dict], today: str, error: str) -> str:
 
 
 def main() -> int:
+    dry_run = os.getenv("SWUDK_NOTIFY_DRY_RUN") == "1"
+    try:
+        configured_timeout = os.getenv("SWUDK_NOTIFY_SEND_TIMEOUT")
+        send_timeout = SEND_TIMEOUT if configured_timeout is None else int(configured_timeout)
+        if configured_timeout is not None and not 30 <= send_timeout <= 180:
+            raise ValueError
+    except ValueError:
+        print("notify stage=config reason=invalid_timeout outcome=not_sent", file=sys.stderr)
+        return 2
     state_dir = Path(os.getenv("SWUDK_STATE_DIR", "/var/lib/swu-checkin"))
     today = today_shanghai()
     marker = state_dir / f"notified-{today}"
-    if marker.exists():
+    if not dry_run and marker.exists():
         print(f"{today} CLI 完成标记已存在，跳过；平台送达未核验")
         return 0
 
@@ -111,25 +120,26 @@ def main() -> int:
         message,
         "--json",
     ]
-    if os.getenv("SWUDK_NOTIFY_DRY_RUN") == "1":
+    if dry_run:
         command.append("--dry-run")
 
-    # Claim before spawning: an interrupted or failed CLI may already have sent.
-    # This is a conservative replay quarantine, never a platform delivery receipt.
-    attempt = state_dir / f"notify-attempt-{today}"
-    try:
-        state_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
-        fd = os.open(attempt, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
-        with os.fdopen(fd, "w", encoding="utf-8") as stream:
-            stream.write("delivery_unverified\n")
-            stream.flush()
-            os.fsync(stream.fileno())
-    except FileExistsError:
-        print("notify stage=guard reason=attempt_exists outcome=delivery_unverified", file=sys.stderr)
-        return 1
-    except OSError:
-        print("notify stage=guard reason=state_error outcome=not_sent", file=sys.stderr)
-        return 1
+    if not dry_run:
+        # Claim before spawning: an interrupted or failed CLI may already have sent.
+        # This is a conservative replay quarantine, never a platform delivery receipt.
+        attempt = state_dir / f"notify-attempt-{today}"
+        try:
+            state_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
+            fd = os.open(attempt, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+            with os.fdopen(fd, "w", encoding="utf-8") as stream:
+                stream.write("delivery_unverified\n")
+                stream.flush()
+                os.fsync(stream.fileno())
+        except FileExistsError:
+            print("notify stage=guard reason=attempt_exists outcome=delivery_unverified", file=sys.stderr)
+            return 1
+        except OSError:
+            print("notify stage=guard reason=state_error outcome=not_sent", file=sys.stderr)
+            return 1
 
     started = time.monotonic()
     try:
@@ -146,7 +156,7 @@ def main() -> int:
         print(f"notify stage=spawn reason=spawn_error outcome=not_sent elapsed_ms={elapsed_ms}", file=sys.stderr)
         return 1
     try:
-        returncode = process.wait(timeout=SEND_TIMEOUT)
+        returncode = process.wait(timeout=send_timeout)
     except subprocess.TimeoutExpired:
         reason = "timeout"
         try:
@@ -172,6 +182,10 @@ def main() -> int:
             file=sys.stderr,
         )
         return 1
+
+    if dry_run:
+        print("notify stage=dry_run outcome=not_sent")
+        return 0
 
     try:
         marker.write_text("sent\n", encoding="utf-8")

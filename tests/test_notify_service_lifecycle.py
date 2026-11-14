@@ -23,7 +23,7 @@ def test_notify_unit_has_bounded_cgroup_stop():
     assert service.get("TimeoutStopSec") == "3"
     assert service.get("SendSIGKILL") == "yes"
     assert service.get("RemainAfterExit", "no") == "no"
-    assert service["TimeoutStartSec"] == "90"
+    assert service["TimeoutStartSec"] == "210"
     assert service["ProtectControlGroups"] == "true"
     assert service["CapabilityBoundingSet"] == ""
 
