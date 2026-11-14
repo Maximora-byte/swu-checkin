@@ -31,14 +31,14 @@ def test_release_acceptance_preserves_existing_data(text, code):
 
 def test_release_manifest_rejects_debug_and_old_versions():
     manifest = (
-        "package: name='io.github.maximorabyte.swucheckin' versionCode='6' versionName='1.1.0'\n"
+        "package: name='io.github.maximorabyte.swucheckin' versionCode='7' versionName='1.1.1'\n"
         "sdkVersion:'24'\ntargetSdkVersion:'36'\n"
     )
     verify_manifest(manifest)
     verify_manifest(manifest.replace("sdkVersion:", "minSdkVersion:"))
     with pytest.raises(ValueError):
         verify_manifest(manifest + "minSdkVersion:'23'\n")
-    for bad in (manifest + "application-debuggable", manifest.replace("versionCode='6'", "versionCode='5'")):
+    for bad in (manifest + "application-debuggable", manifest.replace("versionCode='7'", "versionCode='5'")):
         with pytest.raises(ValueError):
             verify_manifest(bad)
 
@@ -150,7 +150,7 @@ def test_signed_preview_rejects_source_changes_after_metadata_generation(tmp_pat
     certificate.write_bytes(b"fixture DER certificate")
     cert_digest = hashlib.sha256(certificate.read_bytes()).hexdigest()
     manifest = (
-        "package: name='io.github.maximorabyte.swucheckin' versionCode='6' versionName='1.1.0'\n"
+        "package: name='io.github.maximorabyte.swucheckin' versionCode='7' versionName='1.1.1'\n"
         "sdkVersion:'24'\ntargetSdkVersion:'36'\n"
     )
     native = bytearray(120)
@@ -162,9 +162,9 @@ def test_signed_preview_rejects_source_changes_after_metadata_generation(tmp_pat
         "source_commit": commit,
         "source_tree": tree,
         "source_dirty": False,
-        "project_version": "2.2.0",
-        "android_version": "1.1.0",
-        "android_version_code": 6,
+        "project_version": "2.3.0",
+        "android_version": "1.1.1",
+        "android_version_code": 7,
         "developer": "MatchAll",
         "preview": False,
         "uv_lock_sha256": hashlib.sha256(lock.read_bytes()).hexdigest(),

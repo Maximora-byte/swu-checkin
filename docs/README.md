@@ -23,13 +23,13 @@
 - [维护与项目归属](../MAINTAINERS.md)
 - [v2.0.0 发布说明](releases/v2.0.0.md)：已发布资产、升级与该版本限制
 - [v2.1.0 预发布说明](releases/v2.1.0.md)：版本变化、交付资产和未完成的用户验收
-- [v2.2.0 正式发行说明](releases/v2.2.0.md)：界面更新、核心优化、安全修复与 Android 1.1.0
+- [v2.3.0 正式发行说明](releases/v2.3.0.md)：界面更新、核心优化、安全修复与 Android 1.1.1
 - [v2.1.1 正式发行说明](releases/v2.1.1.md)：MatchAll、Android 1.0.0、安装与升级
 - [v2.1.0 历史预发布评估](releases/release-readiness.md)：当时的候选变化、平台验证和发布待办
 - [开发、CI 与发布](development.md)：代码结构、离线测试、质量门禁与不同产物
 - [贡献指南](../CONTRIBUTING.md)
 
-当前源码面向 [v2.2.0](https://github.com/Maximora-byte/swu-checkin/releases/tag/v2.2.0)，开发者统一为 MatchAll，交付 Python、Windows x64 与 Android 1.1.0；macOS 15 两架构继续作为预览附件。实际最新公开版以 [Latest Release](https://github.com/Maximora-byte/swu-checkin/releases/latest) 为准，草稿准备和公开发行分别记录。旧版发行和验收记录保留原始来源，不将旧报告当作当前包的证明。
+当前源码面向 [v2.3.0](https://github.com/Maximora-byte/swu-checkin/releases/tag/v2.3.0)，开发者统一为 MatchAll，交付 Python、Windows x64 与 Android 1.1.1；macOS 15 两架构继续作为预览附件。实际最新公开版以 [Latest Release](https://github.com/Maximora-byte/swu-checkin/releases/latest) 为准，草稿准备和公开发行分别记录。旧版发行和验收记录保留原始来源，不将旧报告当作当前包的证明。
 
 Windows 仍未获得 Authenticode 签名；macOS 为 ad-hoc 签名、未公证预览。Android 正式包使用受保护的持久密钥，CI debug 包只供测试。用户已于 2026-10-03 反馈真实学校账号查询成功，显示“今日状态暂无签到任务”；这是本人只读操作反馈，不包含实际签到或 16 KB 真机验证。每个最终包的来源、签名和测试以发布资产中的报告为准。
 
