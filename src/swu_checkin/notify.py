@@ -1,4 +1,4 @@
-"""Send one non-sensitive Telegram summary for the day's SWU check-in runs."""
+"""Send one non-sensitive Telegram or email summary for the day's SWU check-in runs."""
 
 from __future__ import annotations
 
@@ -94,7 +94,9 @@ def main() -> int:
         return 2
     state_dir = Path(os.getenv("SWUDK_STATE_DIR", "/var/lib/swu-checkin"))
     today = today_shanghai()
-    marker = state_dir / f"notified-{today}"
+    channel = os.getenv("SWUDK_NOTIFY_CHANNEL", "telegram")
+    suffix = "-email" if channel == "email" else ""
+    marker = state_dir / f"notified-{today}{suffix}"
     if not dry_run and marker.exists():
         print(f"{today} CLI 完成标记已存在，跳过；平台送达未核验")
         return 0
@@ -103,7 +105,7 @@ def main() -> int:
     message = _build_message(attempts, today, error)
     target = os.getenv("SWUDK_NOTIFY_TARGET", "").strip()
     if not target:
-        print("Telegram 通知未配置：缺少 SWUDK_NOTIFY_TARGET", file=sys.stderr)
+        print("通知未配置：缺少 SWUDK_NOTIFY_TARGET", file=sys.stderr)
         return 2
 
     command = [
@@ -120,13 +122,18 @@ def main() -> int:
         message,
         "--json",
     ]
-    if dry_run:
+    child_env = None
+    if channel == "email":
+        command = [sys.executable, "-m", "swu_checkin.email_notify"]
+        child_env = os.environ.copy()
+        child_env["SWUDK_EMAIL_BODY"] = message
+    elif dry_run:
         command.append("--dry-run")
 
     if not dry_run:
         # Claim before spawning: an interrupted or failed CLI may already have sent.
         # This is a conservative replay quarantine, never a platform delivery receipt.
-        attempt = state_dir / f"notify-attempt-{today}"
+        attempt = state_dir / f"notify-attempt-{today}{suffix}"
         try:
             state_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
             fd = os.open(attempt, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
@@ -150,6 +157,7 @@ def main() -> int:
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
             start_new_session=os.name == "posix",
+            env=child_env,
         )
     except OSError:
         elapsed_ms = min(999999, max(0, int((time.monotonic() - started) * 1000)))
