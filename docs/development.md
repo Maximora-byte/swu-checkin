@@ -4,9 +4,9 @@
 
 ## 1. 版本与分发边界
 
-当前源码面向 [`v2.2.0`](https://github.com/Maximora-byte/swu-checkin/releases/tag/v2.2.0)，开发者为 MatchAll。Python/Windows 版本 2.2.0，Android 1.1.0 / code6；macOS 15 两架构继续为预览。见 [本次说明](releases/v2.2.0.md)。实际最新公开版以 [Latest Release](https://github.com/Maximora-byte/swu-checkin/releases/latest) 为准，版本 PR、tag 和草稿均不代表已经公开。
+当前源码面向 [`v2.3.0`](https://github.com/Maximora-byte/swu-checkin/releases/tag/v2.3.0)，开发者为 MatchAll。Python/Windows 版本 2.3.0，Android 1.1.1 / code7；macOS 15 两架构继续为预览。见 [本次说明](releases/v2.3.0.md)。实际最新公开版以 [Latest Release](https://github.com/Maximora-byte/swu-checkin/releases/latest) 为准，版本 PR、tag 和草稿均不代表已经公开。
 
-- pyproject.toml、包内 __version__ 与 uv.lock 的项目版本同步为 2.2.0；Android 独立版本为 1.1.0 / code6。
+- pyproject.toml、包内 __version__ 与 uv.lock 的项目版本同步为 2.3.0；Android 独立版本为 1.1.1 / code7。
 - Windows 安装器 Publisher、冻结 EXE 公司信息和桌面窗口，Android 使用说明/清单和包内来源，以及 macOS 应用信息均显示 MatchAll。
 - 原始 LICENSE、第三方许可、仓库地址、应用 ID 和持久签名不因开发者显示名变更而重写。
 - Windows 仍未获得 Authenticode 签名，macOS 未公证且保留 preview；支持边界按平台指南说明。
@@ -152,9 +152,9 @@ uv run --locked python scripts/release/verify_artifacts.py \
 5. 生成保留 14 天的 `release-staged-<SHA>`：六个用户包、各平台来源/许可清单、`ASSET-MANIFEST.json`、MIT、固定发行说明和整体 `SHA256SUMS.txt`
 6. 仅 tag push 的 `release-publish` 取得 `contents: write`；它不 checkout 或执行项目代码，仅下载同一次 run 的暂存集，复核最终哈希/数量。prerelease 创建非 latest 预发布；stable 创建非 latest 草稿，待维护者加入持久签名 Android 包和报告、复核后公开。已有同名 Release 拒绝覆盖；不上传 PyPI
 
-自动暂存的六个用户包是 Python wheel/sdist、Windows x64 Setup/Portable、macOS 15 arm64/x86_64 preview ZIP；Actions 外层 artifact ZIP 不作为用户安装包。Android CI 使用临时 debug 证书，只证明对应包的运行，不公开为 Release APK。本机持久签名 APK、公开证书、来源与许可/验收报告单独准备；公开前仍需完成该资产的审核和签名保管。历史 v2.1.0 [预检 37031347112](https://github.com/Maximora-byte/swu-checkin/actions/runs/37031347112) 已完成全部平台构建、三组 debug 运行验证和 17 文件暂存；六个实际用户包也已独立下载复核。当时的持久签名候选 APK 另通过 60 项生产模拟器验收。该历史包的来源、哈希、失败和边界见 [v2.1.0 发布准备](releases/release-readiness.md)及 [验收清单](releases/v2.1.0-acceptance.json)；这些通过数不能用于证明当前 v2.2.0 发行包。
+自动暂存的六个用户包是 Python wheel/sdist、Windows x64 Setup/Portable、macOS 15 arm64/x86_64 preview ZIP；Actions 外层 artifact ZIP 不作为用户安装包。Android CI 使用临时 debug 证书，只证明对应包的运行，不公开为 Release APK。本机持久签名 APK、公开证书、来源与许可/验收报告单独准备；公开前仍需完成该资产的审核和签名保管。历史 v2.1.0 [预检 37031347112](https://github.com/Maximora-byte/swu-checkin/actions/runs/37031347112) 已完成全部平台构建、三组 debug 运行验证和 17 文件暂存；六个实际用户包也已独立下载复核。当时的持久签名候选 APK 另通过 60 项生产模拟器验收。该历史包的来源、哈希、失败和边界见 [v2.1.0 发布准备](releases/release-readiness.md)及 [验收清单](releases/v2.1.0-acceptance.json)；这些通过数不能用于证明当前 v2.3.0 发行包。
 
-本轮使用数字 2.2.0 配合配置 channel="stable"；Android 使用 versionName=1.1.0 / versionCode=6。stable tag 自动建立草稿，待同源持久签名 Android APK 和逐项验收加入并核对后公开、设为 latest；prerelease 仍明确非 latest。Android CI debug 不作为公开 APK。历史 tag/资产不移动，最终包须按所选 main/tag commit 构建，不能仅凭源码树相同改写来源。
+本轮使用数字 2.3.0 配合配置 channel="stable"；Android 使用 versionName=1.1.1 / versionCode=7。stable tag 自动建立草稿，待同源持久签名 Android APK 和逐项验收加入并核对后公开、设为 latest；prerelease 仍明确非 latest。Android CI debug 不作为公开 APK。历史 tag/资产不移动，最终包须按所选 main/tag commit 构建，不能仅凭源码树相同改写来源。
 
 Android 已新增项目、Chaquopy、Python 和依赖的版权原文与许可清单，APK 检查器要求内嵌原文/hash 完整；桌面构建同样收集实际 CPython、Tcl/Tk、依赖和包内 vendor 的材料。每次最终包仍须执行实际检查，源码有原文不能代替包内完整性验证。旧 debug APK 的许可缺失仍按历史记录保留，不能因源码补齐后把旧包直接公开。
 
@@ -195,7 +195,7 @@ Android 已有[手动客户端](android-client.md)，使用 Compose、Chaquopy 1
 
 设备验收必须记录真实 API、ABI、`getpagesize()`、源码 commit 与 APK SHA256，并逐一验证规定的 instrumentation 测试身份；首次安装、替换安装和清除本应用数据后的冷启动都需完成。测试会操作/安装/卸载本应用，仅可在授权的测试设备上运行；发现已有加密账号或无法可靠判断时，验证器拒绝破坏式安装流程。业务链测试使用合成账号和传输数据，公网站点 HTTPS 验证不访问学校，不应把这类通过结果写成真实 SWU 登录成功。
 
-历史 0.1.0 debug、0.1.1/0.1.2 生产候选保留各自的包哈希、通过数与失败记录，不用于证明新的 1.1.0 APK。最终版本按自己的来源和字节记录验收；用户真实只读查询反馈另行注明，实际签到、16 KB 真机、旧 debug 账号自动迁移和另一个物理电脑恢复仍未验证。
+历史 0.1.0 debug、0.1.1/0.1.2 生产候选保留各自的包哈希、通过数与失败记录，不用于证明新的 1.1.1 APK。最终版本按自己的来源和字节记录验收；用户真实只读查询反馈另行注明，实际签到、16 KB 真机、旧 debug 账号自动迁移和另一个物理电脑恢复仍未验证。
 
 ## 9. macOS 桌面预览验证
 

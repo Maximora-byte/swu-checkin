@@ -2,7 +2,7 @@
 
 本页介绍 `scripts/windows/install.ps1` 的脚本部署，**不是**独立 EXE 安装包。想双击中文窗口的用户请看 [Windows 桌面版](windows-desktop.md)。两种方式共用业务核心，但凭据格式、安装器和任务不同，不能混用。
 
-本文以所在源码 commit 为准。当前项目版本为 **2.2.0**，下载见 [v2.2.0](https://github.com/Maximora-byte/swu-checkin/releases/tag/v2.2.0)；部署时使用同一 tag 的代码、文档与锁文件。版本范围见 [发行说明](releases/v2.2.0.md)。
+本文以所在源码 commit 为准。当前项目版本为 **2.3.0**，下载见 [v2.3.0](https://github.com/Maximora-byte/swu-checkin/releases/tag/v2.3.0)；部署时使用同一 tag 的代码、文档与锁文件。版本范围见 [发行说明](releases/v2.3.0.md)。
 
 | 项目 | 本页脚本部署 | 桌面版 |
 | --- | --- | --- |

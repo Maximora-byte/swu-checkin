@@ -16,7 +16,7 @@ cd swu-checkin
 uv sync --locked --no-dev --python 3.13
 ```
 
-上例使用当前默认分支。要使用本次发行，执行 `git checkout v2.2.0`，并使用同一 tag 的文档与 `uv.lock`；发行文件见 [v2.2.0](https://github.com/Maximora-byte/swu-checkin/releases/tag/v2.2.0)。Python 项目版本为 2.2.0，Android 独立版本为 1.1.0。macOS 附件仍为预览，Windows 尚未获得 Authenticode 签名。
+上例使用当前默认分支。要使用本次发行，执行 `git checkout v2.3.0`，并使用同一 tag 的文档与 `uv.lock`；发行文件见 [v2.3.0](https://github.com/Maximora-byte/swu-checkin/releases/tag/v2.3.0)。Python 项目版本为 2.3.0，Android 独立版本为 1.1.1。macOS 附件仍为预览，Windows 尚未获得 Authenticode 签名。
 
 `uv sync --locked` 会严格使用检出版本的 `uv.lock`。如果锁文件与项目元数据不一致，命令会失败，而不是悄悄更新依赖。
 
