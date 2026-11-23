@@ -2,7 +2,7 @@
 
 macOS 手动桌面预览请参见 [macOS 指南](docs/macos-desktop.md)，Android 手动客户端请参见 [Android 指南](docs/android-client.md)；这些前端不使用本文的 systemd timer。
 
-本文适用于可信的长期在线 Linux 主机。项目是一次性任务，不需要常驻 Web 服务；systemd timer 在北京时间 21:15、21:45 调度，第二次运行会识别已签到状态。units 设置 `AccuracySec=30s`，不承诺精确到秒；电脑关机、网络异常或学校服务不可用仍可能导致漏签。
+本文适用于可信的长期在线 Linux 主机。项目是一次性任务，不需要常驻 Web 服务；systemd timer 在北京时间 21:10、21:29、21:45 调度，后续运行会识别已签到状态。units 设置 `AccuracySec=30s`，不承诺精确到秒；电脑关机、网络异常或学校服务不可用仍可能导致漏签。
 
 > [!IMPORTANT]
 > 只使用 [Maximora-byte/swu-checkin](https://github.com/Maximora-byte/swu-checkin) 同一稳定 tag 的代码、文档、`uv.lock` 和 units。不要混用上游、第三方 fork 或不同版本的文件。
@@ -12,7 +12,7 @@ macOS 手动桌面预览请参见 [macOS 指南](docs/macos-desktop.md)，Androi
 ## 部署模型
 
 ```text
-swu-checkin.timer (21:15 / 21:45)
+swu-checkin.timer (21:10 / 21:29 / 21:45)
         ↓
 swu-checkin.service (专用 swu-checkin 用户)
         ↓

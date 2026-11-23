@@ -48,7 +48,10 @@ def test_timers_use_explicit_shanghai_schedule_without_late_catchup():
     timer = _read("deploy/systemd/swu-checkin.timer")
     notify_timer = _read("deploy/systemd/swu-checkin-notify.timer")
 
-    assert timer.count("Asia/Shanghai") == 2
+    assert timer.count("Asia/Shanghai") == 3
+    assert "OnCalendar=*-*-* 21:10:00 Asia/Shanghai" in timer
+    assert "OnCalendar=*-*-* 21:29:00 Asia/Shanghai" in timer
+    assert "OnCalendar=*-*-* 21:45:00 Asia/Shanghai" in timer
     assert "Persistent=false" in timer
     assert "Asia/Shanghai" in notify_timer
     assert "Persistent=false" in notify_timer

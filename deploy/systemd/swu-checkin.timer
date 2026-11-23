@@ -1,8 +1,9 @@
 [Unit]
-Description=Run SWU dormitory check-in twice each evening
+Description=Run SWU dormitory check-in three times each evening
 
 [Timer]
-OnCalendar=*-*-* 21:15:00 Asia/Shanghai
+OnCalendar=*-*-* 21:10:00 Asia/Shanghai
+OnCalendar=*-*-* 21:29:00 Asia/Shanghai
 OnCalendar=*-*-* 21:45:00 Asia/Shanghai
 AccuracySec=30s
 RandomizedDelaySec=0

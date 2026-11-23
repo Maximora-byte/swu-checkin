@@ -45,7 +45,7 @@ def validate_xml(root: ET.Element, command: str, sid: str, now: datetime) -> Non
             print("Harmless task property mismatch: " + field)
             raise RuntimeError("Harmless task property verification failed")
     boundaries = root.findall(".//t:StartBoundary", NS)
-    if len(boundaries) != 2 or any(
+    if len(boundaries) != 3 or any(
         datetime.fromisoformat(node.text or "") <= now + timedelta(days=6) for node in boundaries
     ):
         raise RuntimeError("Harmless task trigger is not safely in the future")

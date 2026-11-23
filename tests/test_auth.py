@@ -5,10 +5,16 @@ import pytest
 import requests
 
 from swu_checkin.auth import AuthError, AuthFailureReason, auth_failure_status
-from swu_checkin.get_info import _get_token, get_token, recognize_captcha, validate_login_result_text
-from swu_checkin.oauth_flow import OAuthDiscoveryError
+from swu_checkin.get_info import (
+    _get_token,
+    authenticate_token,
+    get_token,
+    recognize_captcha,
+    validate_login_result_text,
+)
+from swu_checkin.oauth_flow import OAuthDiscoveryDetail, OAuthDiscoveryError
 from swu_checkin.service import CheckinService
-from swu_checkin.status import CheckinStatus
+from swu_checkin.status import CheckinStatus, VacationStatus
 
 
 def test_onnx_telemetry_is_disabled_before_ocr_initialization():
@@ -130,7 +136,7 @@ def _captcha_response(status_code: int) -> requests.Response:
     return response
 
 
-@pytest.mark.parametrize("status_code", [408, 425, 429, 503])
+@pytest.mark.parametrize("status_code", [408, 412, 425, 429, 503])
 def test_transient_captcha_http_status_is_network_error(status_code: int):
     session = Mock()
     session.get.return_value = _captcha_response(status_code)
@@ -325,3 +331,107 @@ def test_token_exchange_rejects_redirect_without_following_or_reading_body(monke
     assert exchange_call.args[0] == "https://of.swu.edu.cn/gateway/fighter-middle/api/integrate/uaap/cas/exchange-token"
     assert exchange_call.kwargs["allow_redirects"] is False
     redirect.json.assert_not_called()
+
+
+def test_captcha_412_maps_to_network_error_without_provider_or_post_and_retries(monkeypatch: pytest.MonkeyPatch):
+    flow = Mock(
+        code_random="random",
+        captcha_url="https://idm.swu.edu.cn/am/validate.code",
+        form_action="https://idm.swu.edu.cn/am/UI/Login",
+        goto_value="safe-goto",
+    )
+    identity_response = Mock(url="https://of.swu.edu.cn/&ticket=identity")
+    callback_response = Mock(url="https://of.swu.edu.cn/&ticket=token")
+    token_response = Mock()
+    token_response.json.return_value = {"data": "synthetic-token"}
+    session = Mock()
+    session.post.return_value = Mock(text="ok")
+    session.get.side_effect = [_captcha_response(412)]
+
+    monkeypatch.setattr("swu_checkin.get_info.requests.Session", Mock(return_value=session))
+    monkeypatch.setattr("swu_checkin.get_info.discover_login_flow", Mock(return_value=flow))
+    monkeypatch.setattr("swu_checkin.get_info.des", Mock(return_value=("encrypted-user", "encrypted-password")))
+    monkeypatch.setattr("swu_checkin.get_info.build_login_form_data", Mock(return_value={}))
+    monkeypatch.setattr(
+        "swu_checkin.get_info.follow_trusted_auth_redirects",
+        lambda _s, response, **_kwargs: response,
+    )
+    monkeypatch.setattr("swu_checkin.get_info.describe_auth_response", Mock(return_value="safe-response"))
+    monkeypatch.setattr("swu_checkin.get_info.validate_idm_login_response", Mock())
+    monkeypatch.setattr("swu_checkin.get_info.validate_login_result_text", Mock())
+    monkeypatch.setattr(
+        "swu_checkin.get_info.submit_identity_selection_if_needed",
+        Mock(return_value=identity_response),
+    )
+    monkeypatch.setattr("swu_checkin.get_info.extract_ticket_from_url", Mock(side_effect=["identity", "token"]))
+    monkeypatch.setattr("swu_checkin.get_info.transform_ticket", Mock(return_value="transformed"))
+    monkeypatch.setattr("swu_checkin.get_info.build_cas_callback_url", Mock(return_value="https://safe.invalid"))
+    monkeypatch.setattr("swu_checkin.get_info.validate_cas_callback_response", Mock())
+
+    provider = Mock(return_value="Ab12")
+    with pytest.raises(AuthError) as caught:
+        authenticate_token("student", "password", 1, captcha_provider=provider)
+    assert caught.value.reason is AuthFailureReason.NETWORK_ERROR
+    provider.assert_not_called()
+    session.post.assert_not_called()
+
+    session.get.side_effect = [
+        _captcha_response(412),
+        _captcha_response(200),
+        callback_response,
+        token_response,
+    ]
+    store = Mock()
+    store.get.return_value = None
+    client = Mock()
+    client.get_student_id.return_value = "student"
+    client.get_leave_record_set.return_value.evaluate.return_value = VacationStatus.NO_ACTIVE_LEAVE
+    client.get_transition.return_value = Mock(is_checked_in=True)
+    sleep = Mock()
+    service = CheckinService(
+        token_store=store,
+        sleep=sleep,
+        client_factory=lambda _token, _timeout: client,
+        token_provider=lambda u, p, t: authenticate_token(u, p, t, captcha_provider=provider),
+    )
+
+    result = service.run_checkin("student", "password", max_attempts=2, retry_delay=1)
+
+    assert result.code == CheckinStatus.ALREADY_CHECKED_IN
+    assert result.status == "already_checked_in"
+    assert result.attempts == 2
+    assert provider.call_count == 1
+    assert session.post.call_count == 1
+    sleep.assert_called_once_with(1)
+
+
+def test_oauth_discovery_error_logs_safe_detail_without_leaking_message(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+):
+    discovery = Mock(side_effect=OAuthDiscoveryError("leaky-secret-value", detail=OAuthDiscoveryDetail.UNEXPECTED_URL))
+    monkeypatch.setattr("swu_checkin.get_info.discover_login_flow", discovery)
+
+    with pytest.raises(AuthError) as caught:
+        _get_token("student", "password", timeout=1)
+
+    assert caught.value.reason is AuthFailureReason.OAUTH_FLOW_CHANGED
+    output = capsys.readouterr().out
+    assert "登录过程异常: OAuthDiscoveryError (unexpected_url)" in output
+    assert "leaky-secret-value" not in output
+
+
+def test_oauth_discovery_error_without_detail_logs_only_type(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+):
+    discovery = Mock(side_effect=OAuthDiscoveryError("leaky-secret-value"))
+    monkeypatch.setattr("swu_checkin.get_info.discover_login_flow", discovery)
+
+    with pytest.raises(AuthError) as caught:
+        _get_token("student", "password", timeout=1)
+
+    assert caught.value.reason is AuthFailureReason.OAUTH_FLOW_CHANGED
+    output = capsys.readouterr().out
+    assert output.strip() == "登录过程异常: OAuthDiscoveryError"
+    assert "leaky-secret-value" not in output

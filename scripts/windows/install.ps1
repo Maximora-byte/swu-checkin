@@ -140,5 +140,5 @@ finally {
     $password = $null
 }
 
-Write-Host "Installation completed. Scheduled tasks run daily at 21:15 and 21:45 Beijing time."
+Write-Host "Installation completed. Scheduled tasks run daily at 21:10, 21:29, and 21:45 Beijing time."
 Write-Host "DPAPI credentials can only be decrypted by the same Windows user on this machine."

@@ -49,7 +49,7 @@ Android **1.1.1** 支持校园账号登录、人工验证码、可选加密保�
 | 场景 | 推荐方式 | 特点 |
 | --- | --- | --- |
 | 先确认账号和接口是否可用 | [本地 CLI](docs/quickstart.md) | 最快；先 `setup` / `probe`，再决定是否正式运行 |
-| 长期在线 Linux 主机 | [systemd 部署](DEPLOYMENT.md) | 时间稳定、权限隔离、双次 timer、可选 Telegram 汇总 |
+| 长期在线 Linux 主机 | [systemd 部署](DEPLOYMENT.md) | 时间稳定、权限隔离、三次 timer、可选 Telegram 汇总 |
 | 想使用 Windows 中文窗口 | [桌面版](docs/windows-desktop.md) | 独立 EXE；默认不联网、不启用任务；未签名，下载以 Releases 资产为准 |
 | 想使用 macOS 中文窗口 | [macOS 手动预览](docs/macos-desktop.md) | 原生分架构 .app；可选钥匙串、内存 token；无后台任务、未公证 |
 | 想在 Android 手机手动使用 | [Android 手动客户端](docs/android-client.md) | 人工验证码、可选密钥库加密保存、先查询再确认提交；无后台任务 |

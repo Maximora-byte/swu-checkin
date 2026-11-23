@@ -6,7 +6,7 @@ GitHub Actions 适合没有长期在线主机的用户，但 scheduled workflow 
 
 ## 工作方式
 
-- 每天北京时间 21:15、21:45 各触发一次；
+- 每天北京时间 21:10、21:29、21:45 各触发一次；
 - 支持 `workflow_dispatch` 手动触发；
 - 单个 workflow 可通过 matrix 并行处理多个账号；
 - 使用 Python 3.13 和仓库 `uv.lock`；
@@ -99,7 +99,8 @@ workflow 使用 UTC cron，对应北京时间：
 
 ```yaml
 schedule:
-  - cron: '15 13 * * *'  # 21:15 Asia/Shanghai
+  - cron: '10 13 * * *'  # 21:10 Asia/Shanghai
+  - cron: '29 13 * * *'  # 21:29 Asia/Shanghai
   - cron: '45 13 * * *'  # 21:45 Asia/Shanghai
 ```
 

@@ -28,6 +28,7 @@ from .client import SwuClient
 from .des import des
 from .identity import submit_identity_selection_if_needed
 from .oauth_flow import (
+    OAuthDiscoveryDetail,
     OAuthDiscoveryError,
     build_cas_callback_url,
     build_login_form_data,
@@ -167,11 +168,17 @@ def _fetch_captcha(session: requests.Session, captcha_url: str, timeout: int) ->
     try:
         response.raise_for_status()
     except requests.exceptions.HTTPError:
-        if response.status_code in {408, 425, 429} or 500 <= response.status_code <= 599:
+        if response.status_code in {408, 412, 425, 429} or 500 <= response.status_code <= 599:
             raise
-        raise OAuthDiscoveryError("验证码端点未返回成功响应") from None
+        raise OAuthDiscoveryError(
+            "验证码端点未返回成功响应",
+            detail=OAuthDiscoveryDetail.CAPTCHA_UNAVAILABLE,
+        ) from None
     if response.status_code != 200:
-        raise OAuthDiscoveryError("验证码端点未返回成功响应")
+        raise OAuthDiscoveryError(
+            "验证码端点未返回成功响应",
+            detail=OAuthDiscoveryDetail.CAPTCHA_UNAVAILABLE,
+        )
     return response.content
 
 
@@ -426,7 +433,8 @@ def _get_token(
         safe_print(f"登录过程异常: {type(error).__name__}")
         raise AuthError(AuthFailureReason.NETWORK_ERROR) from None
     except OAuthDiscoveryError as error:
-        safe_print(f"登录过程异常: {type(error).__name__}")
+        detail = f" ({error.detail.value})" if error.detail is not None else ""
+        safe_print(f"登录过程异常: {type(error).__name__}{detail}")
         raise AuthError(error.reason) from None
     except AuthError as error:
         safe_print(f"登录过程异常: {type(error).__name__}")

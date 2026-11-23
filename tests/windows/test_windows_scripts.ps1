@@ -44,7 +44,7 @@ $testRoot = Join-Path ([IO.Path]::GetTempPath()) "SWUCheckin-Test"
 $specs = @(Get-SWUCheckinTaskSpecs -InstallRoot $testRoot -PowerShellPath "powershell.exe")
 Assert-Equal 1 $specs.Count "Exactly one task definition is required."
 Assert-Equal "SWUCheckin-Daily" $specs[0].Name "The task must use the fixed project task name."
-Assert-Equal 2 @($specs[0].Triggers).Count "The task must contain exactly two triggers."
+Assert-Equal 3 @($specs[0].Triggers).Count "The task must contain exactly three triggers."
 Assert-True ((($specs[0].Arguments -join " ") -notmatch "SWUDK_|password|secret|ticket|captcha")) "Task arguments must not contain credentials."
 $taskXml = ConvertTo-SWUCheckinTaskXml `
     -Spec $specs[0] `
@@ -56,8 +56,9 @@ $namespaceManager = New-Object Xml.XmlNamespaceManager($taskDocument.NameTable)
 $namespaceManager.AddNamespace("task", "http://schemas.microsoft.com/windows/2004/02/mit/task")
 $triggerNodes = $taskDocument.SelectNodes("//task:CalendarTrigger", $namespaceManager)
 $startBoundaries = @($triggerNodes | ForEach-Object { $_.StartBoundary })
-Assert-Equal 2 $triggerNodes.Count "Task XML must contain exactly two daily triggers."
-Assert-True ($startBoundaries -contains "2026-09-19T21:15:00+08:00") "Task XML must contain the 21:15 Beijing trigger."
+Assert-Equal 3 $triggerNodes.Count "Task XML must contain exactly three daily triggers."
+Assert-True ($startBoundaries -contains "2026-09-19T21:10:00+08:00") "Task XML must contain the 21:10 Beijing trigger."
+Assert-True ($startBoundaries -contains "2026-09-19T21:29:00+08:00") "Task XML must contain the 21:29 Beijing trigger."
 Assert-True ($startBoundaries -contains "2026-09-19T21:45:00+08:00") "Task XML must contain the 21:45 Beijing trigger."
 Assert-Equal "IgnoreNew" $taskDocument.Task.Settings.MultipleInstancesPolicy "The single task must reject overlapping runs."
 Assert-True (-not ($taskXml -match "SWUDK_|password|secret|ticket|captcha")) "Task XML must not contain credentials."
@@ -130,8 +131,8 @@ finally {
     $env:LOCALAPPDATA = $oldLocalAppData
 }
 
-$boundary = Get-SWUCheckinBeijingStartBoundary -Hour 21 -Minute 15 -Now ([DateTimeOffset]::Parse("2026-09-19T22:00:00+08:00"))
-Assert-Equal "2026-09-20T21:15:00+08:00" $boundary "Task boundaries must use Beijing time."
+$boundary = Get-SWUCheckinBeijingStartBoundary -Hour 21 -Minute 10 -Now ([DateTimeOffset]::Parse("2026-09-19T22:00:00+08:00"))
+Assert-Equal "2026-09-20T21:10:00+08:00" $boundary "Task boundaries must use Beijing time."
 
 $uninstallSource = Get-Content -LiteralPath (Join-Path $scriptsRoot "uninstall.ps1") -Raw
 Assert-True ($uninstallSource.Contains('Remove-Item -LiteralPath $installRoot')) "Uninstall must remove only the resolved project root."
@@ -174,7 +175,8 @@ if ($WindowsIntegration) {
             Command = (Get-Process -Id $PID).Path
             Arguments = '-NoProfile -NonInteractive -Command "exit 0"'
             Triggers = @(
-                [pscustomobject]@{ Hour = 21; Minute = 15 },
+                [pscustomobject]@{ Hour = 21; Minute = 10 },
+                [pscustomobject]@{ Hour = 21; Minute = 29 },
                 [pscustomobject]@{ Hour = 21; Minute = 45 }
             )
         }
@@ -186,7 +188,7 @@ if ($WindowsIntegration) {
         [xml]$registeredXml = Export-ScheduledTask -TaskName $smokeTaskName
         $registeredNamespace = New-Object Xml.XmlNamespaceManager($registeredXml.NameTable)
         $registeredNamespace.AddNamespace("task", "http://schemas.microsoft.com/windows/2004/02/mit/task")
-        Assert-Equal 2 $registeredXml.SelectNodes("//task:CalendarTrigger", $registeredNamespace).Count "Windows Task Scheduler must preserve both triggers."
+        Assert-Equal 3 $registeredXml.SelectNodes("//task:CalendarTrigger", $registeredNamespace).Count "Windows Task Scheduler must preserve all three triggers."
         Assert-Equal "IgnoreNew" $registeredXml.Task.Settings.MultipleInstancesPolicy "Windows Task Scheduler must preserve IgnoreNew."
     }
     finally {

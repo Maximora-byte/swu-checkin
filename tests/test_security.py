@@ -1,3 +1,5 @@
+import ast
+from pathlib import Path
 from unittest.mock import Mock
 
 import pytest
@@ -191,3 +193,47 @@ def test_auth_response_stage_masks_ticket_and_query_values(
     output = capsys.readouterr().out
     assert "ST-sensitive-ticket" not in output
     assert "/<ticket-landing>" in output
+
+
+def test_all_oauth_discovery_raises_use_fixed_enum_detail_and_safe_logging():
+    src_dir = Path(__file__).resolve().parents[1] / "src" / "swu_checkin"
+    allowed_details = set(oauth_flow.OAuthDiscoveryDetail.__members__)
+    checked_raises = 0
+    for path in sorted(src_dir.glob("*.py")):
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        for node in ast.walk(tree):
+            if (
+                isinstance(node, ast.Raise)
+                and isinstance(node.exc, ast.Call)
+                and isinstance(node.exc.func, ast.Name)
+                and node.exc.func.id == "OAuthDiscoveryError"
+            ):
+                checked_raises += 1
+                detail_kws = [kw for kw in node.exc.keywords if kw.arg == "detail"]
+                assert len(detail_kws) == 1, f"{path.name}:{node.lineno} missing detail= keyword"
+                val = detail_kws[0].value
+                assert (
+                    isinstance(val, ast.Attribute)
+                    and isinstance(val.value, ast.Name)
+                    and val.value.id == "OAuthDiscoveryDetail"
+                    and val.attr in allowed_details
+                ), f"{path.name}:{node.lineno} must pass static OAuthDiscoveryDetail member"
+    assert checked_raises >= 45
+
+    login_tree = ast.parse((src_dir / "login.py").read_text(encoding="utf-8"))
+    oauth_handlers = [
+        node
+        for node in ast.walk(login_tree)
+        if isinstance(node, ast.ExceptHandler)
+        and isinstance(node.type, ast.Name)
+        and node.type.id == "OAuthDiscoveryError"
+    ]
+    assert len(oauth_handlers) == 2
+    for handler in oauth_handlers:
+        for inner in ast.walk(handler):
+            if isinstance(inner, ast.Call) and isinstance(inner.func, ast.Name):
+                assert inner.func.id not in {"str", "repr"}
+            if handler.name and isinstance(inner, ast.FormattedValue):
+                assert not (isinstance(inner.value, ast.Name) and inner.value.id == handler.name)
+                if isinstance(inner.value, ast.Attribute) and isinstance(inner.value.value, ast.Name):
+                    assert not (inner.value.value.id == handler.name and inner.value.attr == "args")
