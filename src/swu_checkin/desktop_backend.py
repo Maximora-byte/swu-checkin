@@ -63,7 +63,7 @@ def task_xml(executable: str, sid: str, now: datetime | None = None) -> bytes:
     element(registration, "Description", "SWU Check-in desktop: user-selected scheduled mode")
     triggers = element(root, "Triggers")
     current = (now or datetime.now(UTC)).astimezone(timezone(timedelta(hours=8)))
-    for minute in (15, 45):
+    for minute in (10, 29, 45):
         boundary = current.replace(hour=21, minute=minute, second=0, microsecond=0)
         if boundary <= current:
             boundary += timedelta(days=1)

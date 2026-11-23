@@ -297,7 +297,7 @@ def test_challenge_timeout_never_calls_provider_or_submits_form(login):
     sleep.assert_not_called()
 
 
-@pytest.mark.parametrize("status", [204, 302, 400, 403, 404, 408, 425, 429, 500, 503])
+@pytest.mark.parametrize("status", [204, 302, 400, 403, 404, 408, 412, 425, 429, 500, 503])
 def test_non_200_challenge_never_reaches_provider(login, status):
     session, _discovery, _factory, _ocr, _sleep, _challenges = login
     session.get.side_effect = None
@@ -308,7 +308,7 @@ def test_non_200_challenge_never_reaches_provider(login, status):
         get_info.authenticate_token("synthetic-user", "synthetic-password", 7, captcha_provider=provider)
     expected = (
         AuthFailureReason.NETWORK_ERROR
-        if status in {408, 425, 429} or status >= 500
+        if status in {408, 412, 425, 429} or status >= 500
         else AuthFailureReason.OAUTH_FLOW_CHANGED
     )
     assert caught.value.reason is expected

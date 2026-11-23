@@ -165,10 +165,11 @@ def test_task_xml_escapes_paths_and_has_beijing_daily_triggers():
     assert xml.findtext(".//t:RunLevel", namespaces=ns) == "LeastPrivilege"
     assert xml.findtext(".//t:StartWhenAvailable", namespaces=ns) == "false"
     assert [node.text for node in xml.findall(".//t:StartBoundary", ns)] == [
-        "2026-10-02T21:15:00+08:00",
+        "2026-10-02T21:10:00+08:00",
+        "2026-10-02T21:29:00+08:00",
         "2026-10-01T21:45:00+08:00",
     ]
-    assert [node.text for node in xml.findall(".//t:DaysInterval", ns)] == ["1", "1"]
+    assert [node.text for node in xml.findall(".//t:DaysInterval", ns)] == ["1", "1", "1"]
 
 
 def test_schedule_defaults_off(backend, monkeypatch):
@@ -457,7 +458,7 @@ def test_frozen_task_xml_uses_installed_executable(backend, monkeypatch):
     assert captured[0].findtext(".//t:LogonType", namespaces=ns) == "InteractiveToken"
     assert captured[0].findtext(".//t:RunLevel", namespaces=ns) == "LeastPrivilege"
     boundaries = [node.text for node in captured[0].findall(".//t:StartBoundary", ns)]
-    assert [value[11:] for value in boundaries] == ["21:15:00+08:00", "21:45:00+08:00"]
+    assert [value[11:] for value in boundaries] == ["21:10:00+08:00", "21:29:00+08:00", "21:45:00+08:00"]
 
 
 @pytest.mark.parametrize("entrypoint", ["cli", "gui", "scheduled"])

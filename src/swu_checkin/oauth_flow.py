@@ -4,6 +4,7 @@ import base64
 import re
 import urllib.parse
 from dataclasses import dataclass, field
+from enum import StrEnum
 from typing import Any
 
 import requests
@@ -57,6 +58,20 @@ _ALLOWED_AUTH_PATHS = {
 }
 
 
+class OAuthDiscoveryDetail(StrEnum):
+    """Fixed internal diagnostic codes for failed SWU discovery checks."""
+
+    UNEXPECTED_URL = "unexpected_url"
+    UNEXPECTED_STATUS = "unexpected_status"
+    REDIRECT_LOOP = "redirect_loop"
+    INVALID_OAUTH_STATE = "invalid_oauth_state"
+    LOGIN_FORM_INVALID = "login_form_invalid"
+    CAPTCHA_UNAVAILABLE = "captcha_unavailable"
+    CAS_TICKET_INVALID = "cas_ticket_invalid"
+    IDENTITY_FORM_INVALID = "identity_form_invalid"
+    UNEXPECTED_RESPONSE = "unexpected_response"
+
+
 class OAuthDiscoveryError(ValueError):
     """The server response cannot be proven to be the expected SWU flow."""
 
@@ -65,8 +80,10 @@ class OAuthDiscoveryError(ValueError):
         message: str,
         *,
         reason: AuthFailureReason = AuthFailureReason.OAUTH_FLOW_CHANGED,
+        detail: OAuthDiscoveryDetail | None = None,
     ) -> None:
         self.reason = reason
+        self.detail = detail
         super().__init__(message)
 
 
@@ -103,12 +120,12 @@ def validate_trusted_swu_url(
         or any(ord(character) < 32 for character in url)
         or re.search(r"%(?![0-9A-Fa-f]{2})", url)
     ):
-        raise OAuthDiscoveryError("认证 URL 格式无效")
+        raise OAuthDiscoveryError("认证 URL 格式无效", detail=OAuthDiscoveryDetail.UNEXPECTED_URL)
     try:
         parsed = urllib.parse.urlsplit(url)
         port = parsed.port
     except (TypeError, ValueError) as error:
-        raise OAuthDiscoveryError("认证 URL 格式无效") from error
+        raise OAuthDiscoveryError("认证 URL 格式无效", detail=OAuthDiscoveryDetail.UNEXPECTED_URL) from error
     hostname = parsed.hostname
     if (
         parsed.scheme != "https"
@@ -119,11 +136,11 @@ def validate_trusted_swu_url(
         or not parsed.path.startswith("/")
         or parsed.fragment
     ):
-        raise OAuthDiscoveryError("认证 URL 不在可信 SWU HTTPS 边界内")
+        raise OAuthDiscoveryError("认证 URL 不在可信 SWU HTTPS 边界内", detail=OAuthDiscoveryDetail.UNEXPECTED_URL)
     if expected_host is not None and hostname != expected_host:
-        raise OAuthDiscoveryError("认证 URL 主机与当前阶段不匹配")
+        raise OAuthDiscoveryError("认证 URL 主机与当前阶段不匹配", detail=OAuthDiscoveryDetail.UNEXPECTED_URL)
     if expected_path is not None and parsed.path != expected_path:
-        raise OAuthDiscoveryError("认证 URL 路径与当前阶段不匹配")
+        raise OAuthDiscoveryError("认证 URL 路径与当前阶段不匹配", detail=OAuthDiscoveryDetail.UNEXPECTED_URL)
     return parsed
 
 
@@ -137,16 +154,16 @@ def _unique_query(
         parsed = urllib.parse.urlsplit(url)
         pairs = urllib.parse.parse_qsl(parsed.query, keep_blank_values=True, strict_parsing=True)
     except (TypeError, ValueError) as error:
-        raise OAuthDiscoveryError("认证参数格式无效") from error
+        raise OAuthDiscoveryError("认证参数格式无效", detail=OAuthDiscoveryDetail.UNEXPECTED_RESPONSE) from error
     values: dict[str, str] = {}
     for key, value in pairs:
         if not key or key in values:
-            raise OAuthDiscoveryError("认证参数缺失或重复")
+            raise OAuthDiscoveryError("认证参数缺失或重复", detail=OAuthDiscoveryDetail.UNEXPECTED_RESPONSE)
         values[key] = value
     if not required.issubset(values):
-        raise OAuthDiscoveryError("认证参数缺失或重复")
+        raise OAuthDiscoveryError("认证参数缺失或重复", detail=OAuthDiscoveryDetail.UNEXPECTED_RESPONSE)
     if allowed is not None and not values.keys() <= allowed:
-        raise OAuthDiscoveryError("认证响应包含未知参数")
+        raise OAuthDiscoveryError("认证响应包含未知参数", detail=OAuthDiscoveryDetail.UNEXPECTED_RESPONSE)
     return values
 
 
@@ -160,10 +177,10 @@ def resolve_trusted_redirect(
 
     if response.status_code not in _REDIRECT_STATUSES:
         response.raise_for_status()
-        raise OAuthDiscoveryError("认证服务未返回预期跳转")
+        raise OAuthDiscoveryError("认证服务未返回预期跳转", detail=OAuthDiscoveryDetail.UNEXPECTED_STATUS)
     location = response.headers.get("Location")
     if not location:
-        raise OAuthDiscoveryError("认证跳转缺少 Location")
+        raise OAuthDiscoveryError("认证跳转缺少 Location", detail=OAuthDiscoveryDetail.UNEXPECTED_RESPONSE)
     target = urllib.parse.urljoin(response.url, location)
     validate_trusted_swu_url(target, expected_host=expected_host, expected_path=expected_path)
     return target
@@ -174,16 +191,16 @@ def _resolve_legacy_idm_login_redirect(response: requests.Response) -> str:
 
     if response.status_code not in _REDIRECT_STATUSES:
         response.raise_for_status()
-        raise OAuthDiscoveryError("认证服务未返回预期跳转")
+        raise OAuthDiscoveryError("认证服务未返回预期跳转", detail=OAuthDiscoveryDetail.UNEXPECTED_STATUS)
     location = response.headers.get("Location")
     if not location:
-        raise OAuthDiscoveryError("认证跳转缺少 Location")
+        raise OAuthDiscoveryError("认证跳转缺少 Location", detail=OAuthDiscoveryDetail.UNEXPECTED_RESPONSE)
     raw_target = urllib.parse.urljoin(response.url, location)
     try:
         parsed = urllib.parse.urlsplit(raw_target)
         port = parsed.port
     except (TypeError, ValueError) as error:
-        raise OAuthDiscoveryError("IDM login 跳转格式无效") from error
+        raise OAuthDiscoveryError("IDM login 跳转格式无效", detail=OAuthDiscoveryDetail.UNEXPECTED_URL) from error
     if parsed.scheme == "http":
         if (
             parsed.hostname != "idm.swu.edu.cn"
@@ -193,7 +210,7 @@ def _resolve_legacy_idm_login_redirect(response: requests.Response) -> str:
             or parsed.path != "/am/UI/Login"
             or parsed.fragment
         ):
-            raise OAuthDiscoveryError("IDM legacy 跳转不在精确白名单内")
+            raise OAuthDiscoveryError("IDM legacy 跳转不在精确白名单内", detail=OAuthDiscoveryDetail.UNEXPECTED_URL)
         raw_target = urllib.parse.urlunsplit(("https", "idm.swu.edu.cn", parsed.path, parsed.query, ""))
     validate_trusted_swu_url(
         raw_target,
@@ -212,10 +229,10 @@ def _validate_oauth_authorize_url(url: str) -> tuple[str, str]:
     expected = frozenset({"response_type", "client_id", "redirect_uri", "state", "scope"})
     query = _unique_query(url, required=expected, allowed=expected)
     if query["response_type"] != "code" or not query["client_id"] or not query["scope"]:
-        raise OAuthDiscoveryError("OAuth authorize 参数无效")
+        raise OAuthDiscoveryError("OAuth authorize 参数无效", detail=OAuthDiscoveryDetail.INVALID_OAUTH_STATE)
     state = query["state"]
     if not _STATE_RE.fullmatch(state):
-        raise OAuthDiscoveryError("OAuth state 缺失或无效")
+        raise OAuthDiscoveryError("OAuth state 缺失或无效", detail=OAuthDiscoveryDetail.INVALID_OAUTH_STATE)
     callback_url = query["redirect_uri"]
     parsed_callback = validate_trusted_swu_url(
         callback_url,
@@ -223,7 +240,7 @@ def _validate_oauth_authorize_url(url: str) -> tuple[str, str]:
         expected_path="/cas/oauth/callback/SWU_CAS2_FEDERAL",
     )
     if parsed_callback.query:
-        raise OAuthDiscoveryError("CAS callback 包含意外参数")
+        raise OAuthDiscoveryError("CAS callback 包含意外参数", detail=OAuthDiscoveryDetail.UNEXPECTED_URL)
     return state, callback_url
 
 
@@ -239,7 +256,7 @@ def _validate_legacy_authorize_url(value: str, expected_authorize_url: str) -> N
         parsed = urllib.parse.urlsplit(value)
         port = parsed.port
     except ValueError as error:
-        raise OAuthDiscoveryError("登录表单 goto 无效") from error
+        raise OAuthDiscoveryError("登录表单 goto 无效", detail=OAuthDiscoveryDetail.LOGIN_FORM_INVALID) from error
     valid_port = (parsed.scheme == "http" and port in (None, 80)) or (parsed.scheme == "https" and port in (None, 443))
     if (
         not valid_port
@@ -249,16 +266,16 @@ def _validate_legacy_authorize_url(value: str, expected_authorize_url: str) -> N
         or parsed.path != "/am/oauth2/authorize"
         or parsed.fragment
     ):
-        raise OAuthDiscoveryError("登录表单 goto 超出预期范围")
+        raise OAuthDiscoveryError("登录表单 goto 超出预期范围", detail=OAuthDiscoveryDetail.LOGIN_FORM_INVALID)
     if _canonical_authorize_values(value) != _canonical_authorize_values(expected_authorize_url):
-        raise OAuthDiscoveryError("登录表单 goto 与已发现流程不一致")
+        raise OAuthDiscoveryError("登录表单 goto 与已发现流程不一致", detail=OAuthDiscoveryDetail.LOGIN_FORM_INVALID)
 
 
 def _validate_hidden_goto(goto_value: str, expected_authorize_url: str) -> None:
     try:
         decoded = base64.b64decode(goto_value, validate=True).decode("utf-8")
     except (ValueError, UnicodeDecodeError) as error:
-        raise OAuthDiscoveryError("登录表单 goto 无效") from error
+        raise OAuthDiscoveryError("登录表单 goto 无效", detail=OAuthDiscoveryDetail.LOGIN_FORM_INVALID) from error
     _validate_legacy_authorize_url(decoded, expected_authorize_url)
 
 
@@ -287,16 +304,20 @@ def _validate_cas_login_url(url: str, authorize_url: str) -> None:
         expected_path="/cas/oauth2.0/callbackAuthorize",
     )
     if service_parsed.query:
-        raise OAuthDiscoveryError("CAS service callback 包含意外参数")
+        raise OAuthDiscoveryError("CAS service callback 包含意外参数", detail=OAuthDiscoveryDetail.UNEXPECTED_URL)
     if query["originalRequestUrl"] != authorize_url:
-        raise OAuthDiscoveryError("CAS originalRequestUrl 与已发现流程不一致")
+        raise OAuthDiscoveryError(
+            "CAS originalRequestUrl 与已发现流程不一致", detail=OAuthDiscoveryDetail.INVALID_OAUTH_STATE
+        )
 
 
 def _discover_federated_cas_login_url(cas_login_url: str, html: str) -> str:
     """Apply the exact federation flag advertised by the trusted CAS page."""
 
     if len(_FEDERAL_ENABLE_RE.findall(html)) != 1:
-        raise OAuthDiscoveryError("CAS 登录页未唯一声明 federated 登录入口")
+        raise OAuthDiscoveryError(
+            "CAS 登录页未唯一声明 federated 登录入口", detail=OAuthDiscoveryDetail.UNEXPECTED_RESPONSE
+        )
     parsed = validate_trusted_swu_url(
         cas_login_url,
         expected_host="uaaap.swu.edu.cn",
@@ -304,7 +325,7 @@ def _discover_federated_cas_login_url(cas_login_url: str, html: str) -> str:
     )
     query = _unique_query(cas_login_url)
     if "federalEnable" in query:
-        raise OAuthDiscoveryError("CAS federated 参数重复")
+        raise OAuthDiscoveryError("CAS federated 参数重复", detail=OAuthDiscoveryDetail.INVALID_OAUTH_STATE)
     query["federalEnable"] = "true"
     return urllib.parse.urlunsplit((parsed.scheme, parsed.netloc, parsed.path, urllib.parse.urlencode(query), ""))
 
@@ -314,7 +335,7 @@ def _validate_idm_login_url(url: str, expected_authorize_url: str) -> None:
     expected = frozenset({"realm", "service", "goto"})
     query = _unique_query(url, required=expected, allowed=expected)
     if query["realm"] != "/" or query["service"] != "initService":
-        raise OAuthDiscoveryError("IDM login 参数无效")
+        raise OAuthDiscoveryError("IDM login 参数无效", detail=OAuthDiscoveryDetail.INVALID_OAUTH_STATE)
     _validate_legacy_authorize_url(query["goto"], expected_authorize_url)
 
 
@@ -335,10 +356,15 @@ def parse_login_form(
         raise OAuthDiscoveryError(
             "登录页缺少唯一 Login form",
             reason=AuthFailureReason.LOGIN_PAGE_CHANGED,
+            detail=OAuthDiscoveryDetail.LOGIN_FORM_INVALID,
         )
     form = forms[0]
     if str(form.get("method") or "get").lower() != "post":
-        raise OAuthDiscoveryError("登录 form method 无效", reason=AuthFailureReason.LOGIN_PAGE_CHANGED)
+        raise OAuthDiscoveryError(
+            "登录 form method 无效",
+            reason=AuthFailureReason.LOGIN_PAGE_CHANGED,
+            detail=OAuthDiscoveryDetail.LOGIN_FORM_INVALID,
+        )
     action = urllib.parse.urljoin(page_url, str(form.get("action") or ""))
     parsed_action = validate_trusted_swu_url(
         action,
@@ -346,7 +372,11 @@ def parse_login_form(
         expected_path="/am/UI/Login",
     )
     if parsed_action.query:
-        raise OAuthDiscoveryError("登录 form action 包含意外参数", reason=AuthFailureReason.LOGIN_PAGE_CHANGED)
+        raise OAuthDiscoveryError(
+            "登录 form action 包含意外参数",
+            reason=AuthFailureReason.LOGIN_PAGE_CHANGED,
+            detail=OAuthDiscoveryDetail.LOGIN_FORM_INVALID,
+        )
 
     hidden_fields: dict[str, str] = {}
     for input_field in form.find_all("input"):
@@ -355,24 +385,48 @@ def parse_login_form(
             continue
         name = str(name)
         if not _INPUT_NAME_RE.fullmatch(name) or name in hidden_fields:
-            raise OAuthDiscoveryError("登录 form 字段无效或重复", reason=AuthFailureReason.LOGIN_PAGE_CHANGED)
+            raise OAuthDiscoveryError(
+                "登录 form 字段无效或重复",
+                reason=AuthFailureReason.LOGIN_PAGE_CHANGED,
+                detail=OAuthDiscoveryDetail.LOGIN_FORM_INVALID,
+            )
         if str(input_field.get("type") or "text").lower() != "hidden":
-            raise OAuthDiscoveryError("登录 form 出现意外的可见字段", reason=AuthFailureReason.LOGIN_PAGE_CHANGED)
+            raise OAuthDiscoveryError(
+                "登录 form 出现意外的可见字段",
+                reason=AuthFailureReason.LOGIN_PAGE_CHANGED,
+                detail=OAuthDiscoveryDetail.LOGIN_FORM_INVALID,
+            )
         hidden_fields[name] = str(input_field.get("value") or "")
     if not _REQUIRED_LOGIN_FIELDS.issubset(hidden_fields):
-        raise OAuthDiscoveryError("登录 form 缺少必要 hidden input", reason=AuthFailureReason.LOGIN_PAGE_CHANGED)
+        raise OAuthDiscoveryError(
+            "登录 form 缺少必要 hidden input",
+            reason=AuthFailureReason.LOGIN_PAGE_CHANGED,
+            detail=OAuthDiscoveryDetail.LOGIN_FORM_INVALID,
+        )
     if hidden_fields["encoded"] != "true" or not hidden_fields["SunQueryParamsString"]:
-        raise OAuthDiscoveryError("登录 form hidden input 无效", reason=AuthFailureReason.LOGIN_PAGE_CHANGED)
+        raise OAuthDiscoveryError(
+            "登录 form hidden input 无效",
+            reason=AuthFailureReason.LOGIN_PAGE_CHANGED,
+            detail=OAuthDiscoveryDetail.LOGIN_FORM_INVALID,
+        )
     _validate_hidden_goto(hidden_fields["goto"], expected_authorize_url)
 
     code_random_fields = soup.find_all("input", attrs={"id": "codeRandom"})
     if len(code_random_fields) != 1 or not code_random_fields[0].get("value"):
-        raise OAuthDiscoveryError("登录页缺少唯一随机参数", reason=AuthFailureReason.LOGIN_PAGE_CHANGED)
+        raise OAuthDiscoveryError(
+            "登录页缺少唯一随机参数",
+            reason=AuthFailureReason.LOGIN_PAGE_CHANGED,
+            detail=OAuthDiscoveryDetail.LOGIN_FORM_INVALID,
+        )
     code_random = str(code_random_fields[0].get("value"))
 
     captcha_images = soup.find_all("img", attrs={"id": "kaptchaImage"})
     if len(captcha_images) != 1 or not captcha_images[0].get("src"):
-        raise OAuthDiscoveryError("登录页缺少唯一验证码地址", reason=AuthFailureReason.LOGIN_PAGE_CHANGED)
+        raise OAuthDiscoveryError(
+            "登录页缺少唯一验证码地址",
+            reason=AuthFailureReason.LOGIN_PAGE_CHANGED,
+            detail=OAuthDiscoveryDetail.LOGIN_FORM_INVALID,
+        )
     captcha_url = urllib.parse.urljoin(page_url, str(captcha_images[0].get("src")))
     parsed_captcha = validate_trusted_swu_url(
         captcha_url,
@@ -380,7 +434,11 @@ def parse_login_form(
         expected_path="/am/validate.code",
     )
     if parsed_captcha.query:
-        raise OAuthDiscoveryError("验证码地址包含意外参数", reason=AuthFailureReason.LOGIN_PAGE_CHANGED)
+        raise OAuthDiscoveryError(
+            "验证码地址包含意外参数",
+            reason=AuthFailureReason.LOGIN_PAGE_CHANGED,
+            detail=OAuthDiscoveryDetail.LOGIN_FORM_INVALID,
+        )
 
     return OAuthFlow(
         login_page_url=page_url,
@@ -420,7 +478,7 @@ def discover_login_flow(session: Any, timeout: int = 10) -> OAuthFlow:
     response = session.get(cas_login_url, timeout=timeout, allow_redirects=False)
     if response.status_code != 200:
         response.raise_for_status()
-        raise OAuthDiscoveryError("CAS 登录页未返回成功响应")
+        raise OAuthDiscoveryError("CAS 登录页未返回成功响应", detail=OAuthDiscoveryDetail.UNEXPECTED_STATUS)
     federated_cas_login_url = _discover_federated_cas_login_url(cas_login_url, response.text)
 
     idm_authorize_url = _build_idm_authorize_url(federated_cas_login_url)
@@ -446,7 +504,7 @@ def discover_login_flow(session: Any, timeout: int = 10) -> OAuthFlow:
             )
         login_url = _resolve_legacy_idm_login_redirect(response)
         _validate_idm_login_url(login_url, idm_authorize_url)
-    raise OAuthDiscoveryError("IDM 登录页跳转次数超限")
+    raise OAuthDiscoveryError("IDM 登录页跳转次数超限", detail=OAuthDiscoveryDetail.REDIRECT_LOOP)
 
 
 def build_login_form_data(
@@ -473,19 +531,23 @@ def _validate_auth_chain_target(url: str) -> None:
     parsed = validate_trusted_swu_url(url)
     if parsed.hostname == "of.swu.edu.cn" and _TICKET_LANDING_RE.fullmatch(parsed.path):
         if parsed.query:
-            raise OAuthDiscoveryError("ticket landing 包含意外参数")
+            raise OAuthDiscoveryError("ticket landing 包含意外参数", detail=OAuthDiscoveryDetail.UNEXPECTED_URL)
         return
     if parsed.path not in _ALLOWED_AUTH_PATHS.get(parsed.hostname or "", frozenset()):
         raise OAuthDiscoveryError(
-            f"认证跳转路径不在阶段白名单内 (host={parsed.hostname or 'missing'}, path={parsed.path})"
+            f"认证跳转路径不在阶段白名单内 (host={parsed.hostname or 'missing'}, path={parsed.path})",
+            detail=OAuthDiscoveryDetail.UNEXPECTED_URL,
         )
     query = _unique_query(url)
     if parsed.hostname == "of.swu.edu.cn" and parsed.path.endswith("/resolve-cas-return"):
         if set(query) not in ({"next"}, {"next", "ticket"}) or ("ticket" in query and not query["ticket"]):
-            raise OAuthDiscoveryError(f"CAS service return 参数无效 (keys={sorted(query)})")
+            raise OAuthDiscoveryError(
+                f"CAS service return 参数无效 (keys={sorted(query)})",
+                detail=OAuthDiscoveryDetail.CAS_TICKET_INVALID,
+            )
         next_url = validate_trusted_swu_url(query["next"], expected_host="of.swu.edu.cn", expected_path="/")
         if next_url.query:
-            raise OAuthDiscoveryError("CAS service next 参数无效")
+            raise OAuthDiscoveryError("CAS service next 参数无效", detail=OAuthDiscoveryDetail.CAS_TICKET_INVALID)
 
 
 def _service_return_fragment_ticket(url: str) -> str | None:
@@ -604,11 +666,12 @@ def follow_trusted_auth_redirects(
                     f"认证跳转不可信 (scheme={parsed.scheme or 'missing'}, "
                     f"host={parsed.hostname or 'missing'}, path={path or 'missing'}, "
                     f"port={parsed_port or 'default'}, fragment_path={fragment.path if parsed.fragment else 'none'}, "
-                    f"fragment_keys={fragment_keys})"
+                    f"fragment_keys={fragment_keys})",
+                    detail=OAuthDiscoveryDetail.UNEXPECTED_URL,
                 ) from error
         _validate_auth_chain_target(target)
         response = session.get(target, timeout=timeout, allow_redirects=False)
-    raise OAuthDiscoveryError("认证跳转次数超限")
+    raise OAuthDiscoveryError("认证跳转次数超限", detail=OAuthDiscoveryDetail.REDIRECT_LOOP)
 
 
 def build_cas_callback_url(flow: OAuthFlow, transformed_ticket: str) -> str:

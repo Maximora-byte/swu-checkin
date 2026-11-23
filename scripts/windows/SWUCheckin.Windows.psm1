@@ -30,7 +30,8 @@ function Get-SWUCheckinTaskSpecs {
         Command = $PowerShellPath
         Arguments = $argument
         Triggers = @(
-            [pscustomobject]@{ Hour = 21; Minute = 15 },
+            [pscustomobject]@{ Hour = 21; Minute = 10 },
+            [pscustomobject]@{ Hour = 21; Minute = 29 },
             [pscustomobject]@{ Hour = 21; Minute = 45 }
         )
     }
@@ -83,8 +84,8 @@ function ConvertTo-SWUCheckinTaskXml {
         [DateTimeOffset]$Now = [DateTimeOffset]::UtcNow
     )
 
-    if (@($Spec.Triggers).Count -ne 2) {
-        throw "The scheduled task must contain exactly two triggers."
+    if (@($Spec.Triggers).Count -ne 3) {
+        throw "The scheduled task must contain exactly three triggers."
     }
     $triggerXml = foreach ($trigger in $Spec.Triggers) {
         $startBoundary = Get-SWUCheckinBeijingStartBoundary -Hour $trigger.Hour -Minute $trigger.Minute -Now $Now
